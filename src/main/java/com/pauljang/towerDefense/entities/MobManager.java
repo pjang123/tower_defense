@@ -31,10 +31,19 @@ public class MobManager {
     }
 
     public void spawnMob(EntityType type) {
-        spawnMob(type, 1.0, -1.0, 0.0, false, false);
+        spawnMob(type, 1.0, -1.0, 0.0, false, false, 15, 5);
     }
 
     public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
+        spawnMob(type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
+    }
+
+    public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
+        int xpReward = Math.max(1, goldReward / 3);
+        spawnMob(type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+    }
+
+    public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
         List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints();
         if (waypoints.isEmpty()) {
             plugin.getLogger().warning("Cannot spawn mob: No waypoints defined!");
@@ -46,6 +55,12 @@ public class MobManager {
         
         // Mark as a TD Mob so we can handle events (like sunlight burning)
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+
+        // Store gold reward amount in container
+        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, goldReward);
+
+        // Store xp reward amount in container
+        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, xpReward);
 
         // Prevent zombification for nether mobs in the overworld
         if (entity instanceof org.bukkit.entity.Piglin piglin) {
@@ -90,6 +105,14 @@ public class MobManager {
             org.bukkit.attribute.AttributeInstance armorAttr = entity.getAttribute(Attribute.ARMOR);
             if (armorAttr != null) {
                 armorAttr.setBaseValue(armor);
+            }
+        }
+
+        // Give Giant extra step height so it doesn't get stuck on 1-block steps
+        if (type == EntityType.GIANT) {
+            org.bukkit.attribute.AttributeInstance stepAttr = entity.getAttribute(Attribute.STEP_HEIGHT);
+            if (stepAttr != null) {
+                stepAttr.setBaseValue(1.5);
             }
         }
 
@@ -162,7 +185,24 @@ public class MobManager {
             if (finalTarget != null) {
                 // Periodically repath back to their offset spot if pushed away
                 if (currentTick % 10 == 0) {
-                    mob.getEntity().getPathfinder().moveTo(finalTarget, 1.0);
+                    if (mob.getEntity().getType() == EntityType.GIANT) {
+                        Location loc = mob.getEntity().getLocation();
+                        org.bukkit.util.Vector dir = finalTarget.clone().subtract(loc).toVector();
+                        if (dir.lengthSquared() > 0.01) {
+                            dir.setY(0);
+                            dir.normalize();
+                            float yaw = (float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ()));
+                            mob.getEntity().setRotation(yaw, 0.0f);
+                            double speed = 0.1;
+                            org.bukkit.attribute.AttributeInstance speedAttr = mob.getEntity().getAttribute(Attribute.MOVEMENT_SPEED);
+                            if (speedAttr != null) {
+                                speed = speedAttr.getValue();
+                            }
+                            mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
+                        }
+                    } else {
+                        mob.getEntity().getPathfinder().moveTo(finalTarget, 1.0);
+                    }
                 }
             }
 
@@ -197,14 +237,40 @@ public class MobManager {
             return;
         }
 
-        // Re-calculate pathing only when target waypoint index changes or periodically (every 5 ticks / 250ms)
-        if (mob.getCurrentWaypointIndex() != mob.getLastPathfindWaypointIndex() || currentTick % 5 == 0) {
-            mob.getEntity().getPathfinder().moveTo(target, 1.0);
-            mob.setLastPathfindWaypointIndex(mob.getCurrentWaypointIndex());
+        if (mob.getEntity().getType() == EntityType.GIANT) {
+            // Manually move the giant towards the target
+            Location loc = mob.getEntity().getLocation();
+            org.bukkit.util.Vector dir = target.clone().subtract(loc).toVector();
+            double distanceSq = dir.lengthSquared();
+
+            double speed = 0.1;
+            org.bukkit.attribute.AttributeInstance speedAttr = mob.getEntity().getAttribute(Attribute.MOVEMENT_SPEED);
+            if (speedAttr != null) {
+                speed = speedAttr.getValue();
+            }
+
+            if (distanceSq > 0.01) {
+                dir.setY(0);
+                dir.normalize();
+
+                // Update rotation smoothly
+                float yaw = (float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ()));
+                mob.getEntity().setRotation(yaw, 0.0f);
+
+                // Move towards target (maintain gravity)
+                mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
+            }
+        } else {
+            // Re-calculate pathing only when target waypoint index changes or periodically (every 5 ticks / 250ms)
+            if (mob.getCurrentWaypointIndex() != mob.getLastPathfindWaypointIndex() || currentTick % 5 == 0) {
+                mob.getEntity().getPathfinder().moveTo(target, 1.0);
+                mob.setLastPathfindWaypointIndex(mob.getCurrentWaypointIndex());
+            }
         }
 
         // Check if they are close enough to the waypoint to target the next one
-        if (mob.getEntity().getLocation().distanceSquared(target) < 1.5) {
+        double reachDistance = mob.getEntity().getType() == EntityType.GIANT ? 4.0 : 1.5;
+        if (mob.getEntity().getLocation().distanceSquared(target) < reachDistance) {
             mob.incrementWaypointIndex();
         }
     }
@@ -276,7 +342,7 @@ public class MobManager {
                     return;
                 }
                 PresetMobType preset = spawnList.get(index);
-                spawnMob(preset.getEntityType(), preset.getSpeed(), preset.getHealth(), preset.getArmor(), preset.isSlowImmune(), preset.isFireImmune());
+                spawnMob(preset.getEntityType(), preset.getSpeed(), preset.getHealth(), preset.getArmor(), preset.isSlowImmune(), preset.isFireImmune(), preset.getGoldReward(), preset.getXpReward());
                 index++;
             }
         }.runTaskTimer(plugin, 0L, 10L);
@@ -296,17 +362,19 @@ public class MobManager {
             gui.setItem(i, border);
         }
 
-        // Place spawn items (slots 10-15)
+        // Place spawn items (slots 10-14)
         gui.setItem(10, createMobGUIItem(PresetMobType.DEFAULT_ZOMBIE, queue.getOrDefault(PresetMobType.DEFAULT_ZOMBIE, 0)));
-        gui.setItem(11, createMobGUIItem(PresetMobType.SPEEDY_ZOMBIE, queue.getOrDefault(PresetMobType.SPEEDY_ZOMBIE, 0)));
-        gui.setItem(12, createMobGUIItem(PresetMobType.TANK_ZOMBIE, queue.getOrDefault(PresetMobType.TANK_ZOMBIE, 0)));
-        gui.setItem(13, createMobGUIItem(PresetMobType.FIRE_ZOMBIE, queue.getOrDefault(PresetMobType.FIRE_ZOMBIE, 0)));
-        gui.setItem(14, createMobGUIItem(PresetMobType.PIGLIN, queue.getOrDefault(PresetMobType.PIGLIN, 0)));
-        gui.setItem(15, createMobGUIItem(PresetMobType.HOGLIN, queue.getOrDefault(PresetMobType.HOGLIN, 0)));
+        gui.setItem(11, createMobGUIItem(PresetMobType.GIANT, queue.getOrDefault(PresetMobType.GIANT, 0)));
+        gui.setItem(12, createMobGUIItem(PresetMobType.FIRE_ZOMBIE, queue.getOrDefault(PresetMobType.FIRE_ZOMBIE, 0)));
+        gui.setItem(13, createMobGUIItem(PresetMobType.PIGLIN, queue.getOrDefault(PresetMobType.PIGLIN, 0)));
+        gui.setItem(14, createMobGUIItem(PresetMobType.HOGLIN, queue.getOrDefault(PresetMobType.HOGLIN, 0)));
 
         // Place control buttons (slots 21 and 23)
-        gui.setItem(21, createGUIItem(Material.RED_WOOL, ChatColor.RED + "Clear Queue", ChatColor.GRAY + "Reset all counts to 0."));
+        gui.setItem(21, createGUIItem(Material.RED_WOOL, ChatColor.RED + "Clear Queue", ChatColor.GRAY + "Reset all counts and refund Gold."));
         gui.setItem(23, createGUIItem(Material.LIME_WOOL, ChatColor.GREEN + "Send Wave", ChatColor.GRAY + "Spawn all queued mobs."));
+
+        // Player Upgrades Shortcut (slot 26)
+        gui.setItem(26, createGUIItem(Material.NETHER_STAR, ChatColor.GOLD + "Player Upgrades", ChatColor.GRAY + "Open weapons & upgrades screen."));
 
         player.openInventory(gui);
     }
@@ -321,6 +389,7 @@ public class MobManager {
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GREEN + "Left-Click" + ChatColor.GRAY + " to add +1 to queue.");
             lore.add(ChatColor.RED + "Right-Click" + ChatColor.GRAY + " to remove -1 from queue.");
+            lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + preset.getSpawnCost() + " Gold");
             lore.add(ChatColor.GOLD + "Queued Count: " + ChatColor.YELLOW + count);
             lore.add("");
             

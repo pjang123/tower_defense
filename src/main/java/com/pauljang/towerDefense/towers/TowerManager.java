@@ -9,6 +9,12 @@ import org.bukkit.entity.Mob;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.structure.Structure;
+import org.bukkit.util.BlockVector;
+import org.bukkit.block.structure.StructureRotation;
+import org.bukkit.block.structure.Mirror;
+import java.io.File;
+import java.util.Random;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,11 +42,47 @@ public class TowerManager {
         Location center = plugin.getPlotConfigManager().getPlotCenter(plotId);
         if (center == null) return;
 
-        // Place physical tower block
-        center.getBlock().setType(type.getBlockMaterial());
+        // Try loading NBT structure
+        File structureFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + ".nbt");
+        Structure structure = null;
+        if (structureFile.exists()) {
+            try {
+                structure = org.bukkit.Bukkit.getStructureManager().loadStructure(structureFile);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to load structure file: " + structureFile.getName() + " - " + e.getMessage());
+            }
+        }
+
+        Tower tower = new Tower(plotId, center, type);
+        double holoHeight = 4.2; // Default height for 3-block multiblock shifted 1 block up
+        
+        if (structure != null) {
+            BlockVector size = structure.getSize();
+            tower.setStructureSize(size);
+            
+            int sizeX = size.getBlockX();
+            int sizeY = size.getBlockY();
+            int sizeZ = size.getBlockZ();
+            
+            // Center the structure on the plot center coordinate, shifted 1 block up (keeps floor)
+            Location placementLoc = center.clone().subtract(sizeX / 2, 0, sizeZ / 2).add(0, 1, 0);
+            try {
+                structure.place(placementLoc, false, StructureRotation.NONE, Mirror.NONE, 0, 1.0f, new Random());
+            } catch (Exception e) {
+                plugin.getLogger().severe("Failed to place structure " + type.name() + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+            
+            holoHeight = sizeY + 1.2;
+        } else {
+            // Fallback to the 3-block-tall multiblock tower shifted 1 block up
+            center.clone().add(0, 1, 0).getBlock().setType(type.getBaseMaterial());
+            center.clone().add(0, 2, 0).getBlock().setType(type.getMiddleMaterial());
+            center.clone().add(0, 3, 0).getBlock().setType(type.getBlockMaterial());
+        }
 
         // Spawn holographic text using ArmorStand
-        Location holoLoc = center.clone().add(0, 1.2, 0);
+        Location holoLoc = center.clone().add(0, holoHeight, 0); // Positioned above the tower
         ArmorStand hologram = center.getWorld().spawn(holoLoc, ArmorStand.class, as -> {
             as.setVisible(false);
             as.setGravity(false);
@@ -49,7 +91,6 @@ public class TowerManager {
             as.setCustomNameVisible(true);
         });
 
-        Tower tower = new Tower(plotId, center, type);
         tower.setHologram(hologram);
         placedTowers.put(plotId, tower);
     }
@@ -57,8 +98,28 @@ public class TowerManager {
     public void removeTower(String plotId) {
         Tower tower = placedTowers.remove(plotId);
         if (tower != null) {
-            // Revert center block to grass/air or whatever default
-            tower.getCenterLocation().getBlock().setType(Material.GRASS_BLOCK);
+            Location center = tower.getCenterLocation();
+            if (tower.getStructureSize() != null) {
+                BlockVector size = tower.getStructureSize();
+                int sizeX = size.getBlockX();
+                int sizeY = size.getBlockY();
+                int sizeZ = size.getBlockZ();
+                // Clear the bounding box starting 1 block up
+                Location placementLoc = center.clone().subtract(sizeX / 2, 0, sizeZ / 2).add(0, 1, 0);
+                for (int dx = 0; dx < sizeX; dx++) {
+                    for (int dy = 0; dy < sizeY; dy++) {
+                        for (int dz = 0; dz < sizeZ; dz++) {
+                            Location blockLoc = placementLoc.clone().add(dx, dy, dz);
+                            blockLoc.getBlock().setType(Material.AIR);
+                        }
+                    }
+                }
+            } else {
+                // Revert all 3 tiers starting 1 block up (keeps floor)
+                center.clone().add(0, 1, 0).getBlock().setType(Material.AIR);
+                center.clone().add(0, 2, 0).getBlock().setType(Material.AIR);
+                center.clone().add(0, 3, 0).getBlock().setType(Material.AIR);
+            }
             
             // Clean up hologram ArmorStand
             if (tower.getHologram() != null && tower.getHologram().isValid()) {
@@ -125,7 +186,11 @@ public class TowerManager {
     }
 
     private void shootTarget(Tower tower, Mob target) {
-        Location start = tower.getCenterLocation().clone().add(0, 1.5, 0); // shoot from top of the block
+        double height = 2.5; // Default for 3-block multiblock
+        if (tower.getStructureSize() != null) {
+            height = tower.getStructureSize().getBlockY() - 0.5;
+        }
+        Location start = tower.getCenterLocation().clone().add(0, height, 0);
         Location end = target.getEyeLocation();
 
         // 1. Damage target

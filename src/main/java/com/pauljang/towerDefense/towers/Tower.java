@@ -2,6 +2,7 @@ package com.pauljang.towerDefense.towers;
 
 import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.util.BlockVector;
 
 public class Tower {
     private final String plotId;
@@ -10,6 +11,7 @@ public class Tower {
     private int level = 1;
     private long lastAttackTick = 0;
     private ArmorStand hologram = null;
+    private BlockVector structureSize = null;
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
         this.plotId = plotId;
@@ -29,4 +31,7 @@ public class Tower {
     
     public ArmorStand getHologram() { return hologram; }
     public void setHologram(ArmorStand hologram) { this.hologram = hologram; }
+
+    public BlockVector getStructureSize() { return structureSize; }
+    public void setStructureSize(BlockVector structureSize) { this.structureSize = structureSize; }
 }

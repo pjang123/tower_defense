@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode|waypointmode|wand|clearwaypoints|spawnmob|gui>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode|waypointmode|wand|clearwaypoints|spawnmob|gui|upgrades>");
             return true;
         }
 
@@ -50,6 +50,9 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints " + ChatColor.WHITE + "- Wipe all waypoints");
                 player.sendMessage(ChatColor.YELLOW + "/td spawnmob [type] [speed] [health] [armor] [slowImmune] [fireImmune] " + ChatColor.WHITE + "- Spawn a custom test mob");
                 player.sendMessage(ChatColor.YELLOW + "/td gui " + ChatColor.WHITE + "- Open the Mob Spawner GUI");
+                player.sendMessage(ChatColor.YELLOW + "/td upgrades " + ChatColor.WHITE + "- Open the Player Upgrades GUI");
+                player.sendMessage(ChatColor.YELLOW + "/td givegold [amount] " + ChatColor.WHITE + "- Give yourself gold (Admin)");
+                player.sendMessage(ChatColor.YELLOW + "/td givexp [amount] " + ChatColor.WHITE + "- Give yourself EXP (Admin)");
                 break;
 
             case "gui":
@@ -162,6 +165,43 @@ public class TDCommand implements CommandExecutor {
             case "clearwaypoints":
                 plugin.getWaypointConfigManager().clearAllWaypoints();
                 player.sendMessage(ChatColor.RED + "All waypoints have been wiped from memory!");
+                break;
+
+            case "upgrades":
+                gameManager.openUpgradesGUI(player);
+                break;
+
+            case "givegold":
+                if (!player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP to use testing/admin commands.");
+                    break;
+                }
+                int goldAmount = 1000;
+                if (args.length > 1) {
+                    try {
+                        goldAmount = Integer.parseInt(args[1]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(ChatColor.RED + "Invalid gold amount! Defaulting to 1000.");
+                    }
+                }
+                gameManager.addGold(player.getUniqueId(), goldAmount);
+                player.sendMessage(ChatColor.GREEN + "Gave yourself " + goldAmount + " Gold!");
+                break;
+
+            case "givexp":
+                if (!player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP to use testing/admin commands.");
+                    break;
+                }
+                int xpAmount = 100;
+                if (args.length > 1) {
+                    try {
+                        xpAmount = Integer.parseInt(args[1]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(ChatColor.RED + "Invalid EXP amount! Defaulting to 100.");
+                    }
+                }
+                gameManager.addExp(player.getUniqueId(), xpAmount);
                 break;
 
             default:

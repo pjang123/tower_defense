@@ -165,9 +165,9 @@ public class WandListener implements Listener {
         org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 9, ChatColor.DARK_BLUE + "Buy Tower: " + plotId);
 
         // Shop items
-        gui.setItem(1, createGUIItem(Material.DISPENSER, ChatColor.GREEN + "Archer Tower", ChatColor.GRAY + "Range: 5.0 | Damage: 1.5", ChatColor.GRAY + "Shoots single targets fast."));
-        gui.setItem(3, createGUIItem(Material.REDSTONE_LAMP, ChatColor.RED + "Mage Tower", ChatColor.GRAY + "Range: 4.0 | Damage: 3.0", ChatColor.GRAY + "Slow but deals heavy magic damage."));
-        gui.setItem(5, createGUIItem(Material.PACKED_ICE, ChatColor.AQUA + "Frost Tower", ChatColor.GRAY + "Range: 5.0 | Damage: 0.5", ChatColor.GRAY + "Deals light damage and slows enemies."));
+        gui.setItem(1, createGUIItem(Material.DISPENSER, ChatColor.GREEN + "Archer Tower", ChatColor.GRAY + "Range: 15.0 | Damage: 1.5", ChatColor.GRAY + "Shoots single targets fast.", ChatColor.GOLD + "Cost: " + com.pauljang.towerDefense.towers.TowerType.ARCHER.getCost() + " Gold"));
+        gui.setItem(3, createGUIItem(Material.REDSTONE_LAMP, ChatColor.RED + "Mage Tower", ChatColor.GRAY + "Range: 12.0 | Damage: 3.0", ChatColor.GRAY + "Slow but deals heavy magic damage.", ChatColor.GOLD + "Cost: " + com.pauljang.towerDefense.towers.TowerType.MAGE.getCost() + " Gold"));
+        gui.setItem(5, createGUIItem(Material.PACKED_ICE, ChatColor.AQUA + "Frost Tower", ChatColor.GRAY + "Range: 15.0 | Damage: 0.5", ChatColor.GRAY + "Deals light damage and slows enemies.", ChatColor.GOLD + "Cost: " + com.pauljang.towerDefense.towers.TowerType.FROST.getCost() + " Gold"));
 
         if (plugin.getTowerManager().hasTower(plotId)) {
             gui.setItem(8, createGUIItem(Material.BARRIER, ChatColor.RED + "Demolish Tower", ChatColor.GRAY + "Removes the tower from this plot."));
