@@ -10,6 +10,7 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.ArmorStand;
 
 public class GameManager {
 
@@ -20,6 +21,7 @@ public class GameManager {
     private final java.util.Map<String, Integer> arenaHealth = new java.util.HashMap<>();
     private final java.util.Map<String, java.util.Map<String, Long>> activeSpells = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.Location, org.bukkit.Material> originalFloorBlocks = new java.util.HashMap<>();
+    private final java.util.Map<String, ArmorStand> castleHolograms = new java.util.HashMap<>();
     private BossBar castleBossBar = null;
 
     private java.util.UUID pendingChallenger = null;
@@ -89,6 +91,7 @@ public class GameManager {
 
     private void handleLobbySetup() {
         cleanupBossBar();
+        cleanupCastleHolograms();
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
     }
@@ -108,6 +111,8 @@ public class GameManager {
         if (!arenaHealth.containsKey("1")) arenaHealth.put("1", maxCastleHealth);
         if (!arenaHealth.containsKey("2")) arenaHealth.put("2", maxCastleHealth);
         showBossBar();
+        updateCastleHologram("1");
+        updateCastleHologram("2");
         Bukkit.broadcastMessage(ChatColor.GREEN + "[Tower Defense] The game has begun! Defend your castles!");
         for (Player player : Bukkit.getOnlinePlayers()) {
             giveStarterWeapons(player);
@@ -117,6 +122,7 @@ public class GameManager {
 
     private void handleGameEnd() {
         cleanupBossBar();
+        cleanupCastleHolograms();
         plugin.getMobManager().cleanup();
         plugin.getTowerManager().cleanup();
         cleanupSpells();
@@ -194,6 +200,7 @@ public class GameManager {
         int updated = Math.max(0, current - amount);
         arenaHealth.put(arena, updated);
         updateBossBar();
+        updateCastleHologram(arena);
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
@@ -241,6 +248,68 @@ public class GameManager {
             castleBossBar.removeAll();
             castleBossBar = null;
         }
+    }
+
+    public void updateCastleHologram(String arena) {
+        ArmorStand stand = castleHolograms.get(arena);
+        if (stand == null || !stand.isValid()) {
+            if (currentState == GameState.ACTIVE || currentState == GameState.STARTING) {
+                java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+                if (!waypoints.isEmpty()) {
+                    Location lastWp = waypoints.get(waypoints.size() - 1);
+                    Location spawnLoc = lastWp.clone().add(0, 3.0, 0);
+                    stand = spawnLoc.getWorld().spawn(spawnLoc, ArmorStand.class, as -> {
+                        as.setVisible(false);
+                        as.setGravity(false);
+                        as.setMarker(true);
+                        as.setCustomName("");
+                        as.setCustomNameVisible(true);
+                    });
+                    castleHolograms.put(arena, stand);
+                }
+            }
+        }
+
+        if (stand != null && stand.isValid()) {
+            int health = arenaHealth.getOrDefault(arena, maxCastleHealth);
+            double ratio = (double) health / maxCastleHealth;
+            int totalBars = 20;
+            int greenBars = (int) Math.round(ratio * totalBars);
+            int grayBars = totalBars - greenBars;
+
+            ChatColor color;
+            if (ratio >= 0.6) {
+                color = ChatColor.GREEN;
+            } else if (ratio >= 0.25) {
+                color = ChatColor.YELLOW;
+            } else {
+                color = ChatColor.RED;
+            }
+
+            StringBuilder bar = new StringBuilder();
+            bar.append(ChatColor.GOLD).append(ChatColor.BOLD).append("CASTLE HP: ");
+            bar.append(color);
+            for (int i = 0; i < greenBars; i++) {
+                bar.append("■");
+            }
+            bar.append(ChatColor.GRAY);
+            for (int i = 0; i < grayBars; i++) {
+                bar.append("■");
+            }
+            bar.append(ChatColor.GRAY).append(" (").append(health).append("/").append(maxCastleHealth).append(")");
+
+            stand.setCustomName(bar.toString());
+            stand.setCustomNameVisible(true);
+        }
+    }
+
+    public void cleanupCastleHolograms() {
+        for (ArmorStand stand : castleHolograms.values()) {
+            if (stand != null && stand.isValid()) {
+                stand.remove();
+            }
+        }
+        castleHolograms.clear();
     }
 
     // --- Active Spells and Matchmaking Systems ---
@@ -401,6 +470,7 @@ public class GameManager {
         plugin.getMobManager().cleanup();
         plugin.getTowerManager().cleanup();
         cleanupSpells();
+        cleanupCastleHolograms();
 
         // Teleport
         teleportToArenaStart(p1, "1");
