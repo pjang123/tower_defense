@@ -1,6 +1,12 @@
-name: Tower Defense
-version: '${version}'
-
+name: Tower_Defense
+version: '0.1-Snapshot'
 main: com.pauljang.towerDefense.TowerDefense
 api-version: '26.1.2'
 load: POSTWORLD
+description: pp
+
+commands:
+  td:
+      description: Main command for Tower Defense
+      permission: towerdefense.admin
+      usage: /td [start/stop/status]
