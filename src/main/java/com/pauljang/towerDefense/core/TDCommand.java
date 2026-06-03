@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|setarena [player] [arena]>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]>");
             return true;
         }
 
@@ -51,6 +51,7 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td spawnmob [type] [speed] [health] [armor] [slowImmune] [fireImmune] " + ChatColor.WHITE + "- Spawn a custom test mob");
                 player.sendMessage(ChatColor.YELLOW + "/td gui " + ChatColor.WHITE + "- Open the Mob Spawner GUI");
                 player.sendMessage(ChatColor.YELLOW + "/td upgrades " + ChatColor.WHITE + "- Open the Player Upgrades GUI");
+                player.sendMessage(ChatColor.YELLOW + "/td giveitems " + ChatColor.WHITE + "- Give yourself the GUI opening menu hotbar items");
                 player.sendMessage(ChatColor.YELLOW + "/td givegold [amount] " + ChatColor.WHITE + "- Give yourself gold (Admin)");
                 player.sendMessage(ChatColor.YELLOW + "/td givexp [amount] " + ChatColor.WHITE + "- Give yourself EXP (Admin)");
                 player.sendMessage(ChatColor.YELLOW + "/td setarena [player] [arena] " + ChatColor.WHITE + "- Set player's assigned arena (Admin)");
@@ -184,6 +185,31 @@ public class TDCommand implements CommandExecutor {
 
             case "upgrades":
                 gameManager.openUpgradesGUI(player);
+                break;
+
+            case "giveitems":
+            case "menuitems":
+                // Give Mob Spawner Menu Item in slot 7
+                org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
+                org.bukkit.inventory.meta.ItemMeta spawnerMeta = spawnerItem.getItemMeta();
+                if (spawnerMeta != null) {
+                    spawnerMeta.setDisplayName(ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Mob Spawner Menu");
+                    spawnerMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Mob Spawner GUI."));
+                    spawnerItem.setItemMeta(spawnerMeta);
+                }
+                player.getInventory().setItem(7, spawnerItem);
+
+                // Give Player Upgrades Menu Item in slot 8
+                org.bukkit.inventory.ItemStack upgradeItem = new org.bukkit.inventory.ItemStack(Material.EMERALD);
+                org.bukkit.inventory.meta.ItemMeta upgradeMeta = upgradeItem.getItemMeta();
+                if (upgradeMeta != null) {
+                    upgradeMeta.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Player Upgrades Menu");
+                    upgradeMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Player Upgrades GUI."));
+                    upgradeItem.setItemMeta(upgradeMeta);
+                }
+                player.getInventory().setItem(8, upgradeItem);
+
+                player.sendMessage(ChatColor.GREEN + "Gave you the GUI opening hotbar items in slots 7 and 8!");
                 break;
 
             case "givegold":

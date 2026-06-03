@@ -329,6 +329,26 @@ public class GameManager {
         if (!player.getInventory().contains(Material.ARROW)) {
             player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.ARROW));
         }
+
+        // Give Mob Spawner Menu Item in slot 7 (index 7)
+        org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
+        org.bukkit.inventory.meta.ItemMeta spawnerMeta = spawnerItem.getItemMeta();
+        if (spawnerMeta != null) {
+            spawnerMeta.setDisplayName(ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Mob Spawner Menu");
+            spawnerMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Mob Spawner GUI."));
+            spawnerItem.setItemMeta(spawnerMeta);
+        }
+        player.getInventory().setItem(7, spawnerItem);
+
+        // Give Player Upgrades Menu Item in slot 8 (index 8)
+        org.bukkit.inventory.ItemStack upgradeItem = new org.bukkit.inventory.ItemStack(Material.EMERALD);
+        org.bukkit.inventory.meta.ItemMeta upgradeMeta = upgradeItem.getItemMeta();
+        if (upgradeMeta != null) {
+            upgradeMeta.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Player Upgrades Menu");
+            upgradeMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Player Upgrades GUI."));
+            upgradeItem.setItemMeta(upgradeMeta);
+        }
+        player.getInventory().setItem(8, upgradeItem);
     }
 
     private void replaceItemInInventory(Player player, Material newMat, String type) {

@@ -184,12 +184,24 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        org.bukkit.inventory.ItemStack clickedItem = event.getCurrentItem();
+        if (clickedItem != null && clickedItem.hasItemMeta()) {
+            org.bukkit.inventory.meta.ItemMeta meta = clickedItem.getItemMeta();
+            if (meta != null && meta.hasDisplayName()) {
+                String name = meta.getDisplayName();
+                if (name.equals(org.bukkit.ChatColor.LIGHT_PURPLE + "" + org.bukkit.ChatColor.BOLD + "Mob Spawner Menu") ||
+                    name.equals(org.bukkit.ChatColor.GOLD + "" + org.bukkit.ChatColor.BOLD + "Player Upgrades Menu")) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+
         String title = event.getView().getTitle();
         if (title.equals(org.bukkit.ChatColor.DARK_RED + "TD Mob Spawner")) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 
-            org.bukkit.inventory.ItemStack clickedItem = event.getCurrentItem();
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             int slot = event.getRawSlot();
@@ -251,67 +263,94 @@ public class MobListener implements Listener {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 
-            org.bukkit.inventory.ItemStack clickedItem = event.getCurrentItem();
+            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+
+            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ").length());
+            int slot = event.getRawSlot();
+
+            com.pauljang.towerDefense.towers.TowerType type = null;
+            switch (slot) {
+                case 11 -> type = com.pauljang.towerDefense.towers.TowerType.ARCHER;
+                case 13 -> type = com.pauljang.towerDefense.towers.TowerType.MAGE;
+                case 15 -> type = com.pauljang.towerDefense.towers.TowerType.FROST;
+            }
+
+            if (type != null) {
+                int cost = type.getCost();
+                if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
+                    plugin.getTowerManager().placeTower(plotId, type);
+                    player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName() + " on plot " + plotId + "!");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
+                    player.closeInventory();
+                } else {
+                    player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                }
+            }
+        } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Manage Tower: ")) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             // Extract plot ID from title
-            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ").length());
-            String plotArena = plugin.getPlotConfigManager().getPlotArena(plotId);
-            String playerArena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
-            if (!plotArena.equals(playerArena)) {
-                player.sendMessage(org.bukkit.ChatColor.RED + "You cannot buy towers on the opponent's plots!");
-                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Manage Tower: ").length());
+            com.pauljang.towerDefense.towers.Tower tower = plugin.getTowerManager().getTower(plotId);
+            if (tower == null) {
                 player.closeInventory();
                 return;
             }
-            int slot = event.getRawSlot();
 
+            int slot = event.getRawSlot();
             switch (slot) {
-                case 1 -> { // Archer Tower
-                    int cost = com.pauljang.towerDefense.towers.TowerType.ARCHER.getCost();
-                    if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
-                        plugin.getTowerManager().placeTower(plotId, com.pauljang.towerDefense.towers.TowerType.ARCHER);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed Archer Tower on plot " + plotId);
-                    } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough gold! Requires " + cost + " Gold.");
+                case 22 -> { // Upgrade Tower
+                    int cost = tower.getUpgradeCost();
+                    if (cost == -1) {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Tower is already at the maximum level!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                         return;
                     }
-                }
-                case 3 -> { // Mage Tower
-                    int cost = com.pauljang.towerDefense.towers.TowerType.MAGE.getCost();
                     if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
-                        plugin.getTowerManager().placeTower(plotId, com.pauljang.towerDefense.towers.TowerType.MAGE);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed Mage Tower on plot " + plotId);
+                        tower.incrementLevel();
+                        plugin.getTowerManager().updateHologram(tower);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Upgraded Tower to Level " + tower.getLevel() + "!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                        // Refresh GUI
+                        plugin.getTowerManager().openManageTowerGUI(player, plotId);
                     } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough gold! Requires " + cost + " Gold.");
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
-                        return;
                     }
                 }
-                case 5 -> { // Frost Tower
-                    int cost = com.pauljang.towerDefense.towers.TowerType.FROST.getCost();
-                    if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
-                        plugin.getTowerManager().placeTower(plotId, com.pauljang.towerDefense.towers.TowerType.FROST);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed Frost Tower on plot " + plotId);
-                    } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough gold! Requires " + cost + " Gold.");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
-                        return;
+                case 31 -> { // Cycle Targeting Mode
+                    com.pauljang.towerDefense.towers.TargetingMode current = tower.getTargetingMode();
+                    com.pauljang.towerDefense.towers.TargetingMode next = com.pauljang.towerDefense.towers.TargetingMode.FIRST;
+                    switch (current) {
+                        case FIRST: next = com.pauljang.towerDefense.towers.TargetingMode.LAST; break;
+                        case LAST: next = com.pauljang.towerDefense.towers.TargetingMode.STRONG; break;
+                        case STRONG: next = com.pauljang.towerDefense.towers.TargetingMode.WEAK; break;
+                        case WEAK: next = com.pauljang.towerDefense.towers.TargetingMode.CLOSE; break;
+                        case CLOSE: next = com.pauljang.towerDefense.towers.TargetingMode.FIRST; break;
                     }
+                    tower.setTargetingMode(next);
+                    plugin.getTowerManager().updateHologram(tower);
+                    player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.6f, 1.2f);
+                    // Refresh GUI
+                    plugin.getTowerManager().openManageTowerGUI(player, plotId);
                 }
-                case 8 -> { // Demolish Tower
+                case 40 -> { // Destroy Tower
+                    int refund = tower.getTotalValue() / 2;
                     plugin.getTowerManager().removeTower(plotId);
-                    player.sendMessage(org.bukkit.ChatColor.RED + "Demolished Tower on plot " + plotId);
+                    plugin.getGameManager().addGold(player.getUniqueId(), refund);
+                    player.closeInventory();
+                    player.sendMessage(org.bukkit.ChatColor.RED + "Demolished Tower on plot " + plotId + "! Refunded " + refund + " Gold.");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_BREAK, 0.8f, 1.0f);
                 }
             }
-            player.closeInventory();
-            player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
         } else if (title.equals(org.bukkit.ChatColor.DARK_BLUE + "Player Upgrades")) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 
-            org.bukkit.inventory.ItemStack clickedItem = event.getCurrentItem();
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             int slot = event.getRawSlot();
@@ -476,6 +515,44 @@ public class MobListener implements Listener {
             org.bukkit.Material type = event.getItem().getType();
             if (type == org.bukkit.Material.BOW || type == org.bukkit.Material.CROSSBOW || type.name().endsWith("_SWORD")) {
                 event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerInteract(org.bukkit.event.player.PlayerInteractEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
+        org.bukkit.inventory.ItemStack item = event.getItem();
+        if (item == null || !item.hasItemMeta()) return;
+
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()) return;
+
+        String displayName = meta.getDisplayName();
+        if (displayName.equals(org.bukkit.ChatColor.LIGHT_PURPLE + "" + org.bukkit.ChatColor.BOLD + "Mob Spawner Menu")) {
+            event.setCancelled(true);
+            if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+                plugin.getMobManager().openMobSpawnerGUI(player);
+            }
+        } else if (displayName.equals(org.bukkit.ChatColor.GOLD + "" + org.bukkit.ChatColor.BOLD + "Player Upgrades Menu")) {
+            event.setCancelled(true);
+            if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+                plugin.getGameManager().openUpgradesGUI(player);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerDropItem(org.bukkit.event.player.PlayerDropItemEvent event) {
+        org.bukkit.inventory.ItemStack item = event.getItemDrop().getItemStack();
+        if (item.hasItemMeta()) {
+            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+            if (meta != null && meta.hasDisplayName()) {
+                String name = meta.getDisplayName();
+                if (name.equals(org.bukkit.ChatColor.LIGHT_PURPLE + "" + org.bukkit.ChatColor.BOLD + "Mob Spawner Menu") ||
+                    name.equals(org.bukkit.ChatColor.GOLD + "" + org.bukkit.ChatColor.BOLD + "Player Upgrades Menu")) {
+                    event.setCancelled(true);
+                }
             }
         }
     }

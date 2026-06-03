@@ -55,12 +55,14 @@ Consumable splash potions purchased in exchange for experience points.
 
 ---
 
-## 3. Tower Type Balances
+## 3. Tower Progression Balances
 
-Towers are placed as centered 3-block-tall multiblock structures on plots:
+Towers are placed as centered 3-block-tall multiblock structures on plots. Players build a basic level 1 tower for **100 Gold** and can upgrade it up to Level 5.
 
-| Tower Type | Base Material | Middle Material | Weapon Block | Purchase Cost | Attack Range | Base Damage | Attack Rate (Cooldown) | Special Effects |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Archer Tower** | `COBBLESTONE` | `OAK_FENCE` | `DISPENSER` | 100 Gold | 15.0 blocks | 1.5 HP | 1.0s (20 ticks) | Shoots single targets fast |
-| **Mage Tower** | `POLISHED_BLACKSTONE` | `NETHER_BRICK_FENCE` | `REDSTONE_LAMP` | 175 Gold | 12.0 blocks | 3.0 HP | 1.5s (30 ticks) | Deals heavy magical fire damage |
-| **Frost Tower** | `SNOW_BLOCK` | `SPRUCE_FENCE` | `PACKED_ICE` | 125 Gold | 15.0 blocks | 0.5 HP | 1.0s (20 ticks) | Applies Slowness II (2s) |
+| Level | Upgrade Cost | Attack Range | Attack Damage | Attack Speed (Cooldown) | Special Effects |
+| :---: | :---: | :---: | :---: | :---: | :--- |
+| **1** | — (Base) | 15.0 blocks | 1.5 HP | 1.0s (20 ticks) | Basic single target attack (Crit particles) |
+| **2** | 150 Gold | 16.5 blocks | 3.0 HP | 0.9s (18 ticks) | Increased damage & range |
+| **3** | 300 Gold | 18.0 blocks | 4.5 HP | 0.8s (16 ticks) | **Frost Shot**: Applies Slowness II (2s) on hit (Snowflake particles) |
+| **4** | 500 Gold | 19.5 blocks | 6.0 HP | 0.7s (14 ticks) | **Flame Shot**: Heavy damage attack (Flame particles, blaze shoot sound) |
+| **5** | 800 Gold | 21.0 blocks | 7.5 HP | 0.6s (12 ticks) | **Max Level**: Rapid fire flame attack |
