@@ -1,22 +1,29 @@
 package com.pauljang.towerDefense.entities;
 
 import com.pauljang.towerDefense.TowerDefense;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class MobManager {
 
     private final TowerDefense plugin;
     private final List<TDMob> activeMobs = new ArrayList<>();
+    private final Map<UUID, Map<PresetMobType, Integer>> playerQueues = new HashMap<>();
 
     public MobManager(TowerDefense plugin) {
         this.plugin = plugin;
@@ -207,5 +214,137 @@ public class MobManager {
             mob.getEntity().remove();
         }
         activeMobs.clear();
+    }
+
+    public List<TDMob> getActiveMobs() {
+        return activeMobs;
+    }
+
+    // --- GUI & Queue System ---
+
+    public Map<PresetMobType, Integer> getQueue(UUID uuid) {
+        return playerQueues.computeIfAbsent(uuid, k -> {
+            Map<PresetMobType, Integer> map = new HashMap<>();
+            for (PresetMobType type : PresetMobType.values()) {
+                map.put(type, 0);
+            }
+            return map;
+        });
+    }
+
+    public void addToQueue(UUID uuid, PresetMobType type) {
+        Map<PresetMobType, Integer> queue = getQueue(uuid);
+        queue.put(type, queue.getOrDefault(type, 0) + 1);
+    }
+
+    public void removeFromQueue(UUID uuid, PresetMobType type) {
+        Map<PresetMobType, Integer> queue = getQueue(uuid);
+        int current = queue.getOrDefault(type, 0);
+        if (current > 0) {
+            queue.put(type, current - 1);
+        }
+    }
+
+    public void clearQueue(UUID uuid) {
+        Map<PresetMobType, Integer> queue = getQueue(uuid);
+        for (PresetMobType type : PresetMobType.values()) {
+            queue.put(type, 0);
+        }
+    }
+
+    public void sendQueue(UUID uuid) {
+        Map<PresetMobType, Integer> queue = playerQueues.get(uuid);
+        if (queue == null || queue.isEmpty()) return;
+
+        List<PresetMobType> spawnList = new ArrayList<>();
+        for (Map.Entry<PresetMobType, Integer> entry : queue.entrySet()) {
+            for (int i = 0; i < entry.getValue(); i++) {
+                spawnList.add(entry.getKey());
+            }
+        }
+
+        if (spawnList.isEmpty()) return;
+
+        // Spawn mobs spaced 10 ticks (0.5s) apart
+        new BukkitRunnable() {
+            int index = 0;
+
+            @Override
+            public void run() {
+                if (index >= spawnList.size()) {
+                    cancel();
+                    return;
+                }
+                PresetMobType preset = spawnList.get(index);
+                spawnMob(preset.getEntityType(), preset.getSpeed(), preset.getHealth(), preset.getArmor(), preset.isSlowImmune(), preset.isFireImmune());
+                index++;
+            }
+        }.runTaskTimer(plugin, 0L, 10L);
+
+        // Reset the player's queue after spawning
+        clearQueue(uuid);
+    }
+
+    public void openMobSpawnerGUI(Player player) {
+        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 27, ChatColor.DARK_RED + "TD Mob Spawner");
+
+        Map<PresetMobType, Integer> queue = getQueue(player.getUniqueId());
+
+        // Fill background with gray stained glass panes
+        org.bukkit.inventory.ItemStack border = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < 27; i++) {
+            gui.setItem(i, border);
+        }
+
+        // Place spawn items (slots 10-15)
+        gui.setItem(10, createMobGUIItem(PresetMobType.DEFAULT_ZOMBIE, queue.getOrDefault(PresetMobType.DEFAULT_ZOMBIE, 0)));
+        gui.setItem(11, createMobGUIItem(PresetMobType.SPEEDY_ZOMBIE, queue.getOrDefault(PresetMobType.SPEEDY_ZOMBIE, 0)));
+        gui.setItem(12, createMobGUIItem(PresetMobType.TANK_ZOMBIE, queue.getOrDefault(PresetMobType.TANK_ZOMBIE, 0)));
+        gui.setItem(13, createMobGUIItem(PresetMobType.FIRE_ZOMBIE, queue.getOrDefault(PresetMobType.FIRE_ZOMBIE, 0)));
+        gui.setItem(14, createMobGUIItem(PresetMobType.PIGLIN, queue.getOrDefault(PresetMobType.PIGLIN, 0)));
+        gui.setItem(15, createMobGUIItem(PresetMobType.HOGLIN, queue.getOrDefault(PresetMobType.HOGLIN, 0)));
+
+        // Place control buttons (slots 21 and 23)
+        gui.setItem(21, createGUIItem(Material.RED_WOOL, ChatColor.RED + "Clear Queue", ChatColor.GRAY + "Reset all counts to 0."));
+        gui.setItem(23, createGUIItem(Material.LIME_WOOL, ChatColor.GREEN + "Send Wave", ChatColor.GRAY + "Spawn all queued mobs."));
+
+        player.openInventory(gui);
+    }
+
+    private org.bukkit.inventory.ItemStack createMobGUIItem(PresetMobType preset, int count) {
+        int amount = Math.max(1, count);
+        org.bukkit.inventory.ItemStack item = new org.bukkit.inventory.ItemStack(preset.getMaterial(), amount);
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(preset.getColor() + preset.getDisplayName());
+            
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GREEN + "Left-Click" + ChatColor.GRAY + " to add +1 to queue.");
+            lore.add(ChatColor.RED + "Right-Click" + ChatColor.GRAY + " to remove -1 from queue.");
+            lore.add(ChatColor.GOLD + "Queued Count: " + ChatColor.YELLOW + count);
+            lore.add("");
+            
+            lore.add(ChatColor.DARK_GRAY + "Stats:");
+            lore.add(ChatColor.DARK_GRAY + " - Speed: " + preset.getSpeed() + "x");
+            lore.add(ChatColor.DARK_GRAY + " - HP: " + (preset.getHealth() > 0 ? preset.getHealth() : "Default"));
+            lore.add(ChatColor.DARK_GRAY + " - Armor: " + preset.getArmor());
+            if (preset.isSlowImmune()) lore.add(ChatColor.AQUA + " * Immune to Slow");
+            if (preset.isFireImmune()) lore.add(ChatColor.RED + " * Immune to Fire");
+
+            meta.setLore(lore);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private org.bukkit.inventory.ItemStack createGUIItem(Material material, String name, String... lore) {
+        org.bukkit.inventory.ItemStack item = new org.bukkit.inventory.ItemStack(material);
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(java.util.Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 }

@@ -93,6 +93,64 @@ public class PlotConfigManager {
         return false;
     }
 
+    public String getPlotAt(Location loc) {
+        if (config.getConfigurationSection("plots") == null) return null;
+
+        String worldName = loc.getWorld().getName();
+        int x = loc.getBlockX();
+        int y = loc.getBlockY();
+        int z = loc.getBlockZ();
+
+        for (String plotId : config.getConfigurationSection("plots").getKeys(false)) {
+            String path = "plots." + plotId + ".";
+
+            String savedWorld = config.getString(path + "pos1.world");
+            if (!worldName.equals(savedWorld)) continue;
+
+            int x1 = config.getInt(path + "pos1.x");
+            int y1 = config.getInt(path + "pos1.y");
+            int z1 = config.getInt(path + "pos1.z");
+
+            int x2 = config.getInt(path + "pos2.x");
+            int y2 = config.getInt(path + "pos2.y");
+            int z2 = config.getInt(path + "pos2.z");
+
+            int minX = Math.min(x1, x2);
+            int maxX = Math.max(x1, x2);
+            int minY = Math.min(y1, y2) - 1;
+            int maxY = Math.max(y1, y2) + 3;
+            int minZ = Math.min(z1, z2);
+            int maxZ = Math.max(z1, z2);
+
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ) {
+                return plotId;
+            }
+        }
+        return null;
+    }
+
+    public Location getPlotCenter(String plotId) {
+        String path = "plots." + plotId + ".";
+        if (config.getConfigurationSection("plots") == null || !config.contains(path)) return null;
+
+        String worldName = config.getString(path + "pos1.world");
+        int x1 = config.getInt(path + "pos1.x");
+        int y1 = config.getInt(path + "pos1.y");
+        int z1 = config.getInt(path + "pos1.z");
+
+        int x2 = config.getInt(path + "pos2.x");
+        int z2 = config.getInt(path + "pos2.z");
+
+        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+        if (world == null) return null;
+
+        double centerX = (x1 + x2) / 2.0 + 0.5;
+        double centerY = y1;
+        double centerZ = (z1 + z2) / 2.0 + 0.5;
+
+        return new Location(world, centerX, centerY, centerZ);
+    }
+
     private void saveFile() {
         try {
             config.save(file);

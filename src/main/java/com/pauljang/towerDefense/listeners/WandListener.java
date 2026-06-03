@@ -136,4 +136,55 @@ public class WandListener implements Listener {
             player.sendMessage(ChatColor.RED + "You must type /td saveplot before selecting corners!");
         }
     }
+
+    @EventHandler
+    public void onPlayerPlaceTower(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getClickedBlock() == null) return;
+
+        // If they are holding the wand, skip placement triggers
+        ItemStack item = event.getItem();
+        if (item != null && item.getType() == Material.BLAZE_ROD && item.hasItemMeta()) {
+            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+            if (meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("TD Setup Wand")) {
+                return;
+            }
+        }
+
+        Location clickedLoc = event.getClickedBlock().getLocation();
+        String plotId = plugin.getPlotConfigManager().getPlotAt(clickedLoc);
+
+        if (plotId != null) {
+            event.setCancelled(true);
+            openTowerShopGUI(player, plotId);
+        }
+    }
+
+    private void openTowerShopGUI(Player player, String plotId) {
+        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 9, ChatColor.DARK_BLUE + "Buy Tower: " + plotId);
+
+        // Shop items
+        gui.setItem(1, createGUIItem(Material.DISPENSER, ChatColor.GREEN + "Archer Tower", ChatColor.GRAY + "Range: 5.0 | Damage: 1.5", ChatColor.GRAY + "Shoots single targets fast."));
+        gui.setItem(3, createGUIItem(Material.REDSTONE_LAMP, ChatColor.RED + "Mage Tower", ChatColor.GRAY + "Range: 4.0 | Damage: 3.0", ChatColor.GRAY + "Slow but deals heavy magic damage."));
+        gui.setItem(5, createGUIItem(Material.PACKED_ICE, ChatColor.AQUA + "Frost Tower", ChatColor.GRAY + "Range: 5.0 | Damage: 0.5", ChatColor.GRAY + "Deals light damage and slows enemies."));
+
+        if (plugin.getTowerManager().hasTower(plotId)) {
+            gui.setItem(8, createGUIItem(Material.BARRIER, ChatColor.RED + "Demolish Tower", ChatColor.GRAY + "Removes the tower from this plot."));
+        }
+
+        player.openInventory(gui);
+        player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_OPEN, 0.8f, 1.0f);
+    }
+
+    private ItemStack createGUIItem(Material material, String name, String... lore) {
+        ItemStack item = new ItemStack(material);
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(java.util.Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
 }
