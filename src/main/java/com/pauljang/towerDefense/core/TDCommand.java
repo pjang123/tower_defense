@@ -48,12 +48,56 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td plotmode " + ChatColor.WHITE + "- Toggle Plot Setup mode");
                 player.sendMessage(ChatColor.YELLOW + "/td waypointmode " + ChatColor.WHITE + "- Toggle Waypoint Setup mode");
                 player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints " + ChatColor.WHITE + "- Wipe all waypoints");
-                player.sendMessage(ChatColor.YELLOW + "/td spawnmob " + ChatColor.WHITE + "- Spawn a test mob");
+                player.sendMessage(ChatColor.YELLOW + "/td spawnmob [type] [speed] [health] [armor] [slowImmune] [fireImmune] " + ChatColor.WHITE + "- Spawn a custom test mob");
                 break;
 
             case "spawnmob":
-                plugin.getMobManager().spawnMob(org.bukkit.entity.EntityType.ZOMBIE);
-                player.sendMessage(ChatColor.GREEN + "Spawned a test mob at the first waypoint!");
+                org.bukkit.entity.EntityType mobType = org.bukkit.entity.EntityType.ZOMBIE;
+                double speedMult = 1.0;
+                double maxHealth = -1.0;
+                double armor = 0.0;
+                boolean immuneToSlow = false;
+                boolean immuneToFire = false;
+
+                if (args.length > 1) {
+                    try {
+                        mobType = org.bukkit.entity.EntityType.valueOf(args[1].toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        player.sendMessage(ChatColor.RED + "Invalid entity type '" + args[1] + "'! Defaulting to ZOMBIE.");
+                    }
+                }
+                if (args.length > 2) {
+                    try {
+                        speedMult = Double.parseDouble(args[2]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(ChatColor.RED + "Invalid speed multiplier! Defaulting to 1.0.");
+                    }
+                }
+                if (args.length > 3) {
+                    try {
+                        maxHealth = Double.parseDouble(args[3]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(ChatColor.RED + "Invalid max health! Defaulting to default.");
+                    }
+                }
+                if (args.length > 4) {
+                    try {
+                        armor = Double.parseDouble(args[4]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(ChatColor.RED + "Invalid armor! Defaulting to 0.0.");
+                    }
+                }
+                if (args.length > 5) {
+                    immuneToSlow = Boolean.parseBoolean(args[5]);
+                }
+                if (args.length > 6) {
+                    immuneToFire = Boolean.parseBoolean(args[6]);
+                }
+
+                plugin.getMobManager().spawnMob(mobType, speedMult, maxHealth, armor, immuneToSlow, immuneToFire);
+                player.sendMessage(ChatColor.GREEN + "Spawned custom " + mobType.name() + " at first waypoint!");
+                player.sendMessage(ChatColor.DARK_GREEN + " - Speed Mult: " + speedMult + "x | Health: " + (maxHealth > 0 ? maxHealth : "Default") + " | Armor: " + armor);
+                player.sendMessage(ChatColor.DARK_GREEN + " - Slow Immune: " + immuneToSlow + " | Fire Immune: " + immuneToFire);
                 break;
 
             case "start":

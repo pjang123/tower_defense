@@ -10,6 +10,8 @@ public class TDMob {
     private final Mob entity;
     private final List<Location> waypoints;
     private int currentWaypointIndex = 0;
+    private int lastPathfindWaypointIndex = -1;
+    private long lastAttackTick = 0;
     private final Location finalOffsetWaypoint;
 
     public TDMob(Mob entity, List<Location> waypoints) {
@@ -55,5 +57,25 @@ public class TDMob {
 
     public boolean hasReachedFinalWaypoint() {
         return currentWaypointIndex >= waypoints.size();
+    }
+
+    public int getLastPathfindWaypointIndex() {
+        return lastPathfindWaypointIndex;
+    }
+
+    public void setLastPathfindWaypointIndex(int lastPathfindWaypointIndex) {
+        this.lastPathfindWaypointIndex = lastPathfindWaypointIndex;
+    }
+
+    public long getLastAttackTick() {
+        return lastAttackTick;
+    }
+
+    public void setLastAttackTick(long lastAttackTick) {
+        this.lastAttackTick = lastAttackTick;
+    }
+
+    public Location getFinalOffsetWaypoint() {
+        return finalOffsetWaypoint;
     }
 }
