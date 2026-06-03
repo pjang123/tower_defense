@@ -161,7 +161,12 @@ public class TowerManager {
                 }
 
                 for (Tower tower : placedTowers.values()) {
-                    if (tick - tower.getLastAttackTick() >= tower.getCooldown()) {
+                    long cooldown = tower.getCooldown();
+                    String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                    if (plugin.getGameManager().isSpellActive(towerArena, "OVERCHARGE")) {
+                        cooldown = Math.max(1, cooldown / 2);
+                    }
+                    if (tick - tower.getLastAttackTick() >= cooldown) {
                         Mob target = findTarget(tower);
                         if (target != null) {
                             shootTarget(tower, target);
@@ -454,10 +459,9 @@ public class TowerManager {
     }
 
     public void cleanup() {
-        for (Tower tower : placedTowers.values()) {
-            if (tower.getHologram() != null && tower.getHologram().isValid()) {
-                tower.getHologram().remove();
-            }
+        java.util.List<String> plotIds = new java.util.ArrayList<>(placedTowers.keySet());
+        for (String plotId : plotIds) {
+            removeTower(plotId);
         }
         placedTowers.clear();
     }

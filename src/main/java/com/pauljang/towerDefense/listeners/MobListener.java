@@ -398,72 +398,42 @@ public class MobListener implements Listener {
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }
-                case 15 -> { // Instant Heal II Splash Potion (Costs 30 EXP)
-                    int cost = 30;
-                    if (gm.getExp(uuid) >= cost) {
-                        gm.removeExp(uuid, cost);
-                        org.bukkit.inventory.ItemStack pot = new org.bukkit.inventory.ItemStack(org.bukkit.Material.SPLASH_POTION);
-                        org.bukkit.inventory.meta.PotionMeta meta = (org.bukkit.inventory.meta.PotionMeta) pot.getItemMeta();
-                        if (meta != null) {
-                            meta.setDisplayName(org.bukkit.ChatColor.RED + "Healing Potion II");
-                            org.bukkit.potion.PotionEffectType type = org.bukkit.potion.PotionEffectType.getByName("HEALING");
-                            if (type == null) type = org.bukkit.potion.PotionEffectType.getByName("INSTANT_HEAL");
-                            if (type != null) {
-                                meta.addCustomEffect(new org.bukkit.potion.PotionEffect(type, 1, 1), true);
-                            }
-                            pot.setItemMeta(meta);
-                        }
-                        player.getInventory().addItem(pot);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Purchased Splash Potion of Healing II!");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 0.8f, 1.2f);
+                case 14 -> { // Overcharge Spell (Costs 250 Gold)
+                    int cost = 250;
+                    String arena = gm.getPlayerArena(uuid);
+                    if (gm.hasGold(uuid, cost)) {
+                        gm.removeGold(uuid, cost);
+                        gm.castSpell(arena, "OVERCHARGE", 10);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Overcharge on your track for 10 seconds!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
                     } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough TD EXP! Requires " + cost + " EXP.");
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }
-                case 16 -> { // Slowness Splash Potion (Costs 45 EXP)
-                    int cost = 45;
-                    if (gm.getExp(uuid) >= cost) {
-                        gm.removeExp(uuid, cost);
-                        org.bukkit.inventory.ItemStack pot = new org.bukkit.inventory.ItemStack(org.bukkit.Material.SPLASH_POTION);
-                        org.bukkit.inventory.meta.PotionMeta meta = (org.bukkit.inventory.meta.PotionMeta) pot.getItemMeta();
-                        if (meta != null) {
-                            meta.setDisplayName(org.bukkit.ChatColor.BLUE + "Slowness Splash Potion");
-                            org.bukkit.potion.PotionEffectType type = org.bukkit.potion.PotionEffectType.getByName("SLOWNESS");
-                            if (type == null) type = org.bukkit.potion.PotionEffectType.getByName("SLOW");
-                            if (type != null) {
-                                meta.addCustomEffect(new org.bukkit.potion.PotionEffect(type, 200, 1), true);
-                            }
-                            pot.setItemMeta(meta);
-                        }
-                        player.getInventory().addItem(pot);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Purchased Splash Potion of Slowness II!");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 0.8f, 1.2f);
+                case 15 -> { // Freeze Spell (Costs 200 Gold)
+                    int cost = 200;
+                    String arena = gm.getPlayerArena(uuid);
+                    if (gm.hasGold(uuid, cost)) {
+                        gm.removeGold(uuid, cost);
+                        gm.castSpell(arena, "FREEZE", 10);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Freeze on your track for 10 seconds!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
                     } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough TD EXP! Requires " + cost + " EXP.");
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }
-                case 17 -> { // Harming Splash Potion II (Costs 50 EXP)
-                    int cost = 50;
-                    if (gm.getExp(uuid) >= cost) {
-                        gm.removeExp(uuid, cost);
-                        org.bukkit.inventory.ItemStack pot = new org.bukkit.inventory.ItemStack(org.bukkit.Material.SPLASH_POTION);
-                        org.bukkit.inventory.meta.PotionMeta meta = (org.bukkit.inventory.meta.PotionMeta) pot.getItemMeta();
-                        if (meta != null) {
-                            meta.setDisplayName(org.bukkit.ChatColor.DARK_PURPLE + "Harming Splash Potion II");
-                            org.bukkit.potion.PotionEffectType type = org.bukkit.potion.PotionEffectType.getByName("HARMING");
-                            if (type == null) type = org.bukkit.potion.PotionEffectType.getByName("INSTANT_DAMAGE");
-                            if (type != null) {
-                                meta.addCustomEffect(new org.bukkit.potion.PotionEffect(type, 1, 1), true);
-                            }
-                            pot.setItemMeta(meta);
-                        }
-                        player.getInventory().addItem(pot);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Purchased Splash Potion of Harming II!");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 0.8f, 1.2f);
+                case 16 -> { // Damage Storm Spell (Costs 300 Gold)
+                    int cost = 300;
+                    String arena = gm.getPlayerArena(uuid);
+                    if (gm.hasGold(uuid, cost)) {
+                        gm.removeGold(uuid, cost);
+                        gm.castSpell(arena, "DAMAGE_STORM", 10);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Damage Storm on your track for 10 seconds!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
                     } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough TD EXP! Requires " + cost + " EXP.");
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }

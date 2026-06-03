@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.Location;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -16,8 +17,14 @@ public class GameManager {
     private GameState currentState = null;
 
     private final int maxCastleHealth = 20;
-    private int currentCastleHealth = 20;
+    private final java.util.Map<String, Integer> arenaHealth = new java.util.HashMap<>();
+    private final java.util.Map<String, java.util.Map<String, Long>> activeSpells = new java.util.HashMap<>();
+    private final java.util.Map<org.bukkit.Location, org.bukkit.Material> originalFloorBlocks = new java.util.HashMap<>();
     private BossBar castleBossBar = null;
+
+    private java.util.UUID pendingChallenger = null;
+    private java.util.UUID pendingChallengeTarget = null;
+    private long challengeTimestamp = 0L;
     
     private final java.util.Map<java.util.UUID, Integer> playerGold = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> playerExp = new java.util.HashMap<>();
@@ -28,6 +35,8 @@ public class GameManager {
 
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
+        arenaHealth.put("1", maxCastleHealth);
+        arenaHealth.put("2", maxCastleHealth);
         
         // Start game loop (every 1 second) for passive gold income and HUD updates
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -52,7 +61,11 @@ public class GameManager {
     }
 
     public int getCastleHealth() {
-        return currentCastleHealth;
+        return Math.min(arenaHealth.getOrDefault("1", maxCastleHealth), arenaHealth.getOrDefault("2", maxCastleHealth));
+    }
+
+    public int getArenaHealth(String arena) {
+        return arenaHealth.getOrDefault(arena, maxCastleHealth);
     }
 
     public BossBar getBossBar() {
@@ -76,7 +89,8 @@ public class GameManager {
 
     private void handleLobbySetup() {
         cleanupBossBar();
-        currentCastleHealth = maxCastleHealth;
+        arenaHealth.put("1", maxCastleHealth);
+        arenaHealth.put("2", maxCastleHealth);
     }
 
     private void handleCountdown() {
@@ -91,9 +105,10 @@ public class GameManager {
     }
 
     private void handleGameStart() {
-        currentCastleHealth = maxCastleHealth;
+        if (!arenaHealth.containsKey("1")) arenaHealth.put("1", maxCastleHealth);
+        if (!arenaHealth.containsKey("2")) arenaHealth.put("2", maxCastleHealth);
         showBossBar();
-        Bukkit.broadcastMessage(ChatColor.GREEN + "[Tower Defense] The game has begun! Defend the castle!");
+        Bukkit.broadcastMessage(ChatColor.GREEN + "[Tower Defense] The game has begun! Defend your castles!");
         for (Player player : Bukkit.getOnlinePlayers()) {
             giveStarterWeapons(player);
             player.playSound(player.getLocation(), Sound.EVENT_RAID_HORN, 1.0f, 1.0f);
@@ -103,38 +118,89 @@ public class GameManager {
     private void handleGameEnd() {
         cleanupBossBar();
         plugin.getMobManager().cleanup();
+        plugin.getTowerManager().cleanup();
+        cleanupSpells();
 
-        if (currentCastleHealth <= 0) {
-            Bukkit.broadcastMessage(ChatColor.RED + "" + ChatColor.BOLD + "========================================");
-            Bukkit.broadcastMessage(ChatColor.RED + "" + ChatColor.BOLD + " DEFEAT! The castle was destroyed!");
-            Bukkit.broadcastMessage(ChatColor.RED + "" + ChatColor.BOLD + "========================================");
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                player.playSound(player.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.8f, 0.8f);
-                player.sendTitle(ChatColor.RED + "DEFEAT", ChatColor.GRAY + "The castle was overrun", 10, 70, 20);
+        int hp1 = arenaHealth.getOrDefault("1", maxCastleHealth);
+        int hp2 = arenaHealth.getOrDefault("2", maxCastleHealth);
+
+        Player player1 = null;
+        Player player2 = null;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            String arena = getPlayerArena(player.getUniqueId());
+            if ("1".equals(arena)) {
+                player1 = player;
+            } else if ("2".equals(arena)) {
+                player2 = player;
             }
+        }
+
+        String titleMsg;
+        String subtitleMsg;
+
+        if (hp1 <= 0 && hp2 > 0) {
+            titleMsg = ChatColor.GREEN + "VICTORY";
+            subtitleMsg = (player2 != null ? player2.getName() : "Arena 2") + " wins the game!";
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + (player2 != null ? player2.getName() : "Arena 2") + " has won the duel!");
+        } else if (hp2 <= 0 && hp1 > 0) {
+            titleMsg = ChatColor.GREEN + "VICTORY";
+            subtitleMsg = (player1 != null ? player1.getName() : "Arena 1") + " wins the game!";
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + (player1 != null ? player1.getName() : "Arena 1") + " has won the duel!");
+        } else if (hp1 <= 0 && hp2 <= 0) {
+            titleMsg = ChatColor.RED + "DRAW";
+            subtitleMsg = "Both castles were overrun!";
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] The game ended in a draw!");
         } else {
-            Bukkit.broadcastMessage(ChatColor.GREEN + "" + ChatColor.BOLD + "========================================");
-            Bukkit.broadcastMessage(ChatColor.GREEN + "" + ChatColor.BOLD + " VICTORY! The castle survived!");
-            Bukkit.broadcastMessage(ChatColor.GREEN + "" + ChatColor.BOLD + "========================================");
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
-                player.sendTitle(ChatColor.GREEN + "VICTORY", ChatColor.GRAY + "The castle survived the assault!", 10, 70, 20);
+            titleMsg = ChatColor.YELLOW + "GAME ENDED";
+            subtitleMsg = "The game was stopped.";
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] The game was stopped.");
+        }
+
+        // Clear all projectiles in the worlds of our waypoints
+        java.util.Set<org.bukkit.World> worlds = new java.util.HashSet<>();
+        for (Location wp : plugin.getWaypointConfigManager().getWaypoints("1")) {
+            worlds.add(wp.getWorld());
+        }
+        for (Location wp : plugin.getWaypointConfigManager().getWaypoints("2")) {
+            worlds.add(wp.getWorld());
+        }
+        for (org.bukkit.World world : worlds) {
+            for (org.bukkit.entity.Entity entity : world.getEntities()) {
+                if (entity instanceof org.bukkit.entity.Projectile) {
+                    entity.remove();
+                }
             }
+        }
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+            player.sendTitle(titleMsg, subtitleMsg, 10, 70, 20);
+            
+            // Teleport back to spawn
+            player.teleport(player.getWorld().getSpawnLocation());
+            // Clear items
+            player.getInventory().clear();
         }
     }
 
     public void damageCastle(int amount) {
+        damageCastle("1", amount);
+    }
+
+    public void damageCastle(String arena, int amount) {
         if (currentState != GameState.ACTIVE) return;
 
-        currentCastleHealth = Math.max(0, currentCastleHealth - amount);
+        int current = arenaHealth.getOrDefault(arena, maxCastleHealth);
+        int updated = Math.max(0, current - amount);
+        arenaHealth.put(arena, updated);
         updateBossBar();
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
-            player.sendActionBar(ChatColor.RED + "⚠ Castle Damaged! Health: " + currentCastleHealth + "/" + maxCastleHealth + " ⚠");
+            player.sendActionBar(ChatColor.RED + "⚠ Arena " + arena + " Damaged! Health: " + updated + "/" + maxCastleHealth + " ⚠");
         }
 
-        if (currentCastleHealth <= 0) {
+        if (updated <= 0) {
             setGameState(GameState.ENDED);
         }
     }
@@ -142,7 +208,9 @@ public class GameManager {
     public void showBossBar() {
         if (castleBossBar == null) {
             castleBossBar = Bukkit.createBossBar(
-                ChatColor.RED + "Castle Health: " + currentCastleHealth + "/" + maxCastleHealth,
+                ChatColor.GREEN + "Arena 1: " + ChatColor.WHITE + arenaHealth.getOrDefault("1", maxCastleHealth) + " HP " +
+                ChatColor.GRAY + "| " +
+                ChatColor.RED + "Arena 2: " + ChatColor.WHITE + arenaHealth.getOrDefault("2", maxCastleHealth) + " HP",
                 BarColor.RED,
                 BarStyle.SOLID
             );
@@ -155,8 +223,16 @@ public class GameManager {
 
     public void updateBossBar() {
         if (castleBossBar == null) return;
-        castleBossBar.setTitle(ChatColor.RED + "Castle Health: " + currentCastleHealth + "/" + maxCastleHealth);
-        double progress = (double) currentCastleHealth / maxCastleHealth;
+        int hp1 = arenaHealth.getOrDefault("1", maxCastleHealth);
+        int hp2 = arenaHealth.getOrDefault("2", maxCastleHealth);
+        castleBossBar.setTitle(
+            ChatColor.GREEN + "Arena 1: " + ChatColor.WHITE + hp1 + " HP " +
+            ChatColor.GRAY + "| " +
+            ChatColor.RED + "Arena 2: " + ChatColor.WHITE + hp2 + " HP"
+        );
+        double progress1 = (double) hp1 / maxCastleHealth;
+        double progress2 = (double) hp2 / maxCastleHealth;
+        double progress = (progress1 + progress2) / 2.0;
         castleBossBar.setProgress(Math.max(0.0, Math.min(1.0, progress)));
     }
 
@@ -164,6 +240,194 @@ public class GameManager {
         if (castleBossBar != null) {
             castleBossBar.removeAll();
             castleBossBar = null;
+        }
+    }
+
+    // --- Active Spells and Matchmaking Systems ---
+
+    public boolean isSpellActive(String arena, String spellType) {
+        java.util.Map<String, Long> spells = activeSpells.get(arena);
+        if (spells == null) return false;
+        Long end = spells.get(spellType.toUpperCase());
+        return end != null && System.currentTimeMillis() < end;
+    }
+
+    public void castSpell(String arena, String spellType, int durationSeconds) {
+        String spell = spellType.toUpperCase();
+        long endTime = System.currentTimeMillis() + (durationSeconds * 1000L);
+        activeSpells.computeIfAbsent(arena, k -> new java.util.HashMap<>()).put(spell, endTime);
+
+        Material blockMat = switch (spell) {
+            case "OVERCHARGE" -> Material.EMERALD_BLOCK;
+            case "FREEZE" -> Material.SNOW_BLOCK;
+            case "DAMAGE_STORM" -> Material.MAGMA_BLOCK;
+            default -> null;
+        };
+
+        if (blockMat != null) {
+            java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+            for (Location wp : waypoints) {
+                Location floorLoc = wp.clone().subtract(0, 1, 0);
+                if (!originalFloorBlocks.containsKey(floorLoc)) {
+                    originalFloorBlocks.put(floorLoc, floorLoc.getBlock().getType());
+                }
+                floorLoc.getBlock().setType(blockMat);
+            }
+
+            final long thisRunEndTime = endTime;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (activeSpells.containsKey(arena) && activeSpells.get(arena).getOrDefault(spell, 0L).equals(thisRunEndTime)) {
+                    activeSpells.get(arena).remove(spell);
+                    restoreFloorBlocks(arena);
+                }
+            }, durationSeconds * 20L);
+        }
+    }
+
+    public void restoreFloorBlocks(String arena) {
+        String remainingSpell = null;
+        if (activeSpells.containsKey(arena)) {
+            for (java.util.Map.Entry<String, Long> entry : activeSpells.get(arena).entrySet()) {
+                if (System.currentTimeMillis() + 50L < entry.getValue()) {
+                    remainingSpell = entry.getKey();
+                    break;
+                }
+            }
+        }
+
+        java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+        if (remainingSpell != null) {
+            Material remainingMat = switch (remainingSpell) {
+                case "OVERCHARGE" -> Material.EMERALD_BLOCK;
+                case "FREEZE" -> Material.SNOW_BLOCK;
+                case "DAMAGE_STORM" -> Material.MAGMA_BLOCK;
+                default -> null;
+            };
+            if (remainingMat != null) {
+                for (Location wp : waypoints) {
+                    Location floorLoc = wp.clone().subtract(0, 1, 0);
+                    floorLoc.getBlock().setType(remainingMat);
+                }
+                return;
+            }
+        }
+
+        for (Location wp : waypoints) {
+            Location floorLoc = wp.clone().subtract(0, 1, 0);
+            Material original = originalFloorBlocks.remove(floorLoc);
+            if (original != null) {
+                floorLoc.getBlock().setType(original);
+            }
+        }
+    }
+
+    public void cleanupSpells() {
+        activeSpells.clear();
+        for (java.util.Map.Entry<Location, Material> entry : originalFloorBlocks.entrySet()) {
+            entry.getKey().getBlock().setType(entry.getValue());
+        }
+        originalFloorBlocks.clear();
+    }
+
+    public void challengePlayer(Player challenger, Player target) {
+        if (currentState == GameState.ACTIVE || currentState == GameState.STARTING) {
+            challenger.sendMessage(ChatColor.RED + "A match is already in progress!");
+            return;
+        }
+        if (challenger.getUniqueId().equals(target.getUniqueId())) {
+            challenger.sendMessage(ChatColor.RED + "You cannot challenge yourself!");
+            return;
+        }
+        
+        pendingChallenger = challenger.getUniqueId();
+        pendingChallengeTarget = target.getUniqueId();
+        challengeTimestamp = System.currentTimeMillis();
+
+        challenger.sendMessage(ChatColor.GOLD + "[Tower Defense] You challenged " + target.getName() + " to a duel! They have 30 seconds to accept.");
+        challenger.playSound(challenger.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.2f);
+        
+        target.sendMessage(ChatColor.GOLD + "[Tower Defense] " + challenger.getName() + " has challenged you to a Tower Defense duel!");
+        target.sendMessage(ChatColor.YELLOW + "Type " + ChatColor.GREEN + "/td accept" + ChatColor.YELLOW + " to accept the challenge!");
+        target.playSound(target.getLocation(), Sound.EVENT_RAID_HORN, 0.8f, 1.0f);
+    }
+
+    public void acceptChallenge(Player target) {
+        if (pendingChallengeTarget == null || !pendingChallengeTarget.equals(target.getUniqueId())) {
+            target.sendMessage(ChatColor.RED + "You do not have any pending challenges!");
+            return;
+        }
+        if (System.currentTimeMillis() - challengeTimestamp > 30000L) {
+            target.sendMessage(ChatColor.RED + "The challenge has expired!");
+            pendingChallenger = null;
+            pendingChallengeTarget = null;
+            return;
+        }
+        if (currentState == GameState.ACTIVE || currentState == GameState.STARTING) {
+            target.sendMessage(ChatColor.RED + "A match is already in progress!");
+            return;
+        }
+
+        Player challenger = Bukkit.getPlayer(pendingChallenger);
+        if (challenger == null || !challenger.isOnline()) {
+            target.sendMessage(ChatColor.RED + "The challenger is no longer online!");
+            pendingChallenger = null;
+            pendingChallengeTarget = null;
+            return;
+        }
+
+        pendingChallenger = null;
+        pendingChallengeTarget = null;
+
+        Bukkit.broadcastMessage(ChatColor.GREEN + "" + ChatColor.BOLD + "========================================");
+        Bukkit.broadcastMessage(ChatColor.YELLOW + challenger.getName() + " vs " + target.getName() + " duel has started!");
+        Bukkit.broadcastMessage(ChatColor.GREEN + "" + ChatColor.BOLD + "========================================");
+
+        startPvPMatch(challenger, target);
+    }
+
+    public void startPvPMatch(Player p1, Player p2) {
+        // Reset game state
+        setGameState(GameState.ENDED);
+
+        // Reset players
+        resetPlayerForMatch(p1, "1");
+        resetPlayerForMatch(p2, "2");
+
+        // Set health
+        arenaHealth.put("1", maxCastleHealth);
+        arenaHealth.put("2", maxCastleHealth);
+
+        // Wipe active objects
+        plugin.getMobManager().cleanup();
+        plugin.getTowerManager().cleanup();
+        cleanupSpells();
+
+        // Teleport
+        teleportToArenaStart(p1, "1");
+        teleportToArenaStart(p2, "2");
+
+        // Start match state
+        setGameState(GameState.STARTING);
+    }
+
+    private void resetPlayerForMatch(Player player, String arena) {
+        java.util.UUID uuid = player.getUniqueId();
+        playerGold.put(uuid, 150);
+        playerExp.put(uuid, 0);
+        goldGenLevels.put(uuid, 1);
+        swordLevels.put(uuid, 1);
+        bowLevels.put(uuid, 1);
+        setPlayerArena(uuid, arena);
+        player.getInventory().clear();
+        giveStarterWeapons(player);
+    }
+
+    private void teleportToArenaStart(Player player, String arena) {
+        java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+        if (!waypoints.isEmpty()) {
+            player.teleport(waypoints.get(0).clone().add(0, 1, 0));
+        } else {
+            player.sendMessage(ChatColor.RED + "Warning: No waypoints configured for Arena " + arena + ". Could not teleport!");
         }
     }
 
@@ -237,7 +501,8 @@ public class GameManager {
         java.util.List<String> lines = new java.util.ArrayList<>();
         lines.add(ChatColor.GRAY + "--------------------");
         lines.add(ChatColor.YELLOW + "State: " + ChatColor.WHITE + (currentState != null ? currentState.name() : "LOBBY"));
-        lines.add(ChatColor.RED + "Castle Health: " + ChatColor.WHITE + currentCastleHealth + "/" + maxCastleHealth);
+        lines.add(ChatColor.GREEN + "Arena 1 Health: " + ChatColor.WHITE + arenaHealth.getOrDefault("1", maxCastleHealth) + "/" + maxCastleHealth);
+        lines.add(ChatColor.RED + "Arena 2 Health: " + ChatColor.WHITE + arenaHealth.getOrDefault("2", maxCastleHealth) + "/" + maxCastleHealth);
         lines.add(" ");
         lines.add(ChatColor.GOLD + "Your Gold: " + ChatColor.YELLOW + "$" + getGold(player.getUniqueId()));
         lines.add(ChatColor.GREEN + "Your EXP: " + ChatColor.LIGHT_PURPLE + getExp(player.getUniqueId()) + " XP");
@@ -494,27 +759,31 @@ public class GameManager {
         }
         gui.setItem(11, createCustomGUIItem(bowMat, bowName, bowLore));
 
-        // 4. Potions (Slot 15, 16, 17)
-        java.util.List<String> healLore = new java.util.ArrayList<>();
-        healLore.add(ChatColor.GRAY + "Heals splash area instantly.");
-        healLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "30 TD EXP");
-        healLore.add("");
-        healLore.add(ChatColor.YELLOW + "Click to purchase Splash Potion of Healing II!");
-        gui.setItem(15, createPotionGUIItem("HEALING", "INSTANT_HEAL", ChatColor.RED + "Healing Potion II", healLore));
+        // 4. Spells (Slot 14, 15, 16)
+        java.util.List<String> overchargeLore = new java.util.ArrayList<>();
+        overchargeLore.add(ChatColor.GRAY + "Increases tower attack speeds on your track by 50%.");
+        overchargeLore.add(ChatColor.GRAY + "Duration: 10 seconds");
+        overchargeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "250 Gold");
+        overchargeLore.add("");
+        overchargeLore.add(ChatColor.YELLOW + "Click to cast on your track!");
+        gui.setItem(14, createCustomGUIItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "" + ChatColor.BOLD + "Spell: Overcharge", overchargeLore));
 
-        java.util.List<String> slowLore = new java.util.ArrayList<>();
-        slowLore.add(ChatColor.GRAY + "Slows down target area mobs.");
-        slowLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "45 TD EXP");
-        slowLore.add("");
-        slowLore.add(ChatColor.YELLOW + "Click to purchase Splash Potion of Slowness II!");
-        gui.setItem(16, createPotionGUIItem("SLOWNESS", "SLOW", ChatColor.BLUE + "Slowness Splash Potion", slowLore));
+        java.util.List<String> freezeLore = new java.util.ArrayList<>();
+        freezeLore.add(ChatColor.GRAY + "Slows down mobs traversing your track.");
+        freezeLore.add(ChatColor.GRAY + "(Does not affect slow-immune mobs)");
+        freezeLore.add(ChatColor.GRAY + "Duration: 10 seconds");
+        freezeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "200 Gold");
+        freezeLore.add("");
+        freezeLore.add(ChatColor.YELLOW + "Click to cast on your track!");
+        gui.setItem(15, createCustomGUIItem(Material.SNOW_BLOCK, ChatColor.AQUA + "" + ChatColor.BOLD + "Spell: Freeze", freezeLore));
 
-        java.util.List<String> harmLore = new java.util.ArrayList<>();
-        harmLore.add(ChatColor.GRAY + "Deals instant damage to target area mobs.");
-        harmLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "50 TD EXP");
-        harmLore.add("");
-        harmLore.add(ChatColor.YELLOW + "Click to purchase Splash Potion of Harming II!");
-        gui.setItem(17, createPotionGUIItem("HARMING", "INSTANT_DAMAGE", ChatColor.DARK_PURPLE + "Harming Splash Potion II", harmLore));
+        java.util.List<String> stormLore = new java.util.ArrayList<>();
+        stormLore.add(ChatColor.GRAY + "Deals periodic damage to mobs traversing your track.");
+        stormLore.add(ChatColor.GRAY + "Duration: 10 seconds");
+        stormLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "300 Gold");
+        stormLore.add("");
+        stormLore.add(ChatColor.YELLOW + "Click to cast on your track!");
+        gui.setItem(16, createCustomGUIItem(Material.MAGMA_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Spell: Damage Storm", stormLore));
 
         // Stats Display (Slot 49)
         java.util.List<String> statLore = new java.util.ArrayList<>();

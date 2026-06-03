@@ -202,6 +202,23 @@ public class MobManager {
                         continue;
                     }
 
+                    // Damage Storm check
+                    String mobArena = mob.getEntity().getPersistentDataContainer().get(
+                        new org.bukkit.NamespacedKey(plugin, "td_arena"),
+                        org.bukkit.persistence.PersistentDataType.STRING
+                    );
+                    if (mobArena == null) mobArena = "1";
+                    if (plugin.getGameManager().isSpellActive(mobArena, "DAMAGE_STORM")) {
+                        if (tickCounter % 20 == 0) {
+                            mob.getEntity().damage(2.0); // 2.0 HP (1 heart) per second
+                            mob.getEntity().getWorld().spawnParticle(
+                                org.bukkit.Particle.LAVA,
+                                mob.getEntity().getLocation().add(0, 0.5, 0),
+                                5, 0.2, 0.2, 0.2, 0.05
+                            );
+                        }
+                    }
+
                     handleMobMovement(mob, iterator, tickCounter);
                 }
                 tickCounter++;
@@ -210,6 +227,18 @@ public class MobManager {
     }
 
     private void handleMobMovement(TDMob mob, Iterator<TDMob> iterator, long currentTick) {
+        String mobArena = mob.getEntity().getPersistentDataContainer().get(
+            new org.bukkit.NamespacedKey(plugin, "td_arena"),
+            org.bukkit.persistence.PersistentDataType.STRING
+        );
+        if (mobArena == null) mobArena = "1";
+
+        boolean isFreezeActive = plugin.getGameManager().isSpellActive(mobArena, "FREEZE");
+        boolean isSlowImmune = mob.getEntity().getPersistentDataContainer().has(
+            new org.bukkit.NamespacedKey(plugin, "td_slow_immune"),
+            org.bukkit.persistence.PersistentDataType.BYTE
+        );
+
         // If the mob has reached the final waypoint, run stay-centered & attack logic
         if (mob.hasReachedFinalWaypoint()) {
             Location finalTarget = mob.getFinalOffsetWaypoint();
@@ -229,10 +258,17 @@ public class MobManager {
                             if (speedAttr != null) {
                                 speed = speedAttr.getValue();
                             }
+                            if (isFreezeActive && !isSlowImmune) {
+                                speed = speed * 0.4;
+                            }
                             mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
                         }
                     } else {
-                        mob.getEntity().getPathfinder().moveTo(finalTarget, 1.0);
+                        double pathfinderSpeed = 1.0;
+                        if (isFreezeActive && !isSlowImmune) {
+                            pathfinderSpeed = 0.4;
+                        }
+                        mob.getEntity().getPathfinder().moveTo(finalTarget, pathfinderSpeed);
                     }
                 }
             }
@@ -241,8 +277,8 @@ public class MobManager {
             if (currentTick - mob.getLastAttackTick() >= 40) {
                 mob.setLastAttackTick(currentTick);
 
-                // Deal 1 damage to castle health
-                plugin.getGameManager().damageCastle(1);
+                // Deal 1 damage to the specific arena's castle health
+                plugin.getGameManager().damageCastle(mobArena, 1);
 
                 // Play custom swing animation & strike sound/particles at the mob's position
                 mob.getEntity().swingMainHand();
@@ -280,6 +316,13 @@ public class MobManager {
                 speed = speedAttr.getValue();
             }
 
+            if (isFreezeActive && !isSlowImmune) {
+                speed = speed * 0.4; // 60% slow
+                if (currentTick % 20 == 0) {
+                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 2, false, false, true));
+                }
+            }
+
             if (distanceSq > 0.01) {
                 dir.setY(0);
                 dir.normalize();
@@ -292,9 +335,17 @@ public class MobManager {
                 mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
             }
         } else {
+            double pathfinderSpeed = 1.0;
+            if (isFreezeActive && !isSlowImmune) {
+                pathfinderSpeed = 0.4; // 60% slow
+                if (currentTick % 20 == 0) {
+                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 2, false, false, true));
+                }
+            }
+
             // Re-calculate pathing only when target waypoint index changes or periodically (every 5 ticks / 250ms)
             if (mob.getCurrentWaypointIndex() != mob.getLastPathfindWaypointIndex() || currentTick % 5 == 0) {
-                mob.getEntity().getPathfinder().moveTo(target, 1.0);
+                mob.getEntity().getPathfinder().moveTo(target, pathfinderSpeed);
                 mob.setLastPathfindWaypointIndex(mob.getCurrentWaypointIndex());
             }
         }

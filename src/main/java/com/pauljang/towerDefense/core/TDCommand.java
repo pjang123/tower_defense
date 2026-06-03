@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]|challenge [player]|accept>");
             return true;
         }
 
@@ -41,6 +41,8 @@ public class TDCommand implements CommandExecutor {
             case "list":
                 player.sendMessage(ChatColor.GOLD + "--- Tower Defense Commands ---");
                 player.sendMessage(ChatColor.YELLOW + "/td list " + ChatColor.WHITE + "- Shows this help menu");
+                player.sendMessage(ChatColor.YELLOW + "/td challenge [player] " + ChatColor.WHITE + "- Duel another player in 1v1 TD");
+                player.sendMessage(ChatColor.YELLOW + "/td accept " + ChatColor.WHITE + "- Accept a pending duel challenge");
                 player.sendMessage(ChatColor.YELLOW + "/td start " + ChatColor.WHITE + "- Force start the game");
                 player.sendMessage(ChatColor.YELLOW + "/td stop " + ChatColor.WHITE + "- Force stop the game");
                 player.sendMessage(ChatColor.YELLOW + "/td status " + ChatColor.WHITE + "- Show current game state");
@@ -263,6 +265,23 @@ public class TDCommand implements CommandExecutor {
                 plugin.getGameManager().setPlayerArena(targetPlayer.getUniqueId(), targetArena);
                 player.sendMessage(ChatColor.GREEN + "Set " + targetPlayer.getName() + "'s arena to: " + targetArena);
                 targetPlayer.sendMessage(ChatColor.GREEN + "You have been assigned to Arena: " + targetArena);
+                break;
+
+            case "challenge":
+                if (args.length < 2) {
+                    player.sendMessage(ChatColor.RED + "Usage: /td challenge <player>");
+                    break;
+                }
+                Player challengedPlayer = org.bukkit.Bukkit.getPlayer(args[1]);
+                if (challengedPlayer == null) {
+                    player.sendMessage(ChatColor.RED + "Player not found!");
+                    break;
+                }
+                gameManager.challengePlayer(player, challengedPlayer);
+                break;
+
+            case "accept":
+                gameManager.acceptChallenge(player);
                 break;
 
             default:
