@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode|waypointmode|wand|clearwaypoints|spawnmob|gui|upgrades>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|setarena [player] [arena]>");
             return true;
         }
 
@@ -45,14 +45,15 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td stop " + ChatColor.WHITE + "- Force stop the game");
                 player.sendMessage(ChatColor.YELLOW + "/td status " + ChatColor.WHITE + "- Show current game state");
                 player.sendMessage(ChatColor.YELLOW + "/td wand " + ChatColor.WHITE + "- Gives you the Setup Wand");
-                player.sendMessage(ChatColor.YELLOW + "/td plotmode " + ChatColor.WHITE + "- Toggle Plot Setup mode");
-                player.sendMessage(ChatColor.YELLOW + "/td waypointmode " + ChatColor.WHITE + "- Toggle Waypoint Setup mode");
-                player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints " + ChatColor.WHITE + "- Wipe all waypoints");
+                player.sendMessage(ChatColor.YELLOW + "/td plotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Setup mode for an arena");
+                player.sendMessage(ChatColor.YELLOW + "/td waypointmode [arena] " + ChatColor.WHITE + "- Toggle Waypoint Setup mode for an arena");
+                player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints [arena] " + ChatColor.WHITE + "- Wipe waypoints for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td spawnmob [type] [speed] [health] [armor] [slowImmune] [fireImmune] " + ChatColor.WHITE + "- Spawn a custom test mob");
                 player.sendMessage(ChatColor.YELLOW + "/td gui " + ChatColor.WHITE + "- Open the Mob Spawner GUI");
                 player.sendMessage(ChatColor.YELLOW + "/td upgrades " + ChatColor.WHITE + "- Open the Player Upgrades GUI");
                 player.sendMessage(ChatColor.YELLOW + "/td givegold [amount] " + ChatColor.WHITE + "- Give yourself gold (Admin)");
                 player.sendMessage(ChatColor.YELLOW + "/td givexp [amount] " + ChatColor.WHITE + "- Give yourself EXP (Admin)");
+                player.sendMessage(ChatColor.YELLOW + "/td setarena [player] [arena] " + ChatColor.WHITE + "- Set player's assigned arena (Admin)");
                 break;
 
             case "gui":
@@ -132,11 +133,16 @@ public class TDCommand implements CommandExecutor {
 
                 // If they are IDLE, turn the mode ON
                 if (state == SetupManager.SetupState.IDLE) {
+                    String arena = "1";
+                    if (args.length > 1) {
+                        arena = args[1];
+                    }
+                    plugin.getSetupManager().setEditingArena(player.getUniqueId(), arena);
                     if (!player.getInventory().contains(Material.BLAZE_ROD)) {
                         giveWand(player);
                     }
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.AWAITING_PLOT_P1);
-                    player.sendMessage(ChatColor.AQUA + "--- Plot Setup Mode: ENABLED ---");
+                    player.sendMessage(ChatColor.AQUA + "--- Plot Setup Mode: ENABLED (Arena " + arena + ") ---");
                     player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK the first corner of a plot.");
                 }
                 // If they are already in setup mode, turn it OFF
@@ -150,11 +156,16 @@ public class TDCommand implements CommandExecutor {
                 SetupManager.SetupState wpState = plugin.getSetupManager().getState(player.getUniqueId());
 
                 if (wpState != SetupManager.SetupState.WAYPOINT_MODE) {
+                    String arena = "1";
+                    if (args.length > 1) {
+                        arena = args[1];
+                    }
+                    plugin.getSetupManager().setEditingArena(player.getUniqueId(), arena);
                     if (!player.getInventory().contains(Material.BLAZE_ROD)) {
                         giveWand(player);
                     }
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.WAYPOINT_MODE);
-                    player.sendMessage(ChatColor.AQUA + "--- Waypoint Mode: ENABLED ---");
+                    player.sendMessage(ChatColor.AQUA + "--- Waypoint Mode: ENABLED (Arena " + arena + ") ---");
                     player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK blocks to add waypoints in order. Type /td waypointmode to exit.");
                 } else {
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.IDLE);
@@ -163,8 +174,12 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "clearwaypoints":
-                plugin.getWaypointConfigManager().clearAllWaypoints();
-                player.sendMessage(ChatColor.RED + "All waypoints have been wiped from memory!");
+                String clearArena = "1";
+                if (args.length > 1) {
+                    clearArena = args[1];
+                }
+                plugin.getWaypointConfigManager().clearAllWaypoints(clearArena);
+                player.sendMessage(ChatColor.RED + "All waypoints for Arena " + clearArena + " have been wiped from memory!");
                 break;
 
             case "upgrades":
@@ -202,6 +217,26 @@ public class TDCommand implements CommandExecutor {
                     }
                 }
                 gameManager.addExp(player.getUniqueId(), xpAmount);
+                break;
+
+            case "setarena":
+                if (!player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP to use testing/admin commands.");
+                    break;
+                }
+                if (args.length < 3) {
+                    player.sendMessage(ChatColor.RED + "Usage: /td setarena <player> <arena>");
+                    break;
+                }
+                Player targetPlayer = org.bukkit.Bukkit.getPlayer(args[1]);
+                if (targetPlayer == null) {
+                    player.sendMessage(ChatColor.RED + "Player not found!");
+                    break;
+                }
+                String targetArena = args[2];
+                plugin.getGameManager().setPlayerArena(targetPlayer.getUniqueId(), targetArena);
+                player.sendMessage(ChatColor.GREEN + "Set " + targetPlayer.getName() + "'s arena to: " + targetArena);
+                targetPlayer.sendMessage(ChatColor.GREEN + "You have been assigned to Arena: " + targetArena);
                 break;
 
             default:

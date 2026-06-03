@@ -34,8 +34,8 @@ Players start with a Wooden Sword at game launch.
 Players start with a standard Bow at game launch.
 
 *   **Crossbow (Quick Charge I)**: Upgrade cost = **150 EXP**
-*   **Crossbow (Quick Charge III + Multishot)**: Upgrade cost = **450 EXP**
-    *   *Effect*: Automatically shoots exploding firework rocket projectiles instead of standard arrows.
+*   **Crossbow (Quick Charge III + Piercing IV)**: Upgrade cost = **450 EXP**
+    *   *Effect*: Automatically fires arrows that pierce through up to 4 targets.
 *   *Note*: All upgraded bows provide infinite ammo.
 
 ### Passive Gold Generator

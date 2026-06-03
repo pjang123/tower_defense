@@ -159,6 +159,8 @@ public class TowerManager {
 
         Location towerLoc = tower.getCenterLocation();
         double rangeSquared = Math.pow(tower.getType().getRange(), 2);
+        
+        String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
 
         for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
             Mob mob = tdMob.getEntity();
@@ -166,6 +168,14 @@ public class TowerManager {
 
             // Prevent task crash by ensuring entities are in the same world before distance check
             if (!mob.getWorld().equals(towerLoc.getWorld())) continue;
+
+            // Prevent targeting mobs on different arena tracks
+            String mobArena = mob.getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, "td_arena"),
+                org.bukkit.persistence.PersistentDataType.STRING
+            );
+            if (mobArena == null) mobArena = "1";
+            if (!towerArena.equals(mobArena)) continue;
 
             double distSq = mob.getLocation().distanceSquared(towerLoc);
             if (distSq <= rangeSquared) {

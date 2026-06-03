@@ -31,27 +31,55 @@ public class MobManager {
     }
 
     public void spawnMob(EntityType type) {
-        spawnMob(type, 1.0, -1.0, 0.0, false, false, 15, 5);
+        spawnMob("1", type);
+    }
+
+    public void spawnMob(String arena, EntityType type) {
+        spawnMob(arena, type, 1.0, -1.0, 0.0, false, false, 15, 5);
     }
 
     public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
-        spawnMob(type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
+        spawnMob("1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
+    }
+
+    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
+        spawnMob(arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
     }
 
     public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
         int xpReward = Math.max(1, goldReward / 3);
-        spawnMob(type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+        spawnMob("1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+    }
+
+    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
+        int xpReward = Math.max(1, goldReward / 3);
+        spawnMob(arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
     }
 
     public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
-        List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints();
+        spawnMob("1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+    }
+
+    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
+        List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
         if (waypoints.isEmpty()) {
-            plugin.getLogger().warning("Cannot spawn mob: No waypoints defined!");
+            plugin.getLogger().warning("Cannot spawn mob: No waypoints defined for arena " + arena + "!");
             return;
         }
 
         Location startLocation = waypoints.get(0);
         Mob entity = (Mob) startLocation.getWorld().spawnEntity(startLocation, type);
+
+        // Force spawned mobs to be their adult versions
+        if (entity instanceof org.bukkit.entity.Ageable ageable) {
+            ageable.setAdult();
+        }
+        if (entity instanceof org.bukkit.entity.Zombie zombie) {
+            zombie.setBaby(false);
+        }
+        if (entity instanceof org.bukkit.entity.Piglin piglin) {
+            piglin.setBaby(false);
+        }
         
         // Mark as a TD Mob so we can handle events (like sunlight burning)
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
@@ -61,6 +89,9 @@ public class MobManager {
 
         // Store xp reward amount in container
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, xpReward);
+
+        // Store arena ID in container
+        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
 
         // Prevent zombification for nether mobs in the overworld
         if (entity instanceof org.bukkit.entity.Piglin piglin) {
@@ -331,6 +362,10 @@ public class MobManager {
 
         if (spawnList.isEmpty()) return;
 
+        // Determine opponent's arena
+        String playerArena = plugin.getGameManager().getPlayerArena(uuid);
+        String targetArena = playerArena.equals("1") ? "2" : "1";
+
         // Spawn mobs spaced 10 ticks (0.5s) apart
         new BukkitRunnable() {
             int index = 0;
@@ -342,7 +377,7 @@ public class MobManager {
                     return;
                 }
                 PresetMobType preset = spawnList.get(index);
-                spawnMob(preset.getEntityType(), preset.getSpeed(), preset.getHealth(), preset.getArmor(), preset.isSlowImmune(), preset.isFireImmune(), preset.getGoldReward(), preset.getXpReward());
+                spawnMob(targetArena, preset.getEntityType(), preset.getSpeed(), preset.getHealth(), preset.getArmor(), preset.isSlowImmune(), preset.isFireImmune(), preset.getGoldReward(), preset.getXpReward());
                 index++;
             }
         }.runTaskTimer(plugin, 0L, 10L);
@@ -370,8 +405,12 @@ public class MobManager {
         gui.setItem(14, createMobGUIItem(PresetMobType.HOGLIN, queue.getOrDefault(PresetMobType.HOGLIN, 0)));
 
         // Place control buttons (slots 21 and 23)
+        int totalCost = 0;
+        for (Map.Entry<PresetMobType, Integer> entry : queue.entrySet()) {
+            totalCost += entry.getKey().getSpawnCost() * entry.getValue();
+        }
         gui.setItem(21, createGUIItem(Material.RED_WOOL, ChatColor.RED + "Clear Queue", ChatColor.GRAY + "Reset all counts and refund Gold."));
-        gui.setItem(23, createGUIItem(Material.LIME_WOOL, ChatColor.GREEN + "Send Wave", ChatColor.GRAY + "Spawn all queued mobs."));
+        gui.setItem(23, createGUIItem(Material.LIME_WOOL, ChatColor.GREEN + "Send Wave", ChatColor.GRAY + "Spawn all queued mobs.", ChatColor.GOLD + "Total Wave Value: " + ChatColor.YELLOW + totalCost + " Gold"));
 
         // Player Upgrades Shortcut (slot 26)
         gui.setItem(26, createGUIItem(Material.NETHER_STAR, ChatColor.GOLD + "Player Upgrades", ChatColor.GRAY + "Open weapons & upgrades screen."));

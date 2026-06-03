@@ -38,10 +38,11 @@ public class PlotConfigManager {
     }
 
     // Save a new plot
-    public void savePlot(Location pos1, Location pos2) {
+    public void savePlot(String arena, Location pos1, Location pos2) {
         String plotId = UUID.randomUUID().toString().substring(0, 8);
         String path = "plots." + plotId + ".";
 
+        config.set(path + "arena", arena);
         config.set(path + "pos1.world", pos1.getWorld().getName());
         config.set(path + "pos1.x", pos1.getBlockX());
         config.set(path + "pos1.y", pos1.getBlockY());
@@ -53,6 +54,12 @@ public class PlotConfigManager {
         config.set(path + "pos2.z", pos2.getBlockZ());
 
         saveFile();
+    }
+
+    // Get the arena ID of a plot
+    public String getPlotArena(String plotId) {
+        if (config.getConfigurationSection("plots") == null) return "1";
+        return config.getString("plots." + plotId + ".arena", "1");
     }
 
     // Check if the newly selected area overlaps with ANY saved plot

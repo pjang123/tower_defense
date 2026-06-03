@@ -24,6 +24,7 @@ public class GameManager {
     private final java.util.Map<java.util.UUID, Integer> goldGenLevels = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> swordLevels = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> bowLevels = new java.util.HashMap<>();
+    private final java.util.Map<java.util.UUID, String> playerArenas = new java.util.HashMap<>();
 
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
@@ -33,14 +34,7 @@ public class GameManager {
             boolean isActive = (currentState == GameState.ACTIVE);
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (isActive) {
-                    int level = getGoldGenLevel(player.getUniqueId());
-                    int amount = switch (level) {
-                        case 1 -> 5;
-                        case 2 -> 20;
-                        case 3 -> 50;
-                        case 4 -> 100;
-                        default -> 5;
-                    };
+                    int amount = getPlayerIncomeRate(player.getUniqueId());
                     addGold(player.getUniqueId(), amount, true); // Quiet passive generation
                 }
                 updateScoreboard(player);
@@ -247,6 +241,7 @@ public class GameManager {
         lines.add(" ");
         lines.add(ChatColor.GOLD + "Your Gold: " + ChatColor.YELLOW + "$" + getGold(player.getUniqueId()));
         lines.add(ChatColor.GREEN + "Your EXP: " + ChatColor.LIGHT_PURPLE + getExp(player.getUniqueId()) + " XP");
+        lines.add(ChatColor.YELLOW + "Income: " + ChatColor.GOLD + getPlayerIncomeRate(player.getUniqueId()) + " Gold/s");
         lines.add("  ");
         lines.add(ChatColor.AQUA + "Active Mobs: " + ChatColor.WHITE + plugin.getMobManager().getActiveMobs().size());
         lines.add(ChatColor.GRAY + "-------------------");
@@ -259,6 +254,25 @@ public class GameManager {
         }
 
         player.setScoreboard(board);
+    }
+
+    public String getPlayerArena(java.util.UUID uuid) {
+        return playerArenas.getOrDefault(uuid, "1");
+    }
+
+    public void setPlayerArena(java.util.UUID uuid, String arena) {
+        playerArenas.put(uuid, arena);
+    }
+
+    public int getPlayerIncomeRate(java.util.UUID uuid) {
+        int genLevel = getGoldGenLevel(uuid);
+        return switch (genLevel) {
+            case 1 -> 5;
+            case 2 -> 20;
+            case 3 -> 50;
+            case 4 -> 100;
+            default -> 5;
+        };
     }
 
     public void removeExp(java.util.UUID uuid, int amount) {
@@ -345,7 +359,7 @@ public class GameManager {
                     meta.addEnchant(org.bukkit.enchantments.Enchantment.QUICK_CHARGE, 1, true);
                 } else if (bowLvl == 3) {
                     meta.addEnchant(org.bukkit.enchantments.Enchantment.QUICK_CHARGE, 3, true);
-                    meta.addEnchant(org.bukkit.enchantments.Enchantment.MULTISHOT, 1, true);
+                    meta.addEnchant(org.bukkit.enchantments.Enchantment.PIERCING, 4, true);
                 }
                 item.setItemMeta(meta);
             }
@@ -446,11 +460,11 @@ public class GameManager {
         String bowName = ChatColor.LIGHT_PURPLE + "Bow Upgrade";
         java.util.List<String> bowLore = new java.util.ArrayList<>();
         bowLore.add(ChatColor.GRAY + "Upgrades your ranged combat weapon.");
-        bowLore.add(ChatColor.YELLOW + "Current Weapon: " + ChatColor.WHITE + (bLvl == 1 ? "Bow" : bLvl == 2 ? "Crossbow (Quick Draw)" : "Crossbow (Quick Draw + Multishot + Fireworks)"));
+        bowLore.add(ChatColor.YELLOW + "Current Weapon: " + ChatColor.WHITE + (bLvl == 1 ? "Bow" : bLvl == 2 ? "Crossbow (Quick Charge I)" : "Crossbow (Quick Charge III + Piercing IV)"));
         bowLore.add("");
         if (bLvl < 3) {
             int nextCost = bLvl == 1 ? 150 : 450;
-            String nextWeapon = bLvl == 1 ? "Crossbow (Quick Draw)" : "Crossbow (Quick Draw + Multishot + Fireworks)";
+            String nextWeapon = bLvl == 1 ? "Crossbow (Quick Charge I)" : "Crossbow (Quick Charge III + Piercing IV)";
             bowLore.add(ChatColor.GREEN + "Upgrade to " + nextWeapon + ":");
             bowLore.add(ChatColor.GOLD + " - Cost: " + ChatColor.YELLOW + nextCost + " TD EXP");
             bowLore.add("");

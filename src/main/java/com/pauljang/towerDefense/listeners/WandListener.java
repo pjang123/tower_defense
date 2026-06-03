@@ -107,8 +107,9 @@ public class WandListener implements Listener {
                 setupManager.setPos2(uuid, clickedLoc);
                 player.sendMessage(ChatColor.GREEN + "Corner 2 saved at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ());
 
-                plugin.getPlotConfigManager().savePlot(pos1, clickedLoc);
-                player.sendMessage(ChatColor.AQUA + "Valid " + sizeX + "x" + sizeZ + " plot finalized and saved!");
+                String arena = setupManager.getEditingArena(uuid);
+                plugin.getPlotConfigManager().savePlot(arena, pos1, clickedLoc);
+                player.sendMessage(ChatColor.AQUA + "Valid " + sizeX + "x" + sizeZ + " plot finalized and saved for Arena " + arena + "!");
 
                 setupManager.setState(uuid, SetupState.AWAITING_PLOT_P1);
                 player.sendMessage(ChatColor.YELLOW + "Ready for next plot: LEFT-CLICK the first corner, or type /td plotmode to exit.");
@@ -126,8 +127,9 @@ public class WandListener implements Listener {
                 // and 1.0 to Y so they walk ON TOP of the block, not inside it!
                 Location wpLoc = clickedLoc.clone().add(0.5, 1.0, 0.5);
 
-                plugin.getWaypointConfigManager().addWaypoint(wpLoc);
-                player.sendMessage(ChatColor.LIGHT_PURPLE + "Waypoint added at " + wpLoc.getBlockX() + ", " + wpLoc.getBlockY() + ", " + wpLoc.getBlockZ());
+                String arena = setupManager.getEditingArena(uuid);
+                plugin.getWaypointConfigManager().addWaypoint(arena, wpLoc);
+                player.sendMessage(ChatColor.LIGHT_PURPLE + "Waypoint added for Arena " + arena + " at " + wpLoc.getBlockX() + ", " + wpLoc.getBlockY() + ", " + wpLoc.getBlockZ());
             }
         }
 
@@ -157,6 +159,13 @@ public class WandListener implements Listener {
 
         if (plotId != null) {
             event.setCancelled(true);
+            String plotArena = plugin.getPlotConfigManager().getPlotArena(plotId);
+            String playerArena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
+            if (!plotArena.equals(playerArena)) {
+                player.sendMessage(ChatColor.RED + "You cannot build on the opponent's plots!");
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                return;
+            }
             openTowerShopGUI(player, plotId);
         }
     }

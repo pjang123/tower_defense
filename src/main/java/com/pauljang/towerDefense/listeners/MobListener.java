@@ -10,6 +10,7 @@ import org.bukkit.event.entity.EntityCombustByBlockEvent;
 import org.bukkit.event.entity.EntityCombustByEntityEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -19,6 +20,20 @@ public class MobListener implements Listener {
 
     public MobListener(TowerDefense plugin) {
         this.plugin = plugin;
+    }
+
+    @EventHandler
+    public void onCreatureSpawn(CreatureSpawnEvent event) {
+        Entity entity = event.getEntity();
+        if (entity instanceof org.bukkit.entity.Ageable ageable) {
+            ageable.setAdult();
+        }
+        if (entity instanceof org.bukkit.entity.Zombie zombie) {
+            zombie.setBaby(false);
+        }
+        if (entity instanceof org.bukkit.entity.Piglin piglin) {
+            piglin.setBaby(false);
+        }
     }
 
     @EventHandler
@@ -117,21 +132,29 @@ public class MobListener implements Listener {
             event.getDrops().clear();
             event.setDroppedExp(0);
 
-            // Award bounty gold to all active players
+            // Get the arena this mob was walking on
+            String mobArena = entity.getPersistentDataContainer().get(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING);
+            if (mobArena == null) mobArena = "1";
+
+            // Award bounty gold only to active players on that track
             NamespacedKey rewardKey = new NamespacedKey(plugin, "td_gold_reward");
             if (entity.getPersistentDataContainer().has(rewardKey, PersistentDataType.INTEGER)) {
                 int reward = entity.getPersistentDataContainer().get(rewardKey, PersistentDataType.INTEGER);
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    plugin.getGameManager().addGold(player.getUniqueId(), reward);
+                    if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(mobArena)) {
+                        plugin.getGameManager().addGold(player.getUniqueId(), reward);
+                    }
                 }
             }
 
-            // Award experience to all active players
+            // Award experience only to active players on that track
             NamespacedKey xpRewardKey = new NamespacedKey(plugin, "td_xp_reward");
             if (entity.getPersistentDataContainer().has(xpRewardKey, PersistentDataType.INTEGER)) {
                 int xpReward = entity.getPersistentDataContainer().get(xpRewardKey, PersistentDataType.INTEGER);
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    plugin.getGameManager().addExp(player.getUniqueId(), xpReward);
+                    if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(mobArena)) {
+                        plugin.getGameManager().addExp(player.getUniqueId(), xpReward);
+                    }
                 }
             }
         }
@@ -194,7 +217,7 @@ public class MobListener implements Listener {
                     int count = queue.getOrDefault(presetType, 0);
                     if (count > 0) {
                         plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
-                        plugin.getGameManager().addGold(player.getUniqueId(), presetType.getSpawnCost(), true); // Refund
+                        plugin.getGameManager().addGold(player.getUniqueId(), presetType.getSpawnCost(), true); // Refund Gold
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
                     }
                 }
@@ -233,6 +256,14 @@ public class MobListener implements Listener {
 
             // Extract plot ID from title
             String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ").length());
+            String plotArena = plugin.getPlotConfigManager().getPlotArena(plotId);
+            String playerArena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
+            if (!plotArena.equals(playerArena)) {
+                player.sendMessage(org.bukkit.ChatColor.RED + "You cannot buy towers on the opponent's plots!");
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                player.closeInventory();
+                return;
+            }
             int slot = event.getRawSlot();
 
             switch (slot) {
@@ -418,27 +449,9 @@ public class MobListener implements Listener {
         if (bowLevel == 3) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
             
-            // Spawn Firework rocket
-            org.bukkit.entity.Firework firework = player.getWorld().spawn(
-                player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.2)), 
-                org.bukkit.entity.Firework.class
-            );
-            firework.setShooter(player);
-            firework.setVelocity(velocity);
-
-            org.bukkit.inventory.meta.FireworkMeta meta = firework.getFireworkMeta();
-            if (meta != null) {
-                org.bukkit.FireworkEffect effect = org.bukkit.FireworkEffect.builder()
-                    .withColor(org.bukkit.Color.RED, org.bukkit.Color.ORANGE, org.bukkit.Color.BLUE)
-                    .withFade(org.bukkit.Color.WHITE)
-                    .with(org.bukkit.FireworkEffect.Type.BALL_LARGE)
-                    .trail(true)
-                    .flicker(true)
-                    .build();
-                meta.addEffect(effect);
-                meta.setPower(1);
-                firework.setFireworkMeta(meta);
-            }
+            org.bukkit.entity.Arrow arrow = player.launchProjectile(org.bukkit.entity.Arrow.class);
+            arrow.setVelocity(velocity);
+            arrow.setPierceLevel(4);
             
             // Replenish the arrow consumed when charging the crossbow
             player.getInventory().addItem(new org.bukkit.inventory.ItemStack(org.bukkit.Material.ARROW));

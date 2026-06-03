@@ -36,15 +36,18 @@ public class WaypointConfigManager {
     }
 
     public void addWaypoint(Location loc) {
-        // Find the next available ID (0, 1, 2, etc.)
+        addWaypoint("1", loc);
+    }
+
+    public void addWaypoint(String arena, Location loc) {
         int nextId = 0;
-        if (config.contains("waypoints")) {
-            nextId = config.getConfigurationSection("waypoints").getKeys(false).size();
+        String arenaPath = "waypoints." + arena;
+        if (config.contains(arenaPath)) {
+            nextId = config.getConfigurationSection(arenaPath).getKeys(false).size();
         }
 
-        String path = "waypoints." + nextId;
+        String path = arenaPath + "." + nextId;
         config.set(path + ".world", loc.getWorld().getName());
-        // We save double values (X, Y, Z) so the mob can walk to the exact center of a block
         config.set(path + ".x", loc.getX());
         config.set(path + ".y", loc.getY());
         config.set(path + ".z", loc.getZ());
@@ -52,18 +55,26 @@ public class WaypointConfigManager {
         saveFile();
     }
 
-    // A handy method in case you mess up and need to clear the path
     public void clearAllWaypoints() {
-        config.set("waypoints", null);
+        clearAllWaypoints("1");
+    }
+
+    public void clearAllWaypoints(String arena) {
+        config.set("waypoints." + arena, null);
         saveFile();
     }
 
     public java.util.List<Location> getWaypoints() {
-        java.util.List<Location> waypoints = new java.util.ArrayList<>();
-        if (!config.contains("waypoints")) return waypoints;
+        return getWaypoints("1");
+    }
 
-        for (String key : config.getConfigurationSection("waypoints").getKeys(false)) {
-            String path = "waypoints." + key;
+    public java.util.List<Location> getWaypoints(String arena) {
+        java.util.List<Location> waypoints = new java.util.ArrayList<>();
+        String arenaPath = "waypoints." + arena;
+        if (!config.contains(arenaPath)) return waypoints;
+
+        for (String key : config.getConfigurationSection(arenaPath).getKeys(false)) {
+            String path = arenaPath + "." + key;
             String worldName = config.getString(path + ".world");
             double x = config.getDouble(path + ".x");
             double y = config.getDouble(path + ".y");
