@@ -3,6 +3,7 @@ package com.pauljang.towerDefense.entities;
 import com.pauljang.towerDefense.TowerDefense;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Mob;
 import org.bukkit.persistence.PersistentDataType;
@@ -35,8 +36,50 @@ public class MobManager {
         // Mark as a TD Mob so we can handle events (like sunlight burning)
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
 
+        // Make the mob immune to knockback via attributes
+        org.bukkit.attribute.AttributeInstance kbResist = entity.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (kbResist != null) {
+            kbResist.setBaseValue(1.0);
+        }
+
+        // Initialize healthbar
+        updateHealthBar(entity);
+
         TDMob tdMob = new TDMob(entity, waypoints);
         activeMobs.add(tdMob);
+    }
+
+    public void updateHealthBar(Mob mob) {
+        org.bukkit.attribute.AttributeInstance maxHealthAttr = mob.getAttribute(Attribute.MAX_HEALTH);
+        double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : mob.getHealth();
+        double health = mob.getHealth();
+        double ratio = Math.max(0.0, Math.min(1.0, health / maxHealth));
+
+        int totalBars = 10;
+        int greenBars = (int) Math.round(ratio * totalBars);
+        int grayBars = totalBars - greenBars;
+
+        org.bukkit.ChatColor color;
+        if (ratio >= 0.6) {
+            color = org.bukkit.ChatColor.GREEN;
+        } else if (ratio >= 0.25) {
+            color = org.bukkit.ChatColor.YELLOW;
+        } else {
+            color = org.bukkit.ChatColor.RED;
+        }
+
+        StringBuilder bar = new StringBuilder();
+        bar.append(color);
+        for (int i = 0; i < greenBars; i++) {
+            bar.append("■");
+        }
+        bar.append(org.bukkit.ChatColor.GRAY);
+        for (int i = 0; i < grayBars; i++) {
+            bar.append("■");
+        }
+
+        mob.setCustomName(bar.toString());
+        mob.setCustomNameVisible(true);
     }
 
     private void startMobTicker() {
