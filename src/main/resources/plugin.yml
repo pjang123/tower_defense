@@ -1,0 +1,6 @@
+name: Tower Defense
+version: '${version}'
+
+main: com.pauljang.towerDefense.TowerDefense
+api-version: '26.1.2'
+load: POSTWORLD
