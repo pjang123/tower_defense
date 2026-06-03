@@ -9,7 +9,8 @@ public class SetupManager {
     public enum SetupState {
         IDLE,               // Not currently setting up anything
         AWAITING_PLOT_P1,   // Waiting for the admin to click the first corner
-        AWAITING_PLOT_P2    // Waiting for the admin to click the second corner
+        AWAITING_PLOT_P2,    // Waiting for the admin to click the second corner
+        WAYPOINT_MODE
     }
 
     private final HashMap<UUID, SetupState> playerStates = new HashMap<>();

@@ -3,8 +3,9 @@ package com.pauljang.towerDefense;
 import com.pauljang.towerDefense.core.GameManager;
 import com.pauljang.towerDefense.core.GameState;
 import com.pauljang.towerDefense.core.TDCommand;
+import com.pauljang.towerDefense.data.PlotConfigManager;
+import com.pauljang.towerDefense.data.WaypointConfigManager;
 import com.pauljang.towerDefense.listeners.WandListener;
-import com.pauljang.towerDefense.setup.PlotConfigManager;
 import com.pauljang.towerDefense.setup.SetupManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -13,6 +14,7 @@ public final class TowerDefense extends JavaPlugin {
     private GameManager gameManager;
     private SetupManager setupManager;
     private PlotConfigManager plotConfigManager;
+    private WaypointConfigManager waypointConfigManager;
 
     @Override
     public void onEnable() {
@@ -20,6 +22,7 @@ public final class TowerDefense extends JavaPlugin {
         this.gameManager = new GameManager(this);
         this.setupManager = new SetupManager();
         this.plotConfigManager = new PlotConfigManager(this);
+        this.waypointConfigManager = new WaypointConfigManager(this);
 
         // Register commands
         getCommand("td").setExecutor(new TDCommand(this));
@@ -48,5 +51,8 @@ public final class TowerDefense extends JavaPlugin {
 
     public PlotConfigManager getPlotConfigManager() {
         return plotConfigManager;
+    }
+    public WaypointConfigManager getWaypointConfigManager() {
+        return waypointConfigManager;
     }
 }

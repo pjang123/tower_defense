@@ -1,6 +1,8 @@
 package com.pauljang.towerDefense.listeners;
 
 import com.pauljang.towerDefense.TowerDefense;
+import com.pauljang.towerDefense.data.PlotConfigManager;
+import com.pauljang.towerDefense.data.WaypointConfigManager;
 import com.pauljang.towerDefense.setup.SetupManager;
 import com.pauljang.towerDefense.setup.SetupManager.SetupState;
 import org.bukkit.ChatColor;
@@ -94,7 +96,14 @@ public class WandListener implements Listener {
                     return; // Stop the code here, let them try again
                 }
 
-                // 3. If it passes all checks, save it!
+                // 3. Check for overlapping plots
+                if (plugin.getPlotConfigManager().isPlotOverlapping(pos1, clickedLoc)) {
+                    player.sendMessage(ChatColor.RED + "Error: This plot overlaps with an existing one!");
+                    player.sendMessage(ChatColor.YELLOW + "Please RIGHT-CLICK a different block for Corner 2.");
+                    return;
+                }
+
+                // 4. If it passes all checks, save it!
                 setupManager.setPos2(uuid, clickedLoc);
                 player.sendMessage(ChatColor.GREEN + "Corner 2 saved at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ());
 
@@ -108,6 +117,17 @@ public class WandListener implements Listener {
                 setupManager.setPos1(uuid, clickedLoc);
                 player.sendMessage(ChatColor.GREEN + "Corner 1 UPDATED at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ());
                 player.sendMessage(ChatColor.YELLOW + "Now, please RIGHT-CLICK the opposite corner of the plot.");
+            }
+        }
+
+        else if (state == SetupState.WAYPOINT_MODE) {
+            if (action == Action.LEFT_CLICK_BLOCK) {
+                // We add 0.5 to X and Z so the mob walks to the exact center of the block,
+                // and 1.0 to Y so they walk ON TOP of the block, not inside it!
+                Location wpLoc = clickedLoc.clone().add(0.5, 1.0, 0.5);
+
+                plugin.getWaypointConfigManager().addWaypoint(wpLoc);
+                player.sendMessage(ChatColor.LIGHT_PURPLE + "Waypoint added at " + wpLoc.getBlockX() + ", " + wpLoc.getBlockY() + ", " + wpLoc.getBlockZ());
             }
         }
 
