@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode|waypointmode|wand|clearwaypoints>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode|waypointmode|wand|clearwaypoints|spawnmob>");
             return true;
         }
 
@@ -48,6 +48,12 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td plotmode " + ChatColor.WHITE + "- Toggle Plot Setup mode");
                 player.sendMessage(ChatColor.YELLOW + "/td waypointmode " + ChatColor.WHITE + "- Toggle Waypoint Setup mode");
                 player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints " + ChatColor.WHITE + "- Wipe all waypoints");
+                player.sendMessage(ChatColor.YELLOW + "/td spawnmob " + ChatColor.WHITE + "- Spawn a test mob");
+                break;
+
+            case "spawnmob":
+                plugin.getMobManager().spawnMob(org.bukkit.entity.EntityType.ZOMBIE);
+                player.sendMessage(ChatColor.GREEN + "Spawned a test mob at the first waypoint!");
                 break;
 
             case "start":

@@ -58,6 +58,25 @@ public class WaypointConfigManager {
         saveFile();
     }
 
+    public java.util.List<Location> getWaypoints() {
+        java.util.List<Location> waypoints = new java.util.ArrayList<>();
+        if (!config.contains("waypoints")) return waypoints;
+
+        for (String key : config.getConfigurationSection("waypoints").getKeys(false)) {
+            String path = "waypoints." + key;
+            String worldName = config.getString(path + ".world");
+            double x = config.getDouble(path + ".x");
+            double y = config.getDouble(path + ".y");
+            double z = config.getDouble(path + ".z");
+
+            org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+            if (world != null) {
+                waypoints.add(new Location(world, x, y, z));
+            }
+        }
+        return waypoints;
+    }
+
     private void saveFile() {
         try {
             config.save(file);

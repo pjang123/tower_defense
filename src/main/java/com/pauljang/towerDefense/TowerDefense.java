@@ -5,6 +5,8 @@ import com.pauljang.towerDefense.core.GameState;
 import com.pauljang.towerDefense.core.TDCommand;
 import com.pauljang.towerDefense.data.PlotConfigManager;
 import com.pauljang.towerDefense.data.WaypointConfigManager;
+import com.pauljang.towerDefense.entities.MobManager;
+import com.pauljang.towerDefense.listeners.MobListener;
 import com.pauljang.towerDefense.listeners.WandListener;
 import com.pauljang.towerDefense.setup.SetupManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -15,6 +17,7 @@ public final class TowerDefense extends JavaPlugin {
     private SetupManager setupManager;
     private PlotConfigManager plotConfigManager;
     private WaypointConfigManager waypointConfigManager;
+    private MobManager mobManager;
 
     @Override
     public void onEnable() {
@@ -23,12 +26,14 @@ public final class TowerDefense extends JavaPlugin {
         this.setupManager = new SetupManager();
         this.plotConfigManager = new PlotConfigManager(this);
         this.waypointConfigManager = new WaypointConfigManager(this);
+        this.mobManager = new MobManager(this);
 
         // Register commands
         getCommand("td").setExecutor(new TDCommand(this));
 
         // Register listeners
         getServer().getPluginManager().registerEvents(new WandListener(this), this);
+        getServer().getPluginManager().registerEvents(new MobListener(this), this);
 
         // Set the default state
         this.gameManager.setGameState(GameState.LOBBY);
@@ -38,6 +43,9 @@ public final class TowerDefense extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (this.mobManager != null) {
+            this.mobManager.cleanup();
+        }
         getLogger().info("TowerDefense successfully disabled!");
     }
 
@@ -54,5 +62,8 @@ public final class TowerDefense extends JavaPlugin {
     }
     public WaypointConfigManager getWaypointConfigManager() {
         return waypointConfigManager;
+    }
+    public MobManager getMobManager() {
+        return mobManager;
     }
 }
