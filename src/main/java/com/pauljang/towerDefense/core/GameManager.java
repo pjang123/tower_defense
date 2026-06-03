@@ -17,7 +17,7 @@ public class GameManager {
     private final TowerDefense plugin;
     private GameState currentState = null;
 
-    private final int maxCastleHealth = 20;
+    private int maxCastleHealth = 20;
     private final java.util.Map<String, Integer> arenaHealth = new java.util.HashMap<>();
     private final java.util.Map<String, java.util.Map<String, Long>> activeSpells = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.Location, org.bukkit.Material> originalFloorBlocks = new java.util.HashMap<>();
@@ -37,6 +37,7 @@ public class GameManager {
 
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
+        this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 20);
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
         
@@ -49,13 +50,52 @@ public class GameManager {
                     addGold(player.getUniqueId(), amount, true); // Quiet passive generation
                 }
                 updateScoreboard(player);
-                if (player.getInventory().contains(Material.BOW) || player.getInventory().contains(Material.CROSSBOW)) {
-                    if (!player.getInventory().contains(Material.ARROW)) {
-                        player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.ARROW));
+                // Keep the inventory completely clear of arrows
+                player.getInventory().remove(Material.ARROW);
+            }
+        }, 0L, 20L);
+
+        // Spell Particle Ticker (every 5 ticks)
+        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (currentState != GameState.ACTIVE) return;
+            
+            for (String arena : new String[]{"1", "2"}) {
+                boolean overcharge = isSpellActive(arena, "OVERCHARGE");
+                boolean freeze = isSpellActive(arena, "FREEZE");
+                boolean storm = isSpellActive(arena, "DAMAGE_STORM");
+                boolean haste = isSpellActive(arena, "HASTE_RUSH");
+                boolean emp = isSpellActive(arena, "TOWER_EMP");
+                boolean shield = isSpellActive(arena, "SLOW_SHIELD");
+                
+                if (!overcharge && !freeze && !storm && !haste && !emp && !shield) continue;
+                
+                java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+                for (Location wp : waypoints) {
+                    Location loc = wp.clone().add(0, 0.1, 0);
+                    org.bukkit.World world = loc.getWorld();
+                    if (world == null) continue;
+                    
+                    if (overcharge) {
+                        world.spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, loc, 1, 0.3, 0.1, 0.3, 0.0);
+                    }
+                    if (freeze) {
+                        world.spawnParticle(org.bukkit.Particle.SNOWFLAKE, loc, 1, 0.3, 0.1, 0.3, 0.0);
+                    }
+                    if (storm) {
+                        world.spawnParticle(org.bukkit.Particle.FLAME, loc, 1, 0.3, 0.1, 0.3, 0.02);
+                    }
+                    if (haste) {
+                        world.spawnParticle(org.bukkit.Particle.CRIT, loc, 1, 0.3, 0.1, 0.3, 0.0);
+                    }
+                    if (emp) {
+                        world.spawnParticle(org.bukkit.Particle.SMOKE, loc, 1, 0.3, 0.1, 0.3, 0.0);
+                    }
+                    if (shield) {
+                        world.spawnParticle(org.bukkit.Particle.PORTAL, loc, 1, 0.3, 0.1, 0.3, 0.0);
                     }
                 }
             }
-        }, 0L, 20L);
+        }, 0L, 5L);
     }
 
     public GameState getCurrentState() {
@@ -108,8 +148,8 @@ public class GameManager {
     }
 
     private void handleGameStart() {
-        if (!arenaHealth.containsKey("1")) arenaHealth.put("1", maxCastleHealth);
-        if (!arenaHealth.containsKey("2")) arenaHealth.put("2", maxCastleHealth);
+        arenaHealth.put("1", maxCastleHealth);
+        arenaHealth.put("2", maxCastleHealth);
         showBossBar();
         updateCastleHologram("1");
         updateCastleHologram("2");
@@ -258,10 +298,19 @@ public class GameManager {
                 if (!waypoints.isEmpty()) {
                     Location lastWp = waypoints.get(waypoints.size() - 1);
                     Location spawnLoc = lastWp.clone().add(0, 3.0, 0);
+                    
+                    // Clean up any existing armor stands at the spawn location first to prevent stacking/ghost holograms
+                    spawnLoc.getWorld().getNearbyEntities(spawnLoc, 2.0, 2.0, 2.0).stream()
+                        .filter(e -> e instanceof ArmorStand)
+                        .filter(as -> !castleHolograms.containsValue(as))
+                        .forEach(org.bukkit.entity.Entity::remove);
+
                     stand = spawnLoc.getWorld().spawn(spawnLoc, ArmorStand.class, as -> {
                         as.setVisible(false);
                         as.setGravity(false);
                         as.setMarker(true);
+                        as.setInvulnerable(true);
+                        as.setPersistent(false);
                         as.setCustomName("");
                         as.setCustomNameVisible(true);
                     });
@@ -326,15 +375,35 @@ public class GameManager {
         long endTime = System.currentTimeMillis() + (durationSeconds * 1000L);
         activeSpells.computeIfAbsent(arena, k -> new java.util.HashMap<>()).put(spell, endTime);
 
+        // Play cast sound at the middle of the waypoints (3D sound)
+        java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+        if (!waypoints.isEmpty()) {
+            Location soundLoc = waypoints.get(waypoints.size() / 2);
+            Sound castSound = switch (spell) {
+                case "OVERCHARGE" -> Sound.BLOCK_ANVIL_PLACE;
+                case "FREEZE" -> Sound.BLOCK_GLASS_BREAK;
+                case "DAMAGE_STORM" -> Sound.ENTITY_BLAZE_SHOOT;
+                case "HASTE_RUSH" -> Sound.ENTITY_BAT_TAKEOFF;
+                case "TOWER_EMP" -> Sound.ENTITY_LIGHTNING_BOLT_THUNDER;
+                case "SLOW_SHIELD" -> Sound.ITEM_ARMOR_EQUIP_NETHERITE;
+                default -> null;
+            };
+            if (castSound != null) {
+                soundLoc.getWorld().playSound(soundLoc, castSound, 2.0f, 1.0f);
+            }
+        }
+
         Material blockMat = switch (spell) {
             case "OVERCHARGE" -> Material.EMERALD_BLOCK;
             case "FREEZE" -> Material.SNOW_BLOCK;
             case "DAMAGE_STORM" -> Material.MAGMA_BLOCK;
+            case "HASTE_RUSH" -> Material.GOLD_BLOCK;
+            case "TOWER_EMP" -> Material.REDSTONE_BLOCK;
+            case "SLOW_SHIELD" -> Material.LAPIS_BLOCK;
             default -> null;
         };
 
         if (blockMat != null) {
-            java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
             for (Location wp : waypoints) {
                 Location floorLoc = wp.clone().subtract(0, 1, 0);
                 if (!originalFloorBlocks.containsKey(floorLoc)) {
@@ -370,6 +439,9 @@ public class GameManager {
                 case "OVERCHARGE" -> Material.EMERALD_BLOCK;
                 case "FREEZE" -> Material.SNOW_BLOCK;
                 case "DAMAGE_STORM" -> Material.MAGMA_BLOCK;
+                case "HASTE_RUSH" -> Material.GOLD_BLOCK;
+                case "TOWER_EMP" -> Material.REDSTONE_BLOCK;
+                case "SLOW_SHIELD" -> Material.LAPIS_BLOCK;
                 default -> null;
             };
             if (remainingMat != null) {
@@ -396,6 +468,41 @@ public class GameManager {
             entry.getKey().getBlock().setType(entry.getValue());
         }
         originalFloorBlocks.clear();
+    }
+
+    public void disableRandomTower(String arena, int durationSeconds) {
+        java.util.List<com.pauljang.towerDefense.towers.Tower> arenaTowers = new java.util.ArrayList<>();
+        for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
+            String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+            if (arena.equals(towerArena)) {
+                arenaTowers.add(tower);
+            }
+        }
+        if (arenaTowers.isEmpty()) {
+            return; // No towers to disable
+        }
+        // Pick a random tower
+        java.util.Collections.shuffle(arenaTowers);
+        com.pauljang.towerDefense.towers.Tower targetTower = arenaTowers.get(0);
+        
+        // Set disabled until
+        long durationMs = durationSeconds * 1000L;
+        targetTower.setDisabledUntil(System.currentTimeMillis() + durationMs);
+        
+        // Play sound and visual effect at the tower
+        Location center = targetTower.getCenterLocation();
+        center.getWorld().playSound(center, Sound.ENTITY_ITEM_BREAK, 1.0f, 0.5f);
+        center.getWorld().playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 0.8f);
+        center.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, center.clone().add(0, 2, 0), 1);
+        
+        // Alert players on that track
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            String pArena = getPlayerArena(player.getUniqueId());
+            if (arena.equals(pArena)) {
+                player.sendMessage(ChatColor.RED + "⚡ Your " + targetTower.getType().getDisplayName() + " at " + targetTower.getPlotId() + " has been disabled by an EMP for " + durationSeconds + " seconds! ⚡");
+                player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.8f, 0.8f);
+            }
+        }
     }
 
     public void challengePlayer(Player challenger, Player target) {
@@ -482,7 +589,7 @@ public class GameManager {
 
     private void resetPlayerForMatch(Player player, String arena) {
         java.util.UUID uuid = player.getUniqueId();
-        playerGold.put(uuid, 150);
+        playerGold.put(uuid, plugin.getConfig().getInt("game.starting-gold", 150));
         playerExp.put(uuid, 0);
         goldGenLevels.put(uuid, 1);
         swordLevels.put(uuid, 1);
@@ -504,7 +611,7 @@ public class GameManager {
     // --- Economy / Gold System ---
 
     public int getGold(java.util.UUID uuid) {
-        return playerGold.getOrDefault(uuid, 150); // Default start gold: 150
+        return playerGold.getOrDefault(uuid, plugin.getConfig().getInt("game.starting-gold", 150));
     }
 
     public void addGold(java.util.UUID uuid, int amount) {
@@ -660,10 +767,8 @@ public class GameManager {
         replaceItemInInventory(player, swordMat, "SWORD");
         replaceItemInInventory(player, bowMat, "BOW");
         
-        // Give 1 arrow for ammo bypass
-        if (!player.getInventory().contains(Material.ARROW)) {
-            player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.ARROW));
-        }
+        // Clear any arrows that might have been in the inventory
+        player.getInventory().remove(Material.ARROW);
 
         // Give Mob Spawner Menu Item in slot 7 (index 7)
         org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
@@ -774,11 +879,11 @@ public class GameManager {
         java.util.List<String> genLore = new java.util.ArrayList<>();
         genLore.add(ChatColor.GRAY + "Generates passive gold during the wave.");
         genLore.add(ChatColor.YELLOW + "Current Level: " + ChatColor.WHITE + goldLvl + "/4");
-        genLore.add(ChatColor.YELLOW + "Current Rate: " + ChatColor.WHITE + (goldLvl == 1 ? "5" : goldLvl == 2 ? "20" : goldLvl == 3 ? "50" : "100") + " Gold/sec");
+        genLore.add(ChatColor.YELLOW + "Current Rate: " + ChatColor.WHITE + getPlayerIncomeRate(uuid) + " Gold/sec");
         genLore.add("");
         if (goldLvl < 4) {
-            int nextCost = goldLvl == 1 ? 100 : goldLvl == 2 ? 300 : 600;
-            int nextRate = goldLvl == 1 ? 20 : goldLvl == 2 ? 50 : 100;
+            int nextCost = goldLvl == 1 ? plugin.getConfig().getInt("upgrades.gold-gen.upgrade-costs.level2", 100) : goldLvl == 2 ? plugin.getConfig().getInt("upgrades.gold-gen.upgrade-costs.level3", 300) : plugin.getConfig().getInt("upgrades.gold-gen.upgrade-costs.level4", 600);
+            int nextRate = goldLvl == 1 ? plugin.getConfig().getInt("upgrades.gold-gen.level2-income", 20) : goldLvl == 2 ? plugin.getConfig().getInt("upgrades.gold-gen.level3-income", 50) : plugin.getConfig().getInt("upgrades.gold-gen.level4-income", 100);
             genLore.add(ChatColor.GREEN + "Upgrade to Level " + (goldLvl + 1) + ":");
             genLore.add(ChatColor.GRAY + " - Rate: " + nextRate + " Gold/sec");
             genLore.add(ChatColor.GOLD + " - Cost: " + ChatColor.YELLOW + nextCost + " TD EXP");
@@ -798,7 +903,7 @@ public class GameManager {
         swordLore.add(ChatColor.YELLOW + "Current Tier: " + ChatColor.WHITE + swordMat.name().replace("_", " "));
         swordLore.add("");
         if (sLvl < 5) {
-            int nextCost = sLvl == 1 ? 80 : sLvl == 2 ? 200 : sLvl == 3 ? 450 : 900;
+            int nextCost = sLvl == 1 ? plugin.getConfig().getInt("upgrades.sword.upgrade-costs.level2", 80) : sLvl == 2 ? plugin.getConfig().getInt("upgrades.sword.upgrade-costs.level3", 200) : sLvl == 3 ? plugin.getConfig().getInt("upgrades.sword.upgrade-costs.level4", 450) : plugin.getConfig().getInt("upgrades.sword.upgrade-costs.level5", 900);
             String nextTier = sLvl == 1 ? "Stone" : sLvl == 2 ? "Iron" : sLvl == 3 ? "Diamond" : "Netherite";
             swordLore.add(ChatColor.GREEN + "Upgrade to " + nextTier + " Sword:");
             swordLore.add(ChatColor.GOLD + " - Cost: " + ChatColor.YELLOW + nextCost + " TD EXP");
@@ -818,7 +923,7 @@ public class GameManager {
         bowLore.add(ChatColor.YELLOW + "Current Weapon: " + ChatColor.WHITE + (bLvl == 1 ? "Bow" : bLvl == 2 ? "Crossbow (Quick Charge I)" : "Crossbow (Quick Charge III + Piercing IV)"));
         bowLore.add("");
         if (bLvl < 3) {
-            int nextCost = bLvl == 1 ? 150 : 450;
+            int nextCost = bLvl == 1 ? plugin.getConfig().getInt("upgrades.bow.upgrade-costs.level2", 150) : plugin.getConfig().getInt("upgrades.bow.upgrade-costs.level3", 450);
             String nextWeapon = bLvl == 1 ? "Crossbow (Quick Charge I)" : "Crossbow (Quick Charge III + Piercing IV)";
             bowLore.add(ChatColor.GREEN + "Upgrade to " + nextWeapon + ":");
             bowLore.add(ChatColor.GOLD + " - Cost: " + ChatColor.YELLOW + nextCost + " TD EXP");
@@ -829,31 +934,76 @@ public class GameManager {
         }
         gui.setItem(11, createCustomGUIItem(bowMat, bowName, bowLore));
 
-        // 4. Spells (Slot 14, 15, 16)
+        // 4. Defensive Spells (Slot 12, 13, 14)
+        int overchargeCost = plugin.getConfig().getInt("spells.overcharge.cost", 250);
+        int overchargeDur = plugin.getConfig().getInt("spells.overcharge.duration", 10);
         java.util.List<String> overchargeLore = new java.util.ArrayList<>();
         overchargeLore.add(ChatColor.GRAY + "Increases tower attack speeds on your track by 50%.");
-        overchargeLore.add(ChatColor.GRAY + "Duration: 10 seconds");
-        overchargeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "250 Gold");
+        overchargeLore.add(ChatColor.GRAY + "Duration: " + overchargeDur + " seconds");
+        overchargeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + overchargeCost + " Gold");
         overchargeLore.add("");
         overchargeLore.add(ChatColor.YELLOW + "Click to cast on your track!");
-        gui.setItem(14, createCustomGUIItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "" + ChatColor.BOLD + "Spell: Overcharge", overchargeLore));
+        gui.setItem(12, createCustomGUIItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "" + ChatColor.BOLD + "Spell: Overcharge", overchargeLore));
 
+        int freezeCost = plugin.getConfig().getInt("spells.freeze.cost", 200);
+        int freezeDur = plugin.getConfig().getInt("spells.freeze.duration", 10);
+        double freezeSlow = plugin.getConfig().getDouble("spells.freeze.slow-multiplier", 0.4);
+        int freezePct = (int) Math.round((1.0 - freezeSlow) * 100.0);
         java.util.List<String> freezeLore = new java.util.ArrayList<>();
-        freezeLore.add(ChatColor.GRAY + "Slows down mobs traversing your track.");
+        freezeLore.add(ChatColor.GRAY + "Slows down mobs traversing your track by " + freezePct + "%.");
         freezeLore.add(ChatColor.GRAY + "(Does not affect slow-immune mobs)");
-        freezeLore.add(ChatColor.GRAY + "Duration: 10 seconds");
-        freezeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "200 Gold");
+        freezeLore.add(ChatColor.GRAY + "Duration: " + freezeDur + " seconds");
+        freezeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + freezeCost + " Gold");
         freezeLore.add("");
         freezeLore.add(ChatColor.YELLOW + "Click to cast on your track!");
-        gui.setItem(15, createCustomGUIItem(Material.SNOW_BLOCK, ChatColor.AQUA + "" + ChatColor.BOLD + "Spell: Freeze", freezeLore));
+        gui.setItem(13, createCustomGUIItem(Material.SNOW_BLOCK, ChatColor.AQUA + "" + ChatColor.BOLD + "Spell: Freeze", freezeLore));
 
+        int stormCost = plugin.getConfig().getInt("spells.damage-storm.cost", 300);
+        int stormDur = plugin.getConfig().getInt("spells.damage-storm.duration", 10);
+        double stormDps = plugin.getConfig().getDouble("spells.damage-storm.damage-per-second", 2.0);
         java.util.List<String> stormLore = new java.util.ArrayList<>();
-        stormLore.add(ChatColor.GRAY + "Deals periodic damage to mobs traversing your track.");
-        stormLore.add(ChatColor.GRAY + "Duration: 10 seconds");
-        stormLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + "300 Gold");
+        stormLore.add(ChatColor.GRAY + "Deals periodic damage (" + stormDps + " HP/s) to mobs traversing your track.");
+        stormLore.add(ChatColor.GRAY + "Duration: " + stormDur + " seconds");
+        stormLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + stormCost + " Gold");
         stormLore.add("");
         stormLore.add(ChatColor.YELLOW + "Click to cast on your track!");
-        gui.setItem(16, createCustomGUIItem(Material.MAGMA_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Spell: Damage Storm", stormLore));
+        gui.setItem(14, createCustomGUIItem(Material.MAGMA_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Spell: Damage Storm", stormLore));
+
+        // 5. Offensive Spells / Sabotages (Slot 21, 22, 23)
+        int hasteCost = plugin.getConfig().getInt("spells.haste-rush.cost", 200);
+        int hasteDur = plugin.getConfig().getInt("spells.haste-rush.duration", 6);
+        double hasteMult = plugin.getConfig().getDouble("spells.haste-rush.speed-multiplier", 1.6);
+        int hastePct = (int) Math.round((hasteMult - 1.0) * 100.0);
+        java.util.List<String> hasteLore = new java.util.ArrayList<>();
+        hasteLore.add(ChatColor.GRAY + "Grants Speed II (+" + hastePct + "% speed) to all mobs");
+        hasteLore.add(ChatColor.GRAY + "currently traversing the opponent's track.");
+        hasteLore.add(ChatColor.GRAY + "Duration: " + hasteDur + " seconds");
+        hasteLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + hasteCost + " Gold");
+        hasteLore.add("");
+        hasteLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
+        gui.setItem(21, createCustomGUIItem(Material.GOLD_BLOCK, ChatColor.GOLD + "" + ChatColor.BOLD + "Sabotage: Haste Rush", hasteLore));
+
+        int empCost = plugin.getConfig().getInt("spells.tower-emp.cost", 250);
+        int empDur = plugin.getConfig().getInt("spells.tower-emp.duration", 6);
+        java.util.List<String> empLore = new java.util.ArrayList<>();
+        empLore.add(ChatColor.GRAY + "Disables a random tower on the opponent's");
+        empLore.add(ChatColor.GRAY + "track, stopping its attacks completely.");
+        empLore.add(ChatColor.GRAY + "Duration: " + empDur + " seconds");
+        empLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + empCost + " Gold");
+        empLore.add("");
+        empLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
+        gui.setItem(22, createCustomGUIItem(Material.REDSTONE_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Sabotage: Tower EMP", empLore));
+
+        int shieldCost = plugin.getConfig().getInt("spells.slow-shield.cost", 150);
+        int shieldDur = plugin.getConfig().getInt("spells.slow-shield.duration", 10);
+        java.util.List<String> shieldLore = new java.util.ArrayList<>();
+        shieldLore.add(ChatColor.GRAY + "Grants slow immunity to any mobs spawned");
+        shieldLore.add(ChatColor.GRAY + "on the opponent's track during the spell.");
+        shieldLore.add(ChatColor.GRAY + "Duration: " + shieldDur + " seconds");
+        shieldLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + shieldCost + " Gold");
+        shieldLore.add("");
+        shieldLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
+        gui.setItem(23, createCustomGUIItem(Material.LAPIS_BLOCK, ChatColor.BLUE + "" + ChatColor.BOLD + "Sabotage: Slow Shield", shieldLore));
 
         // Stats Display (Slot 49)
         java.util.List<String> statLore = new java.util.ArrayList<>();

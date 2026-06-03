@@ -5,11 +5,17 @@ import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 
 public enum PresetMobType {
-    DEFAULT_ZOMBIE(EntityType.ZOMBIE, 1.0, -1.0, 0.0, false, false, Material.ZOMBIE_SPAWN_EGG, ChatColor.GREEN, "Default Zombie", 15, 5, 10),
-    GIANT(EntityType.GIANT, 0.5, 150.0, 8.0, true, false, Material.ROTTEN_FLESH, ChatColor.DARK_RED, "Giant Zombie", 80, 40, 50),
-    FIRE_ZOMBIE(EntityType.ZOMBIE, 1.2, 25.0, 2.0, true, true, Material.MAGMA_CREAM, ChatColor.GOLD, "Nether Fire Zombie", 40, 20, 25),
-    PIGLIN(EntityType.PIGLIN, 1.0, -1.0, 0.0, false, false, Material.PIGLIN_SPAWN_EGG, ChatColor.LIGHT_PURPLE, "Piglin Attacker", 25, 10, 15),
-    HOGLIN(EntityType.HOGLIN, 1.0, -1.0, 0.0, false, false, Material.HOGLIN_SPAWN_EGG, ChatColor.DARK_PURPLE, "Hoglin Attacker", 60, 30, 40);
+    ZOMBIE(EntityType.ZOMBIE, 1.0, 20.0, 2.0, false, false, Material.ZOMBIE_SPAWN_EGG, ChatColor.GREEN, "Zombie", 15, 5, 15),
+    SKELETON(EntityType.SKELETON, 1.1, 30.0, 2.0, false, false, Material.SKELETON_SPAWN_EGG, ChatColor.GRAY, "Skeleton", 45, 15, 60),
+    SILVERFISH(EntityType.SILVERFISH, 1.6, 8.0, 0.0, false, false, Material.SILVERFISH_SPAWN_EGG, ChatColor.DARK_GRAY, "Silverfish", 80, 25, 120),
+    SPIDER(EntityType.SPIDER, 1.4, 40.0, 2.0, false, false, Material.SPIDER_SPAWN_EGG, ChatColor.RED, "Spider", 100, 30, 150),
+    PIGMAN(EntityType.ZOMBIFIED_PIGLIN, 0.7, 100.0, 4.0, false, true, Material.ZOMBIFIED_PIGLIN_SPAWN_EGG, ChatColor.GOLD, "Pigman", 130, 45, 200),
+    SLIME(EntityType.SLIME, 0.9, 50.0, 0.0, false, false, Material.SLIME_SPAWN_EGG, ChatColor.GREEN, "Slime", 160, 50, 250),
+    CREEPER(EntityType.CREEPER, 1.0, 60.0, 0.0, false, false, Material.CREEPER_SPAWN_EGG, ChatColor.DARK_GREEN, "Creeper", 260, 80, 400),
+    BLAZE(EntityType.BLAZE, 1.0, 80.0, 0.0, true, true, Material.BLAZE_SPAWN_EGG, ChatColor.GOLD, "Blaze", 320, 100, 500),
+    MAGMA_CUBE(EntityType.MAGMA_CUBE, 0.8, 90.0, 6.0, true, true, Material.MAGMA_CUBE_SPAWN_EGG, ChatColor.DARK_RED, "Magma Cube", 380, 120, 600),
+    GHAST(EntityType.GHAST, 0.7, 200.0, 0.0, true, true, Material.GHAST_SPAWN_EGG, ChatColor.WHITE, "Ghast", 500, 160, 800),
+    GIANT(EntityType.GIANT, 0.4, 500.0, 10.0, true, false, Material.ROTTEN_FLESH, ChatColor.DARK_RED, "Giant Zombie", 600, 200, 1000);
 
     private final EntityType entityType;
     private final double speed;

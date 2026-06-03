@@ -1,0 +1,227 @@
+# Global game settings
+game:
+  starting-gold: 150
+  max-castle-health: 20
+  challenge-timeout-seconds: 30
+
+# Spells configuration (costs in gold, durations in seconds)
+spells:
+  overcharge:
+    cost: 250
+    duration: 10
+  freeze:
+    cost: 200
+    duration: 10
+    slow-multiplier: 0.4
+  damage-storm:
+    cost: 300
+    duration: 10
+    damage-per-second: 2.0
+  haste-rush:
+    cost: 200
+    duration: 6
+    speed-multiplier: 1.6
+  tower-emp:
+    cost: 250
+    duration: 6
+  slow-shield:
+    cost: 150
+    duration: 10
+
+# Passive gold generator & gear upgrades settings
+upgrades:
+  gold-gen:
+    level1-income: 5
+    level2-income: 20
+    level3-income: 50
+    level4-income: 100
+    upgrade-costs:
+      level2: 100
+      level3: 300
+      level4: 600
+  sword:
+    upgrade-costs:
+      level2: 80
+      level3: 200
+      level4: 450
+      level5: 900
+  bow:
+    upgrade-costs:
+      level2: 150
+      level3: 450
+
+# Mobs configuration (costs, speeds, health, armor, rewards, height offset, and special traits)
+mobs:
+  zombie:
+    spawn-cost: 15
+    speed: 1.0
+    health: 20.0
+    armor: 2.0
+    gold-reward: 15
+    xp-reward: 5
+    slow-immune: false
+    fire-immune: false
+    height-offset: 0.0
+  skeleton:
+    spawn-cost: 60
+    speed: 1.1
+    health: 30.0
+    armor: 2.0
+    gold-reward: 45
+    xp-reward: 15
+    slow-immune: false
+    fire-immune: false
+    height-offset: 0.0
+  silverfish:
+    spawn-cost: 120
+    speed: 1.6
+    health: 8.0
+    armor: 0.0
+    gold-reward: 80
+    xp-reward: 25
+    slow-immune: false
+    fire-immune: false
+    height-offset: 0.0
+  spider:
+    spawn-cost: 150
+    speed: 1.4
+    health: 40.0
+    armor: 2.0
+    gold-reward: 100
+    xp-reward: 30
+    slow-immune: false
+    fire-immune: false
+    height-offset: 0.0
+  pigman:
+    spawn-cost: 200
+    speed: 0.7
+    health: 100.0
+    armor: 4.0
+    gold-reward: 130
+    xp-reward: 45
+    slow-immune: false
+    fire-immune: true
+    height-offset: 0.0
+  slime:
+    spawn-cost: 250
+    speed: 0.9
+    health: 50.0
+    armor: 0.0
+    gold-reward: 160
+    xp-reward: 50
+    slow-immune: false
+    fire-immune: false
+    height-offset: 0.0
+    slime-size: 2
+  creeper:
+    spawn-cost: 400
+    speed: 1.0
+    health: 60.0
+    armor: 0.0
+    gold-reward: 260
+    xp-reward: 80
+    slow-immune: false
+    fire-immune: false
+    height-offset: 0.0
+    castle-damage: 5
+  blaze:
+    spawn-cost: 500
+    speed: 1.0
+    health: 80.0
+    armor: 0.0
+    gold-reward: 320
+    xp-reward: 100
+    slow-immune: true
+    fire-immune: true
+    height-offset: 1.5
+  magma_cube:
+    spawn-cost: 600
+    speed: 0.8
+    health: 90.0
+    armor: 6.0
+    gold-reward: 380
+    xp-reward: 120
+    slow-immune: true
+    fire-immune: true
+    height-offset: 1.5
+    slime-size: 2
+  ghast:
+    spawn-cost: 800
+    speed: 0.7
+    health: 200.0
+    armor: 0.0
+    gold-reward: 500
+    xp-reward: 160
+    slow-immune: true
+    fire-immune: true
+    height-offset: 4.0
+  giant:
+    spawn-cost: 1000
+    speed: 0.4
+    health: 500.0
+    armor: 10.0
+    gold-reward: 600
+    xp-reward: 200
+    slow-immune: true
+    fire-immune: false
+    height-offset: 0.0
+
+# Towers configuration
+towers:
+  archer:
+    cost: 100
+    range: 15.0
+    damage: 1.5
+    cooldown: 20
+    range-increase: 1.5
+    damage-increase: 1.5
+    cooldown-decrease: 2
+    upgrade-costs:
+      - 150
+      - 300
+      - 500
+      - 800
+    tier-names:
+      - "Basic Archer"
+      - "Marksman"
+      - "Sharpshooter"
+      - "Soul Archer"
+      - "Royal Hunter"
+  mage:
+    cost: 175
+    range: 12.0
+    damage: 3.0
+    cooldown: 30
+    range-increase: 1.5
+    damage-increase: 2.5
+    cooldown-decrease: 3
+    upgrade-costs:
+      - 150
+      - 300
+      - 500
+      - 800
+    tier-names:
+      - "Apprentice Mage"
+      - "Fire Mage"
+      - "Pyromancer"
+      - "Nether Arcanist"
+      - "Archmage"
+  frost:
+    cost: 125
+    range: 15.0
+    damage: 0.5
+    cooldown: 20
+    range-increase: 1.5
+    damage-increase: 0.8
+    cooldown-decrease: 2
+    upgrade-costs:
+      - 150
+      - 300
+      - 500
+      - 800
+    tier-names:
+      - "Ice Apprentice"
+      - "Frost Mage"
+      - "Cryomancer"
+      - "Blizzard Conjurer"
+      - "Winter Lord"

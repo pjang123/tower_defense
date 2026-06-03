@@ -47,20 +47,48 @@ public class TowerManager {
         Location center = plugin.getPlotConfigManager().getPlotCenter(plotId);
         if (center == null) return;
 
-        // Try loading NBT structure
-        File structureFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + ".nbt");
+        // Clean up only ghost armor stands (not belonging to any currently placed tower) within a 5-block radius
+        center.getWorld().getNearbyEntities(center, 5.0, 5.0, 5.0).stream()
+            .filter(e -> e instanceof ArmorStand)
+            .filter(as -> {
+                for (Tower activeTower : placedTowers.values()) {
+                    if (activeTower.getHolograms().contains(as)) {
+                        return false;
+                    }
+                }
+                return true;
+            })
+            .forEach(org.bukkit.entity.Entity::remove);
+
+        Tower tower = new Tower(plotId, center, type);
+        placedTowers.put(plotId, tower);
+
+        buildTowerStructure(tower);
+        updateHologram(tower);
+    }
+
+    public void buildTowerStructure(Tower tower) {
+        Location center = tower.getCenterLocation();
+        TowerType type = tower.getType();
+        int level = tower.getLevel();
+
+        // 1. Clear old structure blocks if they exist
+        clearTowerBlocks(tower);
+
+        // 2. Try loading level-specific NBT structure (e.g., structures/archer_level_1.nbt)
+        File levelSpecificFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + "_level_" + level + ".nbt");
+        File genericFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + ".nbt");
+        File targetFile = levelSpecificFile.exists() ? levelSpecificFile : (genericFile.exists() ? genericFile : null);
+        
         Structure structure = null;
-        if (structureFile.exists()) {
+        if (targetFile != null) {
             try {
-                structure = org.bukkit.Bukkit.getStructureManager().loadStructure(structureFile);
+                structure = org.bukkit.Bukkit.getStructureManager().loadStructure(targetFile);
             } catch (Exception e) {
-                plugin.getLogger().warning("Failed to load structure file: " + structureFile.getName() + " - " + e.getMessage());
+                plugin.getLogger().warning("Failed to load structure file: " + targetFile.getName() + " - " + e.getMessage());
             }
         }
 
-        Tower tower = new Tower(plotId, center, type);
-        double holoHeight = 4.2; // Default height for 3-block multiblock shifted 1 block up
-        
         if (structure != null) {
             BlockVector size = structure.getSize();
             tower.setStructureSize(size);
@@ -69,46 +97,112 @@ public class TowerManager {
             int sizeY = size.getBlockY();
             int sizeZ = size.getBlockZ();
             
-            // Center the structure on the plot center coordinate, shifted 1 block up (keeps floor)
             Location placementLoc = center.clone().subtract(sizeX / 2, 0, sizeZ / 2).add(0, 1, 0);
             try {
                 structure.place(placementLoc, false, StructureRotation.NONE, Mirror.NONE, 0, 1.0f, new Random());
             } catch (Exception e) {
-                plugin.getLogger().severe("Failed to place structure " + type.name() + ": " + e.getMessage());
+                plugin.getLogger().severe("Failed to place structure " + type.name() + " (Level " + level + "): " + e.getMessage());
                 e.printStackTrace();
             }
-            
-            holoHeight = sizeY + 1.2;
         } else {
-            // Fallback to the 3-block-tall multiblock tower shifted 1 block up
+            // Fallback default 3-block multiblock
+            tower.setStructureSize(null);
             center.clone().add(0, 1, 0).getBlock().setType(type.getBaseMaterial());
             center.clone().add(0, 2, 0).getBlock().setType(type.getMiddleMaterial());
             center.clone().add(0, 3, 0).getBlock().setType(type.getBlockMaterial());
         }
+    }
 
-        // Spawn holographic text using ArmorStand
-        Location holoLoc = center.clone().add(0, holoHeight, 0); // Positioned above the tower
-        ArmorStand hologram = center.getWorld().spawn(holoLoc, ArmorStand.class, as -> {
-            as.setVisible(false);
-            as.setGravity(false);
-            as.setMarker(true);
-            as.setCustomName("");
-            as.setCustomNameVisible(true);
-        });
-
-        tower.setHologram(hologram);
-        updateHologram(tower);
-        placedTowers.put(plotId, tower);
+    private void clearTowerBlocks(Tower tower) {
+        Location center = tower.getCenterLocation();
+        if (tower.getStructureSize() != null) {
+            BlockVector size = tower.getStructureSize();
+            int sizeX = size.getBlockX();
+            int sizeY = size.getBlockY();
+            int sizeZ = size.getBlockZ();
+            Location placementLoc = center.clone().subtract(sizeX / 2, 0, sizeZ / 2).add(0, 1, 0);
+            for (int dx = 0; dx < sizeX; dx++) {
+                for (int dy = 0; dy < sizeY; dy++) {
+                    for (int dz = 0; dz < sizeZ; dz++) {
+                        Location blockLoc = placementLoc.clone().add(dx, dy, dz);
+                        blockLoc.getBlock().setType(Material.AIR);
+                    }
+                }
+            }
+        } else {
+            // Fallback clear
+            center.clone().add(0, 1, 0).getBlock().setType(Material.AIR);
+            center.clone().add(0, 2, 0).getBlock().setType(Material.AIR);
+            center.clone().add(0, 3, 0).getBlock().setType(Material.AIR);
+        }
     }
 
     public void updateHologram(Tower tower) {
-        ArmorStand hologram = tower.getHologram();
-        if (hologram != null && hologram.isValid()) {
-            hologram.setCustomName(
-                tower.getType().getColor() + tower.getType().getDisplayName() + 
-                " Lvl " + tower.getLevel() + " " + 
-                ChatColor.GRAY + "[" + tower.getTargetingMode().getDisplayName() + "]"
-            );
+        Location center = tower.getCenterLocation();
+        double holoHeight = 4.2; // Default fallback height
+        if (tower.getStructureSize() != null) {
+            holoHeight = tower.getStructureSize().getBlockY() + 1.2;
+        }
+
+        // We want to show 3 lines:
+        // Line 0 (Top): [Tier X] Tier Name (specific type/upgrade path)
+        // Line 1: Damage: X DMG | Range: Y | Speed: Zs
+        // Line 2: Priority: TargetingMode
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        lines.add(ChatColor.GREEN + "[" + ChatColor.DARK_GREEN + "Tier " + tower.getRomanLevel() + ChatColor.GREEN + "] " + 
+                  tower.getType().getColor() + ChatColor.BOLD + tower.getTierName());
+        lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" + 
+                  ChatColor.GRAY + " | " + ChatColor.AQUA + "⚡ " + String.format("%.1fs", tower.getCooldown() / 20.0) + 
+                  ChatColor.GRAY + " | " + ChatColor.GREEN + "✦ " + String.format("%.1f", tower.getRange()) + "m");
+        lines.add(ChatColor.GRAY + "Priority: " + ChatColor.GOLD + tower.getTargetingMode().getDisplayName());
+
+        java.util.List<ArmorStand> stands = tower.getHolograms();
+        double spacing = 0.28;
+
+        for (int i = 0; i < lines.size(); i++) {
+            String text = lines.get(i);
+            double lineY = holoHeight - (i * spacing);
+            Location lineLoc = center.clone().add(0, lineY, 0);
+
+            if (i < stands.size()) {
+                ArmorStand as = stands.get(i);
+                if (as != null && as.isValid()) {
+                    as.teleport(lineLoc);
+                    as.setCustomName(text);
+                    as.setCustomNameVisible(true);
+                } else {
+                    final String nameText = text;
+                    ArmorStand newAs = center.getWorld().spawn(lineLoc, ArmorStand.class, asSetup -> {
+                        asSetup.setVisible(false);
+                        asSetup.setGravity(false);
+                        asSetup.setMarker(true);
+                        asSetup.setInvulnerable(true);
+                        asSetup.setPersistent(false);
+                        asSetup.setCustomName(nameText);
+                        asSetup.setCustomNameVisible(true);
+                    });
+                    stands.set(i, newAs);
+                }
+            } else {
+                final String nameText = text;
+                ArmorStand newAs = center.getWorld().spawn(lineLoc, ArmorStand.class, asSetup -> {
+                    asSetup.setVisible(false);
+                    asSetup.setGravity(false);
+                    asSetup.setMarker(true);
+                    asSetup.setInvulnerable(true);
+                    asSetup.setPersistent(false);
+                    asSetup.setCustomName(nameText);
+                    asSetup.setCustomNameVisible(true);
+                });
+                stands.add(newAs);
+            }
+        }
+
+        while (stands.size() > lines.size()) {
+            ArmorStand extra = stands.remove(stands.size() - 1);
+            if (extra != null && extra.isValid()) {
+                extra.remove();
+            }
         }
     }
 
@@ -119,33 +213,15 @@ public class TowerManager {
     public void removeTower(String plotId) {
         Tower tower = placedTowers.remove(plotId);
         if (tower != null) {
-            Location center = tower.getCenterLocation();
-            if (tower.getStructureSize() != null) {
-                BlockVector size = tower.getStructureSize();
-                int sizeX = size.getBlockX();
-                int sizeY = size.getBlockY();
-                int sizeZ = size.getBlockZ();
-                // Clear the bounding box starting 1 block up
-                Location placementLoc = center.clone().subtract(sizeX / 2, 0, sizeZ / 2).add(0, 1, 0);
-                for (int dx = 0; dx < sizeX; dx++) {
-                    for (int dy = 0; dy < sizeY; dy++) {
-                        for (int dz = 0; dz < sizeZ; dz++) {
-                            Location blockLoc = placementLoc.clone().add(dx, dy, dz);
-                            blockLoc.getBlock().setType(Material.AIR);
-                        }
-                    }
-                }
-            } else {
-                // Revert all 3 tiers starting 1 block up (keeps floor)
-                center.clone().add(0, 1, 0).getBlock().setType(Material.AIR);
-                center.clone().add(0, 2, 0).getBlock().setType(Material.AIR);
-                center.clone().add(0, 3, 0).getBlock().setType(Material.AIR);
-            }
+            clearTowerBlocks(tower);
             
-            // Clean up hologram ArmorStand
-            if (tower.getHologram() != null && tower.getHologram().isValid()) {
-                tower.getHologram().remove();
+            // Clean up hologram ArmorStands
+            for (ArmorStand hologram : tower.getHolograms()) {
+                if (hologram != null && hologram.isValid()) {
+                    hologram.remove();
+                }
             }
+            tower.getHolograms().clear();
         }
     }
 
@@ -161,6 +237,13 @@ public class TowerManager {
                 }
 
                 for (Tower tower : placedTowers.values()) {
+                    if (tower.isDisabled()) {
+                        if (tick % 10 == 0) {
+                            Location center = tower.getCenterLocation();
+                            center.getWorld().spawnParticle(org.bukkit.Particle.SMOKE, center.clone().add(0, 2, 0), 2, 0.2, 0.2, 0.2, 0.0);
+                        }
+                        continue;
+                    }
                     long cooldown = tower.getCooldown();
                     String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
                     if (plugin.getGameManager().isSpellActive(towerArena, "OVERCHARGE")) {
@@ -408,37 +491,49 @@ public class TowerManager {
         }
 
         // Slot 11: Archer Tower
+        int archerCost = plugin.getConfig().getInt("towers.archer.cost", 100);
+        double archerRange = plugin.getConfig().getDouble("towers.archer.range", 15.0);
+        double archerDamage = plugin.getConfig().getDouble("towers.archer.damage", 1.5);
+        double archerSpeed = plugin.getConfig().getLong("towers.archer.cooldown", 20L) / 20.0;
         gui.setItem(11, createGUIItem(
             Material.DISPENSER,
             ChatColor.GREEN + "Archer Tower",
-            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + "100 Gold",
-            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + "15.0 blocks",
-            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + "1.5 HP",
-            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + "1.0s",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + archerCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + archerRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + archerDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + archerSpeed + "s",
             "",
             ChatColor.GRAY + "Shoots single targets fast."
         ));
 
         // Slot 13: Mage Tower
+        int mageCost = plugin.getConfig().getInt("towers.mage.cost", 175);
+        double mageRange = plugin.getConfig().getDouble("towers.mage.range", 12.0);
+        double mageDamage = plugin.getConfig().getDouble("towers.mage.damage", 3.0);
+        double mageSpeed = plugin.getConfig().getLong("towers.mage.cooldown", 30L) / 20.0;
         gui.setItem(13, createGUIItem(
             Material.REDSTONE_LAMP,
             ChatColor.RED + "Mage Tower",
-            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + "175 Gold",
-            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + "12.0 blocks",
-            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + "3.0 HP",
-            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + "1.5s",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + mageCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + mageRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + mageDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + mageSpeed + "s",
             "",
             ChatColor.GRAY + "Slow but deals heavy fire damage."
         ));
 
         // Slot 15: Frost Tower
+        int frostCost = plugin.getConfig().getInt("towers.frost.cost", 125);
+        double frostRange = plugin.getConfig().getDouble("towers.frost.range", 15.0);
+        double frostDamage = plugin.getConfig().getDouble("towers.frost.damage", 0.5);
+        double frostSpeed = plugin.getConfig().getLong("towers.frost.cooldown", 20L) / 20.0;
         gui.setItem(15, createGUIItem(
             Material.PACKED_ICE,
             ChatColor.AQUA + "Frost Tower",
-            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + "125 Gold",
-            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + "15.0 blocks",
-            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + "0.5 HP",
-            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + "1.0s",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + frostCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + frostRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + frostDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + frostSpeed + "s",
             "",
             ChatColor.GRAY + "Applies Slowness II (2s) on hit."
         ));
@@ -464,5 +559,9 @@ public class TowerManager {
             removeTower(plotId);
         }
         placedTowers.clear();
+    }
+
+    public Map<String, Tower> getPlacedTowers() {
+        return placedTowers;
     }
 }

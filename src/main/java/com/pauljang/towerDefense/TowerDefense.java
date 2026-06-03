@@ -23,6 +23,9 @@ public final class TowerDefense extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // Save default config.yml
+        saveDefaultConfig();
+
         // Create structures directory if it doesn't exist
         java.io.File structuresDir = new java.io.File(getDataFolder(), "structures");
         if (!structuresDir.exists()) {

@@ -47,6 +47,10 @@ public class TDMob {
         currentWaypointIndex++;
     }
 
+    public void setCurrentWaypointIndex(int currentWaypointIndex) {
+        this.currentWaypointIndex = currentWaypointIndex;
+    }
+
     public Location getNextWaypoint() {
         if (currentWaypointIndex >= waypoints.size()) return null;
         if (currentWaypointIndex == waypoints.size() - 1) {

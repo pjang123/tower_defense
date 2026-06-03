@@ -61,6 +61,10 @@ public class MobManager {
     }
 
     public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
+        spawnMob(arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward, type.name().toLowerCase());
+    }
+
+    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward, String presetKey) {
         List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
         if (waypoints.isEmpty()) {
             plugin.getLogger().warning("Cannot spawn mob: No waypoints defined for arena " + arena + "!");
@@ -68,7 +72,15 @@ public class MobManager {
         }
 
         Location startLocation = waypoints.get(0);
-        Mob entity = (Mob) startLocation.getWorld().spawnEntity(startLocation, type);
+        
+        // Flying check: spawn slightly higher if height-offset > 0
+        double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
+        Location spawnLoc = startLocation.clone();
+        if (heightOffset > 0.0) {
+            spawnLoc.add(0, heightOffset, 0);
+        }
+
+        Mob entity = (Mob) spawnLoc.getWorld().spawnEntity(spawnLoc, type);
 
         // Force spawned mobs to be their adult versions
         if (entity instanceof org.bukkit.entity.Ageable ageable) {
@@ -83,6 +95,9 @@ public class MobManager {
         
         // Mark as a TD Mob so we can handle events (like sunlight burning)
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+
+        // Store preset key
+        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, presetKey);
 
         // Store gold reward amount in container
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, goldReward);
@@ -100,8 +115,15 @@ public class MobManager {
             hoglin.setImmuneToZombification(true);
         }
 
-        // Mark slow and fire immunities if requested
-        if (immuneToSlow) {
+        // Set size if it's a Slime/Magma Cube
+        if (entity instanceof org.bukkit.entity.Slime slime) {
+            int size = plugin.getConfig().getInt("mobs." + presetKey + ".slime-size", 2);
+            slime.setSize(size);
+        }
+
+        // Mark slow and fire immunities if requested or SLOW_SHIELD is active on the arena
+        boolean isSlowShieldActive = plugin.getGameManager().isSpellActive(arena, "SLOW_SHIELD");
+        if (immuneToSlow || isSlowShieldActive) {
             entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_slow_immune"), PersistentDataType.BYTE, (byte) 1);
         }
         if (immuneToFire) {
@@ -145,6 +167,11 @@ public class MobManager {
             if (stepAttr != null) {
                 stepAttr.setBaseValue(1.5);
             }
+        }
+
+        // Handle gravity for flying mobs
+        if (heightOffset > 0.0) {
+            entity.setGravity(false);
         }
 
         // Initialize healthbar
@@ -210,7 +237,8 @@ public class MobManager {
                     if (mobArena == null) mobArena = "1";
                     if (plugin.getGameManager().isSpellActive(mobArena, "DAMAGE_STORM")) {
                         if (tickCounter % 20 == 0) {
-                            mob.getEntity().damage(2.0); // 2.0 HP (1 heart) per second
+                            double dps = plugin.getConfig().getDouble("spells.damage-storm.damage-per-second", 2.0);
+                            mob.getEntity().damage(dps);
                             mob.getEntity().getWorld().spawnParticle(
                                 org.bukkit.Particle.LAVA,
                                 mob.getEntity().getLocation().add(0, 0.5, 0),
@@ -234,41 +262,86 @@ public class MobManager {
         if (mobArena == null) mobArena = "1";
 
         boolean isFreezeActive = plugin.getGameManager().isSpellActive(mobArena, "FREEZE");
+        boolean isHasteActive = plugin.getGameManager().isSpellActive(mobArena, "HASTE_RUSH");
         boolean isSlowImmune = mob.getEntity().getPersistentDataContainer().has(
             new org.bukkit.NamespacedKey(plugin, "td_slow_immune"),
             org.bukkit.persistence.PersistentDataType.BYTE
         );
 
-        // If the mob has reached the final waypoint, run stay-centered & attack logic
+        double slowMult = 1.0;
+        if (isFreezeActive && !isSlowImmune) {
+            slowMult = plugin.getConfig().getDouble("spells.freeze.slow-multiplier", 0.4);
+        }
+
+        double hasteMult = 1.0;
+        if (isHasteActive) {
+            hasteMult = plugin.getConfig().getDouble("spells.haste-rush.speed-multiplier", 1.6);
+        }
+
+        String presetKey = mob.getEntity().getPersistentDataContainer().get(
+            new org.bukkit.NamespacedKey(plugin, "td_preset"),
+            org.bukkit.persistence.PersistentDataType.STRING
+        );
+        if (presetKey == null) presetKey = mob.getEntity().getType().name().toLowerCase();
+
+        double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
+
+        // If the mob has reached the final waypoint, run stay-centered & attack/explode logic
         if (mob.hasReachedFinalWaypoint()) {
+            // Check if it's a Creeper - explode and deal massive damage!
+            if (mob.getEntity().getType() == EntityType.CREEPER) {
+                int castleDamage = plugin.getConfig().getInt("mobs.creeper.castle-damage", 5);
+                plugin.getGameManager().damageCastle(mobArena, castleDamage);
+                
+                Location loc = mob.getEntity().getLocation();
+                loc.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, loc, 1);
+                loc.getWorld().playSound(loc, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+                
+                mob.getEntity().remove();
+                iterator.remove();
+                return;
+            }
+
             Location finalTarget = mob.getFinalOffsetWaypoint();
             if (finalTarget != null) {
+                Location finalTargetLoc = finalTarget.clone().add(0, heightOffset, 0);
                 // Periodically repath back to their offset spot if pushed away
                 if (currentTick % 10 == 0) {
-                    if (mob.getEntity().getType() == EntityType.GIANT) {
+                    if (mob.getEntity().getType() == EntityType.GIANT || heightOffset > 0.0) {
                         Location loc = mob.getEntity().getLocation();
-                        org.bukkit.util.Vector dir = finalTarget.clone().subtract(loc).toVector();
+                        org.bukkit.util.Vector dir = finalTargetLoc.clone().subtract(loc).toVector();
                         if (dir.lengthSquared() > 0.01) {
-                            dir.setY(0);
+                            if (heightOffset <= 0.0) dir.setY(0);
                             dir.normalize();
                             float yaw = (float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ()));
-                            mob.getEntity().setRotation(yaw, 0.0f);
+                            float pitch = heightOffset > 0.0 ? (float) Math.toDegrees(Math.atan2(-dir.getY(), Math.sqrt(dir.getX()*dir.getX() + dir.getZ()*dir.getZ()))) : 0.0f;
+                            mob.getEntity().setRotation(yaw, pitch);
                             double speed = 0.1;
                             org.bukkit.attribute.AttributeInstance speedAttr = mob.getEntity().getAttribute(Attribute.MOVEMENT_SPEED);
                             if (speedAttr != null) {
                                 speed = speedAttr.getValue();
                             }
                             if (isFreezeActive && !isSlowImmune) {
-                                speed = speed * 0.4;
+                                speed = speed * slowMult;
                             }
-                            mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
+                            if (isHasteActive) {
+                                speed = speed * hasteMult;
+                            }
+                            if (heightOffset > 0.0) {
+                                mob.getEntity().setVelocity(dir.multiply(speed));
+                            } else {
+                                mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
+                            }
                         }
                     } else {
                         double pathfinderSpeed = 1.0;
                         if (isFreezeActive && !isSlowImmune) {
-                            pathfinderSpeed = 0.4;
+                            pathfinderSpeed = pathfinderSpeed * slowMult;
                         }
-                        mob.getEntity().getPathfinder().moveTo(finalTarget, pathfinderSpeed);
+                        if (isHasteActive) {
+                            pathfinderSpeed = pathfinderSpeed * hasteMult;
+                        }
+                        mob.getEntity().getPathfinder().moveTo(finalTargetLoc, pathfinderSpeed);
                     }
                 }
             }
@@ -304,10 +377,12 @@ public class MobManager {
             return;
         }
 
-        if (mob.getEntity().getType() == EntityType.GIANT) {
-            // Manually move the giant towards the target
+        Location targetLoc = target.clone().add(0, heightOffset, 0);
+
+        if (mob.getEntity().getType() == EntityType.GIANT || heightOffset > 0.0) {
+            // Manually move the giant or flying mob towards the target
             Location loc = mob.getEntity().getLocation();
-            org.bukkit.util.Vector dir = target.clone().subtract(loc).toVector();
+            org.bukkit.util.Vector dir = targetLoc.clone().subtract(loc).toVector();
             double distanceSq = dir.lengthSquared();
 
             double speed = 0.1;
@@ -317,42 +392,59 @@ public class MobManager {
             }
 
             if (isFreezeActive && !isSlowImmune) {
-                speed = speed * 0.4; // 60% slow
+                speed = speed * slowMult;
                 if (currentTick % 20 == 0) {
                     mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 2, false, false, true));
                 }
             }
+            if (isHasteActive) {
+                speed = speed * hasteMult;
+                if (currentTick % 20 == 0) {
+                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, 1, false, false, true));
+                }
+            }
 
             if (distanceSq > 0.01) {
-                dir.setY(0);
+                if (heightOffset <= 0.0) dir.setY(0);
                 dir.normalize();
 
                 // Update rotation smoothly
                 float yaw = (float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ()));
-                mob.getEntity().setRotation(yaw, 0.0f);
+                float pitch = heightOffset > 0.0 ? (float) Math.toDegrees(Math.atan2(-dir.getY(), Math.sqrt(dir.getX()*dir.getX() + dir.getZ()*dir.getZ()))) : 0.0f;
+                mob.getEntity().setRotation(yaw, pitch);
 
-                // Move towards target (maintain gravity)
-                mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
+                // Move towards target
+                if (heightOffset > 0.0) {
+                    mob.getEntity().setVelocity(dir.multiply(speed));
+                } else {
+                    mob.getEntity().setVelocity(dir.multiply(speed).setY(mob.getEntity().getVelocity().getY()));
+                }
             }
         } else {
             double pathfinderSpeed = 1.0;
             if (isFreezeActive && !isSlowImmune) {
-                pathfinderSpeed = 0.4; // 60% slow
+                pathfinderSpeed = pathfinderSpeed * slowMult;
                 if (currentTick % 20 == 0) {
                     mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 2, false, false, true));
+                }
+            }
+            if (isHasteActive) {
+                pathfinderSpeed = pathfinderSpeed * hasteMult;
+                if (currentTick % 20 == 0) {
+                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, 1, false, false, true));
                 }
             }
 
             // Re-calculate pathing only when target waypoint index changes or periodically (every 5 ticks / 250ms)
             if (mob.getCurrentWaypointIndex() != mob.getLastPathfindWaypointIndex() || currentTick % 5 == 0) {
-                mob.getEntity().getPathfinder().moveTo(target, pathfinderSpeed);
+                mob.getEntity().getPathfinder().moveTo(targetLoc, pathfinderSpeed);
                 mob.setLastPathfindWaypointIndex(mob.getCurrentWaypointIndex());
             }
         }
 
         // Check if they are close enough to the waypoint to target the next one
-        double reachDistance = mob.getEntity().getType() == EntityType.GIANT ? 4.0 : 1.5;
-        if (mob.getEntity().getLocation().distanceSquared(target) < reachDistance) {
+        double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || heightOffset > 0.0) ? 4.0 : 1.5;
+        if (mob.getEntity().getLocation().distanceSquared(targetLoc) < reachDistance) {
             mob.incrementWaypointIndex();
         }
     }
@@ -428,7 +520,16 @@ public class MobManager {
                     return;
                 }
                 PresetMobType preset = spawnList.get(index);
-                spawnMob(targetArena, preset.getEntityType(), preset.getSpeed(), preset.getHealth(), preset.getArmor(), preset.isSlowImmune(), preset.isFireImmune(), preset.getGoldReward(), preset.getXpReward());
+                String nameKey = preset.name().toLowerCase();
+                double speed = plugin.getConfig().getDouble("mobs." + nameKey + ".speed", preset.getSpeed());
+                double health = plugin.getConfig().getDouble("mobs." + nameKey + ".health", preset.getHealth());
+                double armor = plugin.getConfig().getDouble("mobs." + nameKey + ".armor", preset.getArmor());
+                boolean slowImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".slow-immune", preset.isSlowImmune());
+                boolean fireImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".fire-immune", preset.isFireImmune());
+                int goldReward = plugin.getConfig().getInt("mobs." + nameKey + ".gold-reward", preset.getGoldReward());
+                int xpReward = plugin.getConfig().getInt("mobs." + nameKey + ".xp-reward", preset.getXpReward());
+
+                spawnMob(targetArena, preset.getEntityType(), speed, health, armor, slowImmune, fireImmune, goldReward, xpReward);
                 index++;
             }
         }.runTaskTimer(plugin, 0L, 10L);
@@ -438,33 +539,41 @@ public class MobManager {
     }
 
     public void openMobSpawnerGUI(Player player) {
-        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 27, ChatColor.DARK_RED + "TD Mob Spawner");
+        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 54, ChatColor.DARK_RED + "TD Mob Spawner");
 
         Map<PresetMobType, Integer> queue = getQueue(player.getUniqueId());
 
         // Fill background with gray stained glass panes
         org.bukkit.inventory.ItemStack border = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < 27; i++) {
-            gui.setItem(i, border);
+        for (int i = 0; i < 54; i++) {
+            if (i < 9 || i >= 45 || i % 9 == 0 || i % 9 == 8) {
+                gui.setItem(i, border);
+            }
         }
 
-        // Place spawn items (slots 10-14)
-        gui.setItem(10, createMobGUIItem(PresetMobType.DEFAULT_ZOMBIE, queue.getOrDefault(PresetMobType.DEFAULT_ZOMBIE, 0)));
-        gui.setItem(11, createMobGUIItem(PresetMobType.GIANT, queue.getOrDefault(PresetMobType.GIANT, 0)));
-        gui.setItem(12, createMobGUIItem(PresetMobType.FIRE_ZOMBIE, queue.getOrDefault(PresetMobType.FIRE_ZOMBIE, 0)));
-        gui.setItem(13, createMobGUIItem(PresetMobType.PIGLIN, queue.getOrDefault(PresetMobType.PIGLIN, 0)));
-        gui.setItem(14, createMobGUIItem(PresetMobType.HOGLIN, queue.getOrDefault(PresetMobType.HOGLIN, 0)));
+        // Place spawn items (slots 10-16 for Row 1, and slots 20-23 for Row 2)
+        gui.setItem(10, createMobGUIItem(PresetMobType.ZOMBIE, queue.getOrDefault(PresetMobType.ZOMBIE, 0)));
+        gui.setItem(11, createMobGUIItem(PresetMobType.SKELETON, queue.getOrDefault(PresetMobType.SKELETON, 0)));
+        gui.setItem(12, createMobGUIItem(PresetMobType.SILVERFISH, queue.getOrDefault(PresetMobType.SILVERFISH, 0)));
+        gui.setItem(13, createMobGUIItem(PresetMobType.SPIDER, queue.getOrDefault(PresetMobType.SPIDER, 0)));
+        gui.setItem(14, createMobGUIItem(PresetMobType.PIGMAN, queue.getOrDefault(PresetMobType.PIGMAN, 0)));
+        gui.setItem(15, createMobGUIItem(PresetMobType.SLIME, queue.getOrDefault(PresetMobType.SLIME, 0)));
+        gui.setItem(16, createMobGUIItem(PresetMobType.CREEPER, queue.getOrDefault(PresetMobType.CREEPER, 0)));
 
-        // Place control buttons (slots 21 and 23)
+        gui.setItem(20, createMobGUIItem(PresetMobType.BLAZE, queue.getOrDefault(PresetMobType.BLAZE, 0)));
+        gui.setItem(21, createMobGUIItem(PresetMobType.MAGMA_CUBE, queue.getOrDefault(PresetMobType.MAGMA_CUBE, 0)));
+        gui.setItem(22, createMobGUIItem(PresetMobType.GHAST, queue.getOrDefault(PresetMobType.GHAST, 0)));
+        gui.setItem(23, createMobGUIItem(PresetMobType.GIANT, queue.getOrDefault(PresetMobType.GIANT, 0)));
+
+        // Place control buttons (slots 38, 40, and 42)
         int totalCost = 0;
         for (Map.Entry<PresetMobType, Integer> entry : queue.entrySet()) {
-            totalCost += entry.getKey().getSpawnCost() * entry.getValue();
+            int cost = plugin.getConfig().getInt("mobs." + entry.getKey().name().toLowerCase() + ".spawn-cost", entry.getKey().getSpawnCost());
+            totalCost += cost * entry.getValue();
         }
-        gui.setItem(21, createGUIItem(Material.RED_WOOL, ChatColor.RED + "Clear Queue", ChatColor.GRAY + "Reset all counts and refund Gold."));
-        gui.setItem(23, createGUIItem(Material.LIME_WOOL, ChatColor.GREEN + "Send Wave", ChatColor.GRAY + "Spawn all queued mobs.", ChatColor.GOLD + "Total Wave Value: " + ChatColor.YELLOW + totalCost + " Gold"));
-
-        // Player Upgrades Shortcut (slot 26)
-        gui.setItem(26, createGUIItem(Material.NETHER_STAR, ChatColor.GOLD + "Player Upgrades", ChatColor.GRAY + "Open weapons & upgrades screen."));
+        gui.setItem(38, createGUIItem(Material.RED_WOOL, ChatColor.RED + "Clear Queue", ChatColor.GRAY + "Reset all counts and refund Gold."));
+        gui.setItem(40, createGUIItem(Material.LIME_WOOL, ChatColor.GREEN + "Send Wave", ChatColor.GRAY + "Spawn all queued mobs.", ChatColor.GOLD + "Total Wave Value: " + ChatColor.YELLOW + totalCost + " Gold"));
+        gui.setItem(42, createGUIItem(Material.NETHER_STAR, ChatColor.GOLD + "Player Upgrades", ChatColor.GRAY + "Open weapons & upgrades screen."));
 
         player.openInventory(gui);
     }
@@ -477,18 +586,26 @@ public class MobManager {
             meta.setDisplayName(preset.getColor() + preset.getDisplayName());
             
             List<String> lore = new ArrayList<>();
+            String nameKey = preset.name().toLowerCase();
+            int spawnCost = plugin.getConfig().getInt("mobs." + nameKey + ".spawn-cost", preset.getSpawnCost());
+            double speed = plugin.getConfig().getDouble("mobs." + nameKey + ".speed", preset.getSpeed());
+            double health = plugin.getConfig().getDouble("mobs." + nameKey + ".health", preset.getHealth());
+            double armor = plugin.getConfig().getDouble("mobs." + nameKey + ".armor", preset.getArmor());
+            boolean slowImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".slow-immune", preset.isSlowImmune());
+            boolean fireImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".fire-immune", preset.isFireImmune());
+
             lore.add(ChatColor.GREEN + "Left-Click" + ChatColor.GRAY + " to add +1 to queue.");
             lore.add(ChatColor.RED + "Right-Click" + ChatColor.GRAY + " to remove -1 from queue.");
-            lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + preset.getSpawnCost() + " Gold");
+            lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + spawnCost + " Gold");
             lore.add(ChatColor.GOLD + "Queued Count: " + ChatColor.YELLOW + count);
             lore.add("");
             
             lore.add(ChatColor.DARK_GRAY + "Stats:");
-            lore.add(ChatColor.DARK_GRAY + " - Speed: " + preset.getSpeed() + "x");
-            lore.add(ChatColor.DARK_GRAY + " - HP: " + (preset.getHealth() > 0 ? preset.getHealth() : "Default"));
-            lore.add(ChatColor.DARK_GRAY + " - Armor: " + preset.getArmor());
-            if (preset.isSlowImmune()) lore.add(ChatColor.AQUA + " * Immune to Slow");
-            if (preset.isFireImmune()) lore.add(ChatColor.RED + " * Immune to Fire");
+            lore.add(ChatColor.DARK_GRAY + " - Speed: " + speed + "x");
+            lore.add(ChatColor.DARK_GRAY + " - HP: " + (health > 0 ? health : "Default"));
+            lore.add(ChatColor.DARK_GRAY + " - Armor: " + armor);
+            if (slowImmune) lore.add(ChatColor.AQUA + " * Immune to Slow");
+            if (fireImmune) lore.add(ChatColor.RED + " * Immune to Fire");
 
             meta.setLore(lore);
             item.setItemMeta(meta);

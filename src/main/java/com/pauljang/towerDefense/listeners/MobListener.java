@@ -1,6 +1,7 @@
 package com.pauljang.towerDefense.listeners;
 
 import com.pauljang.towerDefense.TowerDefense;
+import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
@@ -157,6 +158,46 @@ public class MobListener implements Listener {
                     }
                 }
             }
+
+            // Slime / Magma Cube Split Handling
+            if (entity instanceof org.bukkit.entity.Slime || entity instanceof org.bukkit.entity.MagmaCube) {
+                final Location deathLoc = entity.getLocation();
+                final String arena = mobArena;
+                int parentWpIndex = 0;
+                for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
+                    if (tdMob.getEntity().equals(entity)) {
+                        parentWpIndex = tdMob.getCurrentWaypointIndex();
+                        break;
+                    }
+                }
+                final int wpIndex = parentWpIndex;
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    double radius = 3.0;
+                    for (org.bukkit.entity.Entity nearby : deathLoc.getWorld().getNearbyEntities(deathLoc, radius, radius, radius)) {
+                        if (nearby instanceof org.bukkit.entity.Slime child) {
+                            NamespacedKey mobKey = new NamespacedKey(plugin, "td_mob");
+                            if (!child.getPersistentDataContainer().has(mobKey, PersistentDataType.BYTE)) {
+                                child.getPersistentDataContainer().set(mobKey, PersistentDataType.BYTE, (byte) 1);
+                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
+                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, child.getType() == org.bukkit.entity.EntityType.MAGMA_CUBE ? "magma_cube" : "slime");
+                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, 0); // No farming split slimes
+                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, 0);
+                                
+                                org.bukkit.attribute.AttributeInstance kbResist = child.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
+                                if (kbResist != null) {
+                                    kbResist.setBaseValue(1.0);
+                                }
+                                
+                                java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+                                com.pauljang.towerDefense.entities.TDMob childTDMob = new com.pauljang.towerDefense.entities.TDMob(child, waypoints);
+                                childTDMob.setCurrentWaypointIndex(wpIndex);
+                                plugin.getMobManager().getActiveMobs().add(childTDMob);
+                                plugin.getMobManager().updateHealthBar(child);
+                            }
+                        }
+                    }
+                }, 1L);
+            }
         }
     }
 
@@ -207,16 +248,22 @@ public class MobListener implements Listener {
             int slot = event.getRawSlot();
             com.pauljang.towerDefense.entities.PresetMobType presetType = null;
             switch (slot) {
-                case 10 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.DEFAULT_ZOMBIE;
-                case 11 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GIANT;
-                case 12 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.FIRE_ZOMBIE;
-                case 13 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.PIGLIN;
-                case 14 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.HOGLIN;
+                case 10 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.ZOMBIE;
+                case 11 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SKELETON;
+                case 12 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SILVERFISH;
+                case 13 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SPIDER;
+                case 14 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.PIGMAN;
+                case 15 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SLIME;
+                case 16 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.CREEPER;
+                case 20 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.BLAZE;
+                case 21 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.MAGMA_CUBE;
+                case 22 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GHAST;
+                case 23 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GIANT;
             }
 
             if (presetType != null) {
                 if (event.isLeftClick()) {
-                    int cost = presetType.getSpawnCost();
+                    int cost = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
                     if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                         plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
@@ -229,7 +276,8 @@ public class MobListener implements Listener {
                     int count = queue.getOrDefault(presetType, 0);
                     if (count > 0) {
                         plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
-                        plugin.getGameManager().addGold(player.getUniqueId(), presetType.getSpawnCost(), true); // Refund Gold
+                        int refund = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
+                        plugin.getGameManager().addGold(player.getUniqueId(), refund, true); // Refund Gold
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
                     }
                 }
@@ -237,11 +285,12 @@ public class MobListener implements Listener {
                 return;
             }
 
-            if (slot == 21) { // Clear Queue and refund
+            if (slot == 38) { // Clear Queue and refund
                 java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
                 int totalRefund = 0;
                 for (java.util.Map.Entry<com.pauljang.towerDefense.entities.PresetMobType, Integer> entry : queue.entrySet()) {
-                    totalRefund += entry.getKey().getSpawnCost() * entry.getValue();
+                    int cost = plugin.getConfig().getInt("mobs." + entry.getKey().name().toLowerCase() + ".spawn-cost", entry.getKey().getSpawnCost());
+                    totalRefund += cost * entry.getValue();
                 }
                 plugin.getMobManager().clearQueue(player.getUniqueId());
                 if (totalRefund > 0) {
@@ -250,12 +299,12 @@ public class MobListener implements Listener {
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 0.8f, 0.8f);
                 plugin.getMobManager().openMobSpawnerGUI(player);
                 player.sendMessage(org.bukkit.ChatColor.RED + "Cleared the mob spawner queue and refunded " + totalRefund + " Gold!");
-            } else if (slot == 23) { // Send Wave
+            } else if (slot == 40) { // Send Wave
                 plugin.getMobManager().sendQueue(player.getUniqueId());
                 player.closeInventory();
                 player.playSound(player.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 0.8f, 1.2f);
                 player.sendMessage(org.bukkit.ChatColor.GREEN + "Spawning the queued mob wave!");
-            } else if (slot == 26) { // Open upgrades screen
+            } else if (slot == 42) { // Open upgrades screen
                 plugin.getGameManager().openUpgradesGUI(player);
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 0.8f, 1.2f);
             }
@@ -312,6 +361,7 @@ public class MobListener implements Listener {
                     }
                     if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                         tower.incrementLevel();
+                        plugin.getTowerManager().buildTowerStructure(tower);
                         plugin.getTowerManager().updateHologram(tower);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Upgraded Tower to Level " + tower.getLevel() + "!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
@@ -365,7 +415,7 @@ public class MobListener implements Listener {
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                         return;
                     }
-                    int cost = lvl == 1 ? 100 : lvl == 2 ? 300 : 600;
+                    int cost = lvl == 1 ? plugin.getConfig().getInt("upgrades.gold-gen.upgrade-costs.level2", 100) : lvl == 2 ? plugin.getConfig().getInt("upgrades.gold-gen.upgrade-costs.level3", 300) : plugin.getConfig().getInt("upgrades.gold-gen.upgrade-costs.level4", 600);
                     if (gm.getExp(uuid) >= cost) {
                         gm.removeExp(uuid, cost);
                         gm.setGoldGenLevel(uuid, lvl + 1);
@@ -386,7 +436,7 @@ public class MobListener implements Listener {
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                         return;
                     }
-                    int cost = lvl == 1 ? 150 : 450;
+                    int cost = lvl == 1 ? plugin.getConfig().getInt("upgrades.bow.upgrade-costs.level2", 150) : plugin.getConfig().getInt("upgrades.bow.upgrade-costs.level3", 450);
                     if (gm.getExp(uuid) >= cost) {
                         gm.removeExp(uuid, cost);
                         gm.setBowLevel(uuid, lvl + 1);
@@ -398,39 +448,88 @@ public class MobListener implements Listener {
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }
-                case 14 -> { // Overcharge Spell (Costs 250 Gold)
-                    int cost = 250;
+                case 12 -> { // Overcharge Spell
+                    int cost = plugin.getConfig().getInt("spells.overcharge.cost", 250);
+                    int duration = plugin.getConfig().getInt("spells.overcharge.duration", 10);
                     String arena = gm.getPlayerArena(uuid);
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
-                        gm.castSpell(arena, "OVERCHARGE", 10);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Overcharge on your track for 10 seconds!");
+                        gm.castSpell(arena, "OVERCHARGE", duration);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Overcharge on your track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
                     } else {
                         player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }
-                case 15 -> { // Freeze Spell (Costs 200 Gold)
-                    int cost = 200;
+                case 13 -> { // Freeze Spell
+                    int cost = plugin.getConfig().getInt("spells.freeze.cost", 200);
+                    int duration = plugin.getConfig().getInt("spells.freeze.duration", 10);
                     String arena = gm.getPlayerArena(uuid);
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
-                        gm.castSpell(arena, "FREEZE", 10);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Freeze on your track for 10 seconds!");
+                        gm.castSpell(arena, "FREEZE", duration);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Freeze on your track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
                     } else {
                         player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                     }
                 }
-                case 16 -> { // Damage Storm Spell (Costs 300 Gold)
-                    int cost = 300;
+                case 14 -> { // Damage Storm Spell
+                    int cost = plugin.getConfig().getInt("spells.damage-storm.cost", 300);
+                    int duration = plugin.getConfig().getInt("spells.damage-storm.duration", 10);
                     String arena = gm.getPlayerArena(uuid);
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
-                        gm.castSpell(arena, "DAMAGE_STORM", 10);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Damage Storm on your track for 10 seconds!");
+                        gm.castSpell(arena, "DAMAGE_STORM", duration);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Damage Storm on your track for " + duration + " seconds!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                }
+                case 21 -> { // Haste Rush Sabotage (Cast on Opponent)
+                    int cost = plugin.getConfig().getInt("spells.haste-rush.cost", 200);
+                    int duration = plugin.getConfig().getInt("spells.haste-rush.duration", 6);
+                    String playerArena = gm.getPlayerArena(uuid);
+                    String targetArena = playerArena.equals("1") ? "2" : "1";
+                    if (gm.hasGold(uuid, cost)) {
+                        gm.removeGold(uuid, cost);
+                        gm.castSpell(targetArena, "HASTE_RUSH", duration);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Sabotage: Haste Rush on your opponent's track for " + duration + " seconds!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                }
+                case 22 -> { // Tower EMP Sabotage (Cast on Opponent)
+                    int cost = plugin.getConfig().getInt("spells.tower-emp.cost", 250);
+                    int duration = plugin.getConfig().getInt("spells.tower-emp.duration", 6);
+                    String playerArena = gm.getPlayerArena(uuid);
+                    String targetArena = playerArena.equals("1") ? "2" : "1";
+                    if (gm.hasGold(uuid, cost)) {
+                        gm.removeGold(uuid, cost);
+                        gm.castSpell(targetArena, "TOWER_EMP", duration);
+                        gm.disableRandomTower(targetArena, duration);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Sabotage: Tower EMP on your opponent's track for " + duration + " seconds!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                }
+                case 23 -> { // Slow Shield Sabotage (Cast on Opponent)
+                    int cost = plugin.getConfig().getInt("spells.slow-shield.cost", 150);
+                    int duration = plugin.getConfig().getInt("spells.slow-shield.duration", 10);
+                    String playerArena = gm.getPlayerArena(uuid);
+                    String targetArena = playerArena.equals("1") ? "2" : "1";
+                    if (gm.hasGold(uuid, cost)) {
+                        gm.removeGold(uuid, cost);
+                        gm.castSpell(targetArena, "SLOW_SHIELD", duration);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Sabotage: Slow Shield on your opponent's track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
                     } else {
                         player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
@@ -444,37 +543,6 @@ public class MobListener implements Listener {
                 }
             }
             gm.openUpgradesGUI(player);
-        }
-    }
-
-    @EventHandler
-    public void onBowShoot(org.bukkit.event.entity.EntityShootBowEvent event) {
-        if (!(event.getEntity() instanceof org.bukkit.entity.Player player)) return;
-
-        int bowLevel = plugin.getGameManager().getBowLevel(player.getUniqueId());
-        event.setCancelled(true);
-        org.bukkit.util.Vector velocity = event.getProjectile().getVelocity();
-
-        if (bowLevel == 3) {
-            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
-            
-            org.bukkit.entity.Arrow arrow = player.launchProjectile(org.bukkit.entity.Arrow.class);
-            arrow.setVelocity(velocity);
-            arrow.setPierceLevel(4);
-            
-            // Replenish the arrow consumed when charging the crossbow
-            player.getInventory().addItem(new org.bukkit.inventory.ItemStack(org.bukkit.Material.ARROW));
-        } else if (bowLevel == 2) {
-            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
-            org.bukkit.entity.Arrow arrow = player.launchProjectile(org.bukkit.entity.Arrow.class);
-            arrow.setVelocity(velocity);
-            
-            // Replenish the arrow consumed when charging the crossbow
-            player.getInventory().addItem(new org.bukkit.inventory.ItemStack(org.bukkit.Material.ARROW));
-        } else {
-            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ARROW_SHOOT, 1.0f, 1.0f);
-            org.bukkit.entity.Arrow arrow = player.launchProjectile(org.bukkit.entity.Arrow.class);
-            arrow.setVelocity(velocity);
         }
     }
 
@@ -493,7 +561,52 @@ public class MobListener implements Listener {
     public void onPlayerInteract(org.bukkit.event.player.PlayerInteractEvent event) {
         org.bukkit.entity.Player player = event.getPlayer();
         org.bukkit.inventory.ItemStack item = event.getItem();
-        if (item == null || !item.hasItemMeta()) return;
+        if (item == null) return;
+
+        // Custom bow / crossbow shooting with zero arrows in inventory
+        if (item.getType() == org.bukkit.Material.BOW || item.getType() == org.bukkit.Material.CROSSBOW) {
+            org.bukkit.event.block.Action action = event.getAction();
+            if (action == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || action == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+                if (plugin.getGameManager().getCurrentState() != com.pauljang.towerDefense.core.GameState.ACTIVE) {
+                    return;
+                }
+                
+                if (player.hasCooldown(item.getType())) {
+                    return;
+                }
+                
+                event.setCancelled(true);
+                
+                int bowLevel = plugin.getGameManager().getBowLevel(player.getUniqueId());
+                int cooldownTicks = 15; // default bow: 15 ticks (0.75s)
+                
+                if (item.getType() == org.bukkit.Material.CROSSBOW) {
+                    cooldownTicks = bowLevel == 3 ? 8 : 10; // Level 3: 8 ticks (0.4s), Level 2: 10 ticks (0.5s)
+                }
+
+                player.setCooldown(item.getType(), cooldownTicks);
+                
+                org.bukkit.util.Vector direction = player.getEyeLocation().getDirection();
+                org.bukkit.Location spawnLoc = player.getEyeLocation().add(direction.clone().multiply(1.2));
+                
+                org.bukkit.entity.Arrow arrow = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.Arrow.class);
+                arrow.setShooter(player);
+                arrow.setVelocity(direction.multiply(2.5));
+                arrow.setPickupStatus(org.bukkit.entity.AbstractArrow.PickupStatus.DISALLOWED);
+                
+                if (item.getType() == org.bukkit.Material.CROSSBOW) {
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
+                    if (bowLevel == 3) {
+                        arrow.setPierceLevel(4);
+                    }
+                } else {
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ARROW_SHOOT, 1.0f, 1.0f);
+                }
+            }
+            return;
+        }
+
+        if (!item.hasItemMeta()) return;
 
         org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
         if (meta == null || !meta.hasDisplayName()) return;
@@ -523,6 +636,50 @@ public class MobListener implements Listener {
                     name.equals(org.bukkit.ChatColor.GOLD + "" + org.bukkit.ChatColor.BOLD + "Player Upgrades Menu")) {
                     event.setCancelled(true);
                 }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamageByEntity(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        org.bukkit.entity.Entity victim = event.getEntity();
+        NamespacedKey tdKey = new NamespacedKey(plugin, "td_mob");
+        
+        // Only run checks for custom TD Mobs
+        if (!victim.getPersistentDataContainer().has(tdKey, PersistentDataType.BYTE)) {
+            return;
+        }
+
+        // Determine the player responsible for the attack (melee or ranged/potions)
+        org.bukkit.entity.Player attacker = null;
+        org.bukkit.entity.Entity damager = event.getDamager();
+
+        if (damager instanceof org.bukkit.entity.Player p) {
+            attacker = p;
+        } else if (damager instanceof org.bukkit.entity.Projectile proj) {
+            if (proj.getShooter() instanceof org.bukkit.entity.Player p) {
+                attacker = p;
+            }
+        } else if (damager instanceof org.bukkit.entity.AreaEffectCloud cloud) {
+            if (cloud.getSource() instanceof org.bukkit.entity.Player p) {
+                attacker = p;
+            }
+        } else if (damager instanceof org.bukkit.entity.ThrownPotion potion) {
+            if (potion.getShooter() instanceof org.bukkit.entity.Player p) {
+                attacker = p;
+            }
+        }
+
+        if (attacker != null) {
+            NamespacedKey arenaKey = new NamespacedKey(plugin, "td_arena");
+            String mobArena = victim.getPersistentDataContainer().get(arenaKey, PersistentDataType.STRING);
+            if (mobArena == null) mobArena = "1";
+
+            String playerArena = plugin.getGameManager().getPlayerArena(attacker.getUniqueId());
+
+            // Attack is cancelled if player is trying to hit a mob on the opponent's track
+            if (!mobArena.equals(playerArena)) {
+                event.setCancelled(true);
             }
         }
     }
