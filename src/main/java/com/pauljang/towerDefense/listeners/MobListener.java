@@ -63,6 +63,7 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onMobDamage(EntityDamageEvent event) {
+        if (event.isCancelled()) return;
         Entity entity = event.getEntity();
         if (!(entity instanceof Mob mob)) return;
 
@@ -70,8 +71,8 @@ public class MobListener implements Listener {
         if (mob.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             // Check for fire-related damage if the mob has fire immunity
             NamespacedKey fireImmuneKey = new NamespacedKey(plugin, "td_fire_immune");
+            EntityDamageEvent.DamageCause cause = event.getCause();
             if (mob.getPersistentDataContainer().has(fireImmuneKey, PersistentDataType.BYTE)) {
-                EntityDamageEvent.DamageCause cause = event.getCause();
                 if (cause == EntityDamageEvent.DamageCause.FIRE ||
                     cause == EntityDamageEvent.DamageCause.FIRE_TICK ||
                     cause == EntityDamageEvent.DamageCause.LAVA ||
@@ -79,6 +80,97 @@ public class MobListener implements Listener {
                     cause == EntityDamageEvent.DamageCause.MELTING) {
                     event.setCancelled(true);
                     return;
+                }
+            }
+
+            // Custom fire tick damage scaling
+            if (cause == EntityDamageEvent.DamageCause.FIRE_TICK) {
+                NamespacedKey fireDmgKey = new NamespacedKey(plugin, "td_fire_damage");
+                if (mob.getPersistentDataContainer().has(fireDmgKey, PersistentDataType.DOUBLE)) {
+                    double customDmg = mob.getPersistentDataContainer().get(fireDmgKey, PersistentDataType.DOUBLE);
+                    event.setDamage(customDmg);
+                }
+            }
+
+            // Custom poison tick damage scaling
+            if (cause == EntityDamageEvent.DamageCause.POISON) {
+                NamespacedKey poisonDmgKey = new NamespacedKey(plugin, "td_poison_damage");
+                if (mob.getPersistentDataContainer().has(poisonDmgKey, PersistentDataType.DOUBLE)) {
+                    double customDmg = mob.getPersistentDataContainer().get(poisonDmgKey, PersistentDataType.DOUBLE);
+                    event.setDamage(customDmg);
+                }
+            }
+
+            // Slime / Magma Cube Shrinking on lethal damage (3 sizes: largest 4, medium 2, smallest 1)
+            double damage = event.getFinalDamage();
+            double health = mob.getHealth();
+            if (health - damage <= 0) {
+                if (mob instanceof org.bukkit.entity.Slime slime) {
+                    int currentSize = slime.getSize();
+                    if (currentSize > 1) {
+                        int nextSize = currentSize > 2 ? 2 : 1;
+                        
+                        // Capture existing attribute base values before shrinking, as setSize recalculates them
+                        double speedVal = 0.1;
+                        org.bukkit.attribute.AttributeInstance speedAttr = mob.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
+                        if (speedAttr != null) speedVal = speedAttr.getBaseValue();
+
+                        double kbVal = 1.0;
+                        org.bukkit.attribute.AttributeInstance kbAttr = mob.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
+                        if (kbAttr != null) kbVal = kbAttr.getBaseValue();
+
+                        double armorVal = 0.0;
+                        org.bukkit.attribute.AttributeInstance armorAttr = mob.getAttribute(org.bukkit.attribute.Attribute.ARMOR);
+                        if (armorAttr != null) armorVal = armorAttr.getBaseValue();
+
+                        double stepVal = 0.6;
+                        org.bukkit.attribute.AttributeInstance stepAttr = mob.getAttribute(org.bukkit.attribute.Attribute.STEP_HEIGHT);
+                        if (stepAttr != null) stepVal = stepAttr.getBaseValue();
+
+                        // Cancel the lethal damage
+                        event.setCancelled(true);
+                        
+                        // Shrink the slime
+                        slime.setSize(nextSize);
+                        
+                        // Restore captured attribute base values
+                        if (speedAttr != null) speedAttr.setBaseValue(speedVal);
+                        if (kbAttr != null) kbAttr.setBaseValue(kbVal);
+                        if (armorAttr != null) armorAttr.setBaseValue(armorVal);
+                        if (stepAttr != null) stepAttr.setBaseValue(stepVal);
+                        
+                        // Recalculate and set the new max health based on the original config health
+                        String presetKey = mob.getPersistentDataContainer().get(
+                            new NamespacedKey(plugin, "td_preset"),
+                            PersistentDataType.STRING
+                        );
+                        if (presetKey == null) presetKey = mob.getType().name().toLowerCase();
+                        
+                        double baseMaxHealth = plugin.getConfig().getDouble("mobs." + presetKey + ".health", 50.0);
+                        double multiplier = nextSize == 2 ? 0.5 : 0.25;
+                        double newMaxHealth = baseMaxHealth * multiplier;
+                        
+                        org.bukkit.attribute.AttributeInstance maxHealthAttr = mob.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+                        if (maxHealthAttr != null) {
+                            maxHealthAttr.setBaseValue(newMaxHealth);
+                            mob.setHealth(newMaxHealth);
+                        }
+                        
+                        // Play damage hurt flash and sound
+                        mob.playEffect(org.bukkit.EntityEffect.HURT);
+                        org.bukkit.Sound hurtSound = (mob instanceof org.bukkit.entity.MagmaCube) 
+                            ? org.bukkit.Sound.ENTITY_MAGMA_CUBE_HURT 
+                            : org.bukkit.Sound.ENTITY_SLIME_HURT;
+                        mob.getWorld().playSound(mob.getLocation(), hurtSound, 1.0f, 1.0f);
+                        
+                        // Play a shrinking sound and particles
+                        mob.getWorld().playSound(mob.getLocation(), org.bukkit.Sound.ENTITY_SLIME_SQUISH, 1.0f, 0.8f);
+                        mob.getWorld().spawnParticle(org.bukkit.Particle.POOF, mob.getLocation(), 10, 0.3, 0.3, 0.3, 0.05);
+                        
+                        // Update health bar immediately
+                        plugin.getMobManager().updateHealthBar(mob);
+                        return;
+                    }
                 }
             }
 
@@ -148,12 +240,13 @@ public class MobListener implements Listener {
                 }
             }
 
-            // Award experience only to active players on that track
+            // Award experience only to the player who sent the mob (on the opposite track)
             NamespacedKey xpRewardKey = new NamespacedKey(plugin, "td_xp_reward");
             if (entity.getPersistentDataContainer().has(xpRewardKey, PersistentDataType.INTEGER)) {
                 int xpReward = entity.getPersistentDataContainer().get(xpRewardKey, PersistentDataType.INTEGER);
+                String senderArena = mobArena.equals("1") ? "2" : "1";
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(mobArena)) {
+                    if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(senderArena)) {
                         plugin.getGameManager().addExp(player.getUniqueId(), xpReward);
                     }
                 }
@@ -215,11 +308,17 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
         if (plugin.getGameManager().getBossBar() != null) {
-            plugin.getGameManager().getBossBar().addPlayer(event.getPlayer());
+            plugin.getGameManager().getBossBar().addPlayer(player);
         }
-        if (plugin.getGameManager().getCurrentState() == com.pauljang.towerDefense.core.GameState.ACTIVE) {
-            plugin.getGameManager().giveStarterWeapons(event.getPlayer());
+        com.pauljang.towerDefense.core.GameState state = plugin.getGameManager().getCurrentState();
+        if (state == com.pauljang.towerDefense.core.GameState.ACTIVE || state == com.pauljang.towerDefense.core.GameState.STARTING) {
+            player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            player.setAllowFlight(true);
+            if (state == com.pauljang.towerDefense.core.GameState.ACTIVE) {
+                plugin.getGameManager().giveStarterWeapons(player);
+            }
         }
     }
 
@@ -262,8 +361,48 @@ public class MobListener implements Listener {
             }
 
             if (presetType != null) {
-                if (event.isLeftClick()) {
-                    int cost = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
+                org.bukkit.event.inventory.ClickType clickType = event.getClick();
+                int cost = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
+                
+                if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) {
+                    // Add up to 10 mobs based on gold availability
+                    int totalCost = cost * 10;
+                    if (plugin.getGameManager().removeGold(player.getUniqueId(), totalCost)) {
+                        for (int i = 0; i < 10; i++) {
+                            plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
+                        }
+                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
+                    } else {
+                        int currentGold = plugin.getGameManager().getGold(player.getUniqueId());
+                        int affordable = currentGold / cost;
+                        int toBuy = Math.min(10, affordable);
+                        if (toBuy > 0) {
+                            if (plugin.getGameManager().removeGold(player.getUniqueId(), cost * toBuy)) {
+                                for (int i = 0; i < toBuy; i++) {
+                                    plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
+                                }
+                                player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
+                                player.sendMessage(org.bukkit.ChatColor.YELLOW + "Only had enough Gold to queue " + toBuy + " mobs.");
+                            }
+                        } else {
+                            player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + totalCost + " Gold for 10 mobs.");
+                            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                        }
+                    }
+                } else if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
+                    // Remove up to 10 mobs from the queue
+                    java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+                    int count = queue.getOrDefault(presetType, 0);
+                    int toRemove = Math.min(10, count);
+                    if (toRemove > 0) {
+                        for (int i = 0; i < toRemove; i++) {
+                            plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
+                        }
+                        int totalRefund = cost * toRemove;
+                        plugin.getGameManager().addGold(player.getUniqueId(), totalRefund, true);
+                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
+                    }
+                } else if (event.isLeftClick()) {
                     if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                         plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
@@ -276,8 +415,7 @@ public class MobListener implements Listener {
                     int count = queue.getOrDefault(presetType, 0);
                     if (count > 0) {
                         plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
-                        int refund = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
-                        plugin.getGameManager().addGold(player.getUniqueId(), refund, true); // Refund Gold
+                        plugin.getGameManager().addGold(player.getUniqueId(), cost, true);
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
                     }
                 }
@@ -319,13 +457,18 @@ public class MobListener implements Listener {
 
             com.pauljang.towerDefense.towers.TowerType type = null;
             switch (slot) {
-                case 11 -> type = com.pauljang.towerDefense.towers.TowerType.ARCHER;
-                case 13 -> type = com.pauljang.towerDefense.towers.TowerType.MAGE;
-                case 15 -> type = com.pauljang.towerDefense.towers.TowerType.FROST;
+                case 10 -> type = com.pauljang.towerDefense.towers.TowerType.ARCHER;
+                case 11 -> type = com.pauljang.towerDefense.towers.TowerType.FIRE;
+                case 12 -> type = com.pauljang.towerDefense.towers.TowerType.PRISMARINE;
+                case 13 -> type = com.pauljang.towerDefense.towers.TowerType.CHORUS;
+                case 14 -> type = com.pauljang.towerDefense.towers.TowerType.REDSTONE;
+                case 15 -> type = com.pauljang.towerDefense.towers.TowerType.POISON;
+                case 16 -> type = com.pauljang.towerDefense.towers.TowerType.ICE;
             }
 
             if (type != null) {
-                int cost = type.getCost();
+                String nameKey = type.name().toLowerCase() + "_1";
+                int cost = plugin.getConfig().getInt("towers." + nameKey + ".cost", type.getCost());
                 if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                     plugin.getTowerManager().placeTower(plotId, type);
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName() + " on plot " + plotId + "!");
@@ -363,6 +506,10 @@ public class MobListener implements Listener {
                         tower.incrementLevel();
                         plugin.getTowerManager().buildTowerStructure(tower);
                         plugin.getTowerManager().updateHologram(tower);
+                        if (tower.getType() == com.pauljang.towerDefense.towers.TowerType.REDSTONE) {
+                            String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                            plugin.getTowerManager().updateAllTowerHologramsInArena(arena);
+                        }
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Upgraded Tower to Level " + tower.getLevel() + "!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
                         // Refresh GUI
@@ -373,6 +520,9 @@ public class MobListener implements Listener {
                     }
                 }
                 case 31 -> { // Cycle Targeting Mode
+                    if (tower.getType() == com.pauljang.towerDefense.towers.TowerType.REDSTONE) {
+                        return;
+                    }
                     com.pauljang.towerDefense.towers.TargetingMode current = tower.getTargetingMode();
                     com.pauljang.towerDefense.towers.TargetingMode next = com.pauljang.towerDefense.towers.TargetingMode.FIRST;
                     switch (current) {
@@ -682,6 +832,21 @@ public class MobListener implements Listener {
                 event.setCancelled(true);
             }
         }
+    }
+
+    @EventHandler
+    public void onSlimeSplit(org.bukkit.event.entity.SlimeSplitEvent event) {
+        event.setCancelled(true);
+    }
+
+    @EventHandler
+    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        plugin.getGameManager().handlePlayerDisconnect(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerKick(org.bukkit.event.player.PlayerKickEvent event) {
+        plugin.getGameManager().handlePlayerDisconnect(event.getPlayer());
     }
 }
 

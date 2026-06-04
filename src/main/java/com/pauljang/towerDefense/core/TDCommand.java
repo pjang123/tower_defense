@@ -113,8 +113,18 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "start":
-                gameManager.setGameState(GameState.STARTING);
-                player.sendMessage(ChatColor.GREEN + "Forcing game to STARTING state!");
+                if (gameManager.getCurrentState() == GameState.ACTIVE || gameManager.getCurrentState() == GameState.STARTING) {
+                    player.sendMessage(ChatColor.YELLOW + "A game is already active! Gracefully restarting the match...");
+                    gameManager.setGameState(GameState.ENDED);
+                    
+                    // Small delay to ensure clean termination before starting a new countdown
+                    org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        gameManager.setGameState(GameState.STARTING);
+                    }, 5L);
+                } else {
+                    gameManager.setGameState(GameState.STARTING);
+                    player.sendMessage(ChatColor.GREEN + "Forcing game to STARTING state!");
+                }
                 break;
 
             case "stop":

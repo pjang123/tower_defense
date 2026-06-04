@@ -17,7 +17,7 @@ public class GameManager {
     private final TowerDefense plugin;
     private GameState currentState = null;
 
-    private int maxCastleHealth = 20;
+    private int maxCastleHealth = 100;
     private final java.util.Map<String, Integer> arenaHealth = new java.util.HashMap<>();
     private final java.util.Map<String, java.util.Map<String, Long>> activeSpells = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.Location, org.bukkit.Material> originalFloorBlocks = new java.util.HashMap<>();
@@ -37,7 +37,7 @@ public class GameManager {
 
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
-        this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 20);
+        this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 100);
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
         
@@ -138,6 +138,25 @@ public class GameManager {
 
     private void handleCountdown() {
         cleanupBossBar();
+        arenaHealth.put("1", maxCastleHealth);
+        arenaHealth.put("2", maxCastleHealth);
+        plugin.getMobManager().clearAllQueues();
+
+        // Auto-assign arenas if they are not already set to "1" or "2", and reset player stats for the match
+        int count = 1;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            String currentArena = playerArenas.get(player.getUniqueId());
+            if (!"1".equals(currentArena) && !"2".equals(currentArena)) {
+                String assignedArena = count == 1 ? "1" : "2";
+                setPlayerArena(player.getUniqueId(), assignedArena);
+                count++;
+            }
+            
+            resetPlayerForMatch(player, getPlayerArena(player.getUniqueId()));
+            player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            player.setAllowFlight(true);
+        }
+
         Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] Game starting in 10 seconds!");
         // We'll auto-start after 10 seconds for testing
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -155,7 +174,8 @@ public class GameManager {
         updateCastleHologram("2");
         Bukkit.broadcastMessage(ChatColor.GREEN + "[Tower Defense] The game has begun! Defend your castles!");
         for (Player player : Bukkit.getOnlinePlayers()) {
-            giveStarterWeapons(player);
+            player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            player.setAllowFlight(true);
             player.playSound(player.getLocation(), Sound.EVENT_RAID_HORN, 1.0f, 1.0f);
         }
     }
@@ -226,7 +246,54 @@ public class GameManager {
             player.teleport(player.getWorld().getSpawnLocation());
             // Clear items
             player.getInventory().clear();
+            
+            // Reset gamemode and preserve flight properties
+            player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            player.setAllowFlight(true);
         }
+    }
+
+    public void handlePlayerDisconnect(Player player) {
+        if (currentState != GameState.ACTIVE && currentState != GameState.STARTING) {
+            return;
+        }
+
+        String quittingArena = getPlayerArena(player.getUniqueId());
+        if (!"1".equals(quittingArena) && !"2".equals(quittingArena)) {
+            return; // Not in the active game
+        }
+
+        // Determine the winning arena
+        String winningArena = "1".equals(quittingArena) ? "2" : "1";
+
+        // Find the remaining online player in the winning arena
+        Player winner = null;
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (!p.getUniqueId().equals(player.getUniqueId())) {
+                String arena = getPlayerArena(p.getUniqueId());
+                if (winningArena.equals(arena)) {
+                    winner = p;
+                    break;
+                }
+            }
+        }
+
+        // Broadcast disconnection and victory
+        Bukkit.broadcastMessage(ChatColor.RED + "[Tower Defense] " + player.getName() + " has disconnected! The match has ended.");
+        if (winner != null) {
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + winner.getName() + " wins by forfeit!");
+        } else {
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] The match ended because both players disconnected.");
+        }
+
+        // Force set the loser's health to 0 to trigger setGameState(GameState.ENDED) and display victory
+        arenaHealth.put(quittingArena, 0);
+        setGameState(GameState.ENDED);
+
+        // Go back to lobby state after a short delay
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            setGameState(GameState.LOBBY);
+        }, 100L); // 5 seconds delay to see the victory screen
     }
 
     public void damageCastle(int amount) {
@@ -968,21 +1035,21 @@ public class GameManager {
         stormLore.add("");
         stormLore.add(ChatColor.YELLOW + "Click to cast on your track!");
         gui.setItem(14, createCustomGUIItem(Material.MAGMA_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Spell: Damage Storm", stormLore));
-
+ 
         // 5. Offensive Spells / Sabotages (Slot 21, 22, 23)
         int hasteCost = plugin.getConfig().getInt("spells.haste-rush.cost", 200);
         int hasteDur = plugin.getConfig().getInt("spells.haste-rush.duration", 6);
         double hasteMult = plugin.getConfig().getDouble("spells.haste-rush.speed-multiplier", 1.6);
         int hastePct = (int) Math.round((hasteMult - 1.0) * 100.0);
         java.util.List<String> hasteLore = new java.util.ArrayList<>();
-        hasteLore.add(ChatColor.GRAY + "Grants Speed II (+" + hastePct + "% speed) to all mobs");
+        hasteLore.add(ChatColor.GRAY + "Grants Speed I (+" + hastePct + "% speed) to all mobs");
         hasteLore.add(ChatColor.GRAY + "currently traversing the opponent's track.");
         hasteLore.add(ChatColor.GRAY + "Duration: " + hasteDur + " seconds");
         hasteLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + hasteCost + " Gold");
         hasteLore.add("");
         hasteLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
         gui.setItem(21, createCustomGUIItem(Material.GOLD_BLOCK, ChatColor.GOLD + "" + ChatColor.BOLD + "Sabotage: Haste Rush", hasteLore));
-
+ 
         int empCost = plugin.getConfig().getInt("spells.tower-emp.cost", 250);
         int empDur = plugin.getConfig().getInt("spells.tower-emp.duration", 6);
         java.util.List<String> empLore = new java.util.ArrayList<>();
@@ -993,9 +1060,9 @@ public class GameManager {
         empLore.add("");
         empLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
         gui.setItem(22, createCustomGUIItem(Material.REDSTONE_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Sabotage: Tower EMP", empLore));
-
+ 
         int shieldCost = plugin.getConfig().getInt("spells.slow-shield.cost", 150);
-        int shieldDur = plugin.getConfig().getInt("spells.slow-shield.duration", 10);
+        int shieldDur = plugin.getConfig().getInt("spells.slow-shield.duration", 5);
         java.util.List<String> shieldLore = new java.util.ArrayList<>();
         shieldLore.add(ChatColor.GRAY + "Grants slow immunity to any mobs spawned");
         shieldLore.add(ChatColor.GRAY + "on the opponent's track during the spell.");

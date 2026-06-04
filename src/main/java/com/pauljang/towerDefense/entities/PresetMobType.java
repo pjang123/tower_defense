@@ -10,11 +10,11 @@ public enum PresetMobType {
     SILVERFISH(EntityType.SILVERFISH, 1.6, 8.0, 0.0, false, false, Material.SILVERFISH_SPAWN_EGG, ChatColor.DARK_GRAY, "Silverfish", 80, 25, 120),
     SPIDER(EntityType.SPIDER, 1.4, 40.0, 2.0, false, false, Material.SPIDER_SPAWN_EGG, ChatColor.RED, "Spider", 100, 30, 150),
     PIGMAN(EntityType.ZOMBIFIED_PIGLIN, 0.7, 100.0, 4.0, false, true, Material.ZOMBIFIED_PIGLIN_SPAWN_EGG, ChatColor.GOLD, "Pigman", 130, 45, 200),
-    SLIME(EntityType.SLIME, 0.9, 50.0, 0.0, false, false, Material.SLIME_SPAWN_EGG, ChatColor.GREEN, "Slime", 160, 50, 250),
+    SLIME(EntityType.SLIME, 0.675, 50.0, 0.0, false, false, Material.SLIME_SPAWN_EGG, ChatColor.GREEN, "Slime", 160, 50, 250),
     CREEPER(EntityType.CREEPER, 1.0, 60.0, 0.0, false, false, Material.CREEPER_SPAWN_EGG, ChatColor.DARK_GREEN, "Creeper", 260, 80, 400),
     BLAZE(EntityType.BLAZE, 1.0, 80.0, 0.0, true, true, Material.BLAZE_SPAWN_EGG, ChatColor.GOLD, "Blaze", 320, 100, 500),
     MAGMA_CUBE(EntityType.MAGMA_CUBE, 0.8, 90.0, 6.0, true, true, Material.MAGMA_CUBE_SPAWN_EGG, ChatColor.DARK_RED, "Magma Cube", 380, 120, 600),
-    GHAST(EntityType.GHAST, 0.7, 200.0, 0.0, true, true, Material.GHAST_SPAWN_EGG, ChatColor.WHITE, "Ghast", 500, 160, 800),
+    GHAST(EntityType.GHAST, 0.7, 200.0, 0.0, true, true, Material.GHAST_SPAWN_EGG, ChatColor.WHITE, "Ghast", 500, 160, 1000),
     GIANT(EntityType.GIANT, 0.4, 500.0, 10.0, true, false, Material.ROTTEN_FLESH, ChatColor.DARK_RED, "Giant Zombie", 600, 200, 1000);
 
     private final EntityType entityType;

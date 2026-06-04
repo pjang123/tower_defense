@@ -39,13 +39,7 @@ public class Tower {
     public java.util.List<ArmorStand> getHolograms() { return holograms; }
 
     public String getTierName() {
-        TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String name = type.name().toLowerCase();
-        java.util.List<String> names = plugin.getConfig().getStringList("towers." + name + ".tier-names");
-        if (names != null && level >= 1 && level <= names.size()) {
-            return names.get(level - 1);
-        }
-        return type.getDisplayName() + " T" + level;
+        return type.name().toLowerCase() + "_" + level;
     }
 
     public String getRomanLevel() {
@@ -67,55 +61,38 @@ public class Tower {
 
     public double getRange() {
         TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String name = type.name().toLowerCase();
-        double baseRange = plugin.getConfig().getDouble("towers." + name + ".range", type.getRange());
-        double rangeInc = plugin.getConfig().getDouble("towers." + name + ".range-increase", 1.5);
-        return baseRange + (level - 1) * rangeInc;
+        String nameKey = type.name().toLowerCase() + "_" + level;
+        return plugin.getConfig().getDouble("towers." + nameKey + ".range", type.getRange() + (level - 1) * 1.5);
     }
 
     public double getDamage() {
         TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String name = type.name().toLowerCase();
-        double baseDamage = plugin.getConfig().getDouble("towers." + name + ".damage", type.getDamage());
-        double scale = plugin.getConfig().getDouble("towers." + name + ".damage-increase", type == TowerType.MAGE ? 2.5 : (type == TowerType.FROST ? 0.8 : 1.5));
-        return baseDamage + (level - 1) * scale;
+        String nameKey = type.name().toLowerCase() + "_" + level;
+        return plugin.getConfig().getDouble("towers." + nameKey + ".damage", type.getDamage() + (level - 1) * 1.5);
     }
 
     public long getCooldown() {
         TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String name = type.name().toLowerCase();
-        long baseCooldown = plugin.getConfig().getLong("towers." + name + ".cooldown", type.getCooldown());
-        long step = plugin.getConfig().getLong("towers." + name + ".cooldown-decrease", type == TowerType.MAGE ? 3L : 2L);
-        return Math.max(8L, baseCooldown - (level - 1) * step);
+        String nameKey = type.name().toLowerCase() + "_" + level;
+        return plugin.getConfig().getLong("towers." + nameKey + ".cooldown", Math.max(8L, type.getCooldown() - (level - 1) * 2));
     }
 
     public int getUpgradeCost() {
+        if (level >= 3) {
+            return -1; // Max level reached
+        }
         TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String name = type.name().toLowerCase();
-        java.util.List<Integer> costs = plugin.getConfig().getIntegerList("towers." + name + ".upgrade-costs");
-        if (costs == null || costs.isEmpty()) {
-            costs = java.util.Arrays.asList(150, 300, 500, 800);
-        }
-        if (level >= 1 && level <= costs.size()) {
-            return costs.get(level - 1);
-        }
-        return -1; // Max level reached
+        String nextKey = type.name().toLowerCase() + "_" + (level + 1);
+        return plugin.getConfig().getInt("towers." + nextKey + ".cost", (level + 1) * 150);
     }
 
     public int getTotalValue() {
         TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String name = type.name().toLowerCase();
-        int baseCost = plugin.getConfig().getInt("towers." + name + ".cost", type.getCost());
-        java.util.List<Integer> costs = plugin.getConfig().getIntegerList("towers." + name + ".upgrade-costs");
-        if (costs == null || costs.isEmpty()) {
-            costs = java.util.Arrays.asList(150, 300, 500, 800);
+        int total = 0;
+        for (int l = 1; l <= level; l++) {
+            String key = type.name().toLowerCase() + "_" + l;
+            total += plugin.getConfig().getInt("towers." + key + ".cost", l * 100);
         }
-        int val = baseCost;
-        for (int i = 1; i < level; i++) {
-            if (i <= costs.size()) {
-                val += costs.get(i - 1);
-            }
-        }
-        return val;
+        return total;
     }
 }

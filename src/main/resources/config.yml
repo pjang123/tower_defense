@@ -1,7 +1,7 @@
 # Global game settings
 game:
   starting-gold: 150
-  max-castle-health: 20
+  max-castle-health: 100
   challenge-timeout-seconds: 30
 
 # Spells configuration (costs in gold, durations in seconds)
@@ -20,13 +20,13 @@ spells:
   haste-rush:
     cost: 200
     duration: 6
-    speed-multiplier: 1.6
+    speed-multiplier: 1.2
   tower-emp:
     cost: 250
     duration: 6
   slow-shield:
     cost: 150
-    duration: 10
+    duration: 5
 
 # Passive gold generator & gear upgrades settings
 upgrades:
@@ -104,7 +104,7 @@ mobs:
     height-offset: 0.0
   slime:
     spawn-cost: 250
-    speed: 0.9
+    speed: 0.675
     health: 50.0
     armor: 0.0
     gold-reward: 160
@@ -146,7 +146,7 @@ mobs:
     height-offset: 1.5
     slime-size: 2
   ghast:
-    spawn-cost: 800
+    spawn-cost: 1000
     speed: 0.7
     health: 200.0
     armor: 0.0
@@ -168,60 +168,146 @@ mobs:
 
 # Towers configuration
 towers:
-  archer:
+  # --- Archer Towers ---
+  archer_1:
     cost: 100
     range: 15.0
     damage: 1.5
     cooldown: 20
-    range-increase: 1.5
-    damage-increase: 1.5
-    cooldown-decrease: 2
-    upgrade-costs:
-      - 150
-      - 300
-      - 500
-      - 800
-    tier-names:
-      - "Basic Archer"
-      - "Marksman"
-      - "Sharpshooter"
-      - "Soul Archer"
-      - "Royal Hunter"
-  mage:
-    cost: 175
-    range: 12.0
+  archer_2:
+    cost: 150
+    range: 16.5
     damage: 3.0
-    cooldown: 30
-    range-increase: 1.5
-    damage-increase: 2.5
-    cooldown-decrease: 3
-    upgrade-costs:
-      - 150
-      - 300
-      - 500
-      - 800
-    tier-names:
-      - "Apprentice Mage"
-      - "Fire Mage"
-      - "Pyromancer"
-      - "Nether Arcanist"
-      - "Archmage"
-  frost:
+    cooldown: 18
+  archer_3:
+    cost: 300
+    range: 18.0
+    damage: 4.5
+    cooldown: 16
+
+  # --- Fire Towers (AoE Fire, damages and burns mobs) ---
+  fire_1:
+    cost: 175
+    range: 8.0
+    damage: 1.0
+    cooldown: 80
+    fire-ticks: 60       # 3 seconds burn
+  fire_2:
+    cost: 250
+    range: 10.0
+    damage: 2.0
+    cooldown: 80
+    fire-ticks: 100      # 5 seconds burn
+  fire_3:
+    cost: 400
+    range: 12.0
+    damage: 3.5
+    cooldown: 80
+    fire-ticks: 140      # 7 seconds burn
+
+  # --- Prismarine Towers (AoE Slowness, slows mobs) ---
+  prismarine_1:
     cost: 125
-    range: 15.0
+    range: 8.0
     damage: 0.5
+    cooldown: 30
+    slowness-level: 1
+    slowness-duration: 40  # 2 seconds
+  prismarine_2:
+    cost: 200
+    range: 10.0
+    damage: 1.0
+    cooldown: 30
+    slowness-level: 2
+    slowness-duration: 60  # 3 seconds
+  prismarine_3:
+    cost: 350
+    range: 12.0
+    damage: 1.5
+    cooldown: 30
+    slowness-level: 3
+    slowness-duration: 80  # 4 seconds
+
+  # --- Chorus Towers (Teleports leading mob backwards along path) ---
+  chorus_1:
+    cost: 150
+    range: 8.0
+    damage: 0.0
+    cooldown: 120          # 6 seconds between teleports
+    teleport-back: 1       # Teleport back by 1 waypoint
+  chorus_2:
+    cost: 250
+    range: 10.0
+    damage: 0.0
+    cooldown: 80           # 4 seconds between teleports
+    teleport-back: 2       # Teleport back by 2 waypoints
+  chorus_3:
+    cost: 400
+    range: 12.0
+    damage: 0.0
+    cooldown: 40           # 2 seconds between teleports
+    teleport-back: 3       # Teleport back by 3 waypoints
+
+  # --- Redstone Towers (Passive booster, speeds up nearby towers) ---
+  redstone_1:
+    cost: 200
+    range: 10.0            # Boost radius (blocks)
+    damage: 0.0
     cooldown: 20
-    range-increase: 1.5
-    damage-increase: 0.8
-    cooldown-decrease: 2
-    upgrade-costs:
-      - 150
-      - 300
-      - 500
-      - 800
-    tier-names:
-      - "Ice Apprentice"
-      - "Frost Mage"
-      - "Cryomancer"
-      - "Blizzard Conjurer"
-      - "Winter Lord"
+  redstone_2:
+    cost: 300
+    range: 16.0
+    damage: 0.0
+    cooldown: 20
+  redstone_3:
+    cost: 500
+    range: 24.0
+    damage: 0.0
+    cooldown: 20
+
+  # --- Poison Towers (AoE Poison, spiders immune) ---
+  poison_1:
+    cost: 150
+    range: 8.0
+    damage: 0.5
+    cooldown: 80
+    poison-level: 1
+    poison-duration: 60    # 3 seconds
+  poison_2:
+    cost: 250
+    range: 10.0
+    damage: 1.0
+    cooldown: 80
+    poison-level: 2
+    poison-duration: 80    # 4 seconds
+  poison_3:
+    cost: 400
+    range: 12.0
+    damage: 1.5
+    cooldown: 80
+    poison-level: 3
+    poison-duration: 100   # 5 seconds
+
+  # --- Ice Towers (AoE Slowness, slows mobs) ---
+  ice_1:
+    cost: 125
+    range: 8.0
+    damage: 0.5
+    cooldown: 30
+    slowness-level: 1
+    slowness-duration: 40  # 2 seconds
+  ice_2:
+    cost: 200
+    range: 10.0
+    damage: 1.0
+    cooldown: 30
+    slowness-level: 2
+    slowness-duration: 60  # 3 seconds
+  ice_3:
+    cost: 350
+    range: 12.0
+    damage: 1.5
+    cooldown: 30
+    slowness-level: 3
+    slowness-duration: 80  # 4 seconds
+

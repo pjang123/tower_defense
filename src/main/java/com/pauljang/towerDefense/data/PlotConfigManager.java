@@ -125,7 +125,18 @@ public class PlotConfigManager {
             int minX = Math.min(x1, x2);
             int maxX = Math.max(x1, x2);
             int minY = Math.min(y1, y2) - 1;
-            int maxY = Math.max(y1, y2) + 3;
+            int maxBaseY = Math.max(y1, y2);
+            int maxY = maxBaseY + 3;
+
+            com.pauljang.towerDefense.towers.Tower tower = plugin.getTowerManager().getTower(plotId);
+            if (tower != null) {
+                int towerHeight = 3;
+                if (tower.getStructureSize() != null) {
+                    towerHeight = tower.getStructureSize().getBlockY();
+                }
+                maxY = maxBaseY + towerHeight + 2;
+            }
+
             int minZ = Math.min(z1, z2);
             int maxZ = Math.max(z1, z2);
 

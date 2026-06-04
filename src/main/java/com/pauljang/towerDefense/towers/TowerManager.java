@@ -65,6 +65,10 @@ public class TowerManager {
 
         buildTowerStructure(tower);
         updateHologram(tower);
+
+        if (type == TowerType.REDSTONE) {
+            updateAllTowerHologramsInArena(plugin.getPlotConfigManager().getPlotArena(plotId));
+        }
     }
 
     public void buildTowerStructure(Tower tower) {
@@ -75,8 +79,8 @@ public class TowerManager {
         // 1. Clear old structure blocks if they exist
         clearTowerBlocks(tower);
 
-        // 2. Try loading level-specific NBT structure (e.g., structures/archer_level_1.nbt)
-        File levelSpecificFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + "_level_" + level + ".nbt");
+        // 2. Try loading level-specific NBT structure (e.g., structures/archer_1.nbt)
+        File levelSpecificFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + "_" + level + ".nbt");
         File genericFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + ".nbt");
         File targetFile = levelSpecificFile.exists() ? levelSpecificFile : (genericFile.exists() ? genericFile : null);
         
@@ -107,9 +111,52 @@ public class TowerManager {
         } else {
             // Fallback default 3-block multiblock
             tower.setStructureSize(null);
-            center.clone().add(0, 1, 0).getBlock().setType(type.getBaseMaterial());
-            center.clone().add(0, 2, 0).getBlock().setType(type.getMiddleMaterial());
-            center.clone().add(0, 3, 0).getBlock().setType(type.getBlockMaterial());
+            center.clone().add(0, 1, 0).getBlock().setType(type.getBaseMaterial(), false);
+            center.clone().add(0, 2, 0).getBlock().setType(type.getMiddleMaterial(), false);
+            center.clone().add(0, 3, 0).getBlock().setType(type.getBlockMaterial(), false);
+        }
+        
+        isolateTowerBlocks(center, tower.getStructureSize());
+        clearNearbyDroppedItemsLater(center);
+    }
+
+    private void isolateTowerBlocks(Location center, BlockVector size) {
+        int sizeX = size != null ? size.getBlockX() : 1;
+        int sizeY = size != null ? size.getBlockY() : 3;
+        int sizeZ = size != null ? size.getBlockZ() : 1;
+        
+        Location scanStart = size != null 
+            ? center.clone().subtract(sizeX / 2, 0, sizeZ / 2).add(0, 1, 0)
+            : center.clone().add(0, 1, 0);
+            
+        // Expand the scan boundaries by 1 block in X and Z to disconnect neighbors
+        for (int dx = -1; dx <= sizeX; dx++) {
+            for (int dy = 0; dy < sizeY; dy++) {
+                for (int dz = -1; dz <= sizeZ; dz++) {
+                    Location loc = scanStart.clone().add(dx, dy, dz);
+                    org.bukkit.block.Block block = loc.getBlock();
+                    org.bukkit.block.data.BlockData blockData = block.getBlockData();
+                    
+                    boolean modified = false;
+                    if (blockData instanceof org.bukkit.block.data.MultipleFacing multipleFacing) {
+                        for (org.bukkit.block.BlockFace face : multipleFacing.getAllowedFaces()) {
+                            multipleFacing.setFace(face, false);
+                        }
+                        modified = true;
+                    } else if (blockData instanceof org.bukkit.block.data.type.Wall wall) {
+                        wall.setHeight(org.bukkit.block.BlockFace.NORTH, org.bukkit.block.data.type.Wall.Height.NONE);
+                        wall.setHeight(org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.data.type.Wall.Height.NONE);
+                        wall.setHeight(org.bukkit.block.BlockFace.EAST, org.bukkit.block.data.type.Wall.Height.NONE);
+                        wall.setHeight(org.bukkit.block.BlockFace.WEST, org.bukkit.block.data.type.Wall.Height.NONE);
+                        wall.setUp(true);
+                        modified = true;
+                    }
+                    
+                    if (modified) {
+                        block.setBlockData(blockData, false);
+                    }
+                }
+            }
         }
     }
 
@@ -125,16 +172,17 @@ public class TowerManager {
                 for (int dy = 0; dy < sizeY; dy++) {
                     for (int dz = 0; dz < sizeZ; dz++) {
                         Location blockLoc = placementLoc.clone().add(dx, dy, dz);
-                        blockLoc.getBlock().setType(Material.AIR);
+                        blockLoc.getBlock().setType(Material.AIR, false);
                     }
                 }
             }
         } else {
             // Fallback clear
-            center.clone().add(0, 1, 0).getBlock().setType(Material.AIR);
-            center.clone().add(0, 2, 0).getBlock().setType(Material.AIR);
-            center.clone().add(0, 3, 0).getBlock().setType(Material.AIR);
+            center.clone().add(0, 1, 0).getBlock().setType(Material.AIR, false);
+            center.clone().add(0, 2, 0).getBlock().setType(Material.AIR, false);
+            center.clone().add(0, 3, 0).getBlock().setType(Material.AIR, false);
         }
+        clearNearbyDroppedItemsLater(center);
     }
 
     public void updateHologram(Tower tower) {
@@ -144,16 +192,27 @@ public class TowerManager {
             holoHeight = tower.getStructureSize().getBlockY() + 1.2;
         }
 
-        // We want to show 3 lines:
-        // Line 0 (Top): [Tier X] Tier Name (specific type/upgrade path)
-        // Line 1: Damage: X DMG | Range: Y | Speed: Zs
-        // Line 2: Priority: TargetingMode
+        long cooldown = tower.getCooldown();
+        boolean isBoosted = isRedstoneBoosted(tower);
+        if (isBoosted) {
+            cooldown = Math.max(1L, (long)(cooldown * 0.7));
+        }
+        String speedStr = String.format("%.1fs", cooldown / 20.0);
+        if (isBoosted) {
+            speedStr += ChatColor.RED + " ⚡";
+        }
+
         java.util.List<String> lines = new java.util.ArrayList<>();
-        lines.add(ChatColor.GREEN + "[" + ChatColor.DARK_GREEN + "Tier " + tower.getRomanLevel() + ChatColor.GREEN + "] " + 
-                  tower.getType().getColor() + ChatColor.BOLD + tower.getTierName());
-        lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" + 
-                  ChatColor.GRAY + " | " + ChatColor.AQUA + "⚡ " + String.format("%.1fs", tower.getCooldown() / 20.0) + 
-                  ChatColor.GRAY + " | " + ChatColor.GREEN + "✦ " + String.format("%.1f", tower.getRange()) + "m");
+        lines.add(tower.getType().getColor().toString() + ChatColor.BOLD.toString() + tower.getType().name().toLowerCase() + "_" + tower.getLevel());
+        
+        if (tower.getType() == TowerType.REDSTONE) {
+            lines.add(ChatColor.RED + "✦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
+                      ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% ⚡");
+        } else {
+            lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" + 
+                      ChatColor.GRAY + " | " + ChatColor.AQUA + "⚡ " + speedStr + 
+                      ChatColor.GRAY + " | " + ChatColor.GREEN + "✦ " + String.format("%.1f", tower.getRange()) + "m");
+        }
         lines.add(ChatColor.GRAY + "Priority: " + ChatColor.GOLD + tower.getTargetingMode().getDisplayName());
 
         java.util.List<ArmorStand> stands = tower.getHolograms();
@@ -206,6 +265,15 @@ public class TowerManager {
         }
     }
 
+    public void updateAllTowerHologramsInArena(String arena) {
+        for (Tower tower : placedTowers.values()) {
+            String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+            if (arena.equals(towerArena)) {
+                updateHologram(tower);
+            }
+        }
+    }
+
     public Tower getTower(String plotId) {
         return placedTowers.get(plotId);
     }
@@ -222,6 +290,10 @@ public class TowerManager {
                 }
             }
             tower.getHolograms().clear();
+
+            if (tower.getType() == TowerType.REDSTONE) {
+                updateAllTowerHologramsInArena(plugin.getPlotConfigManager().getPlotArena(plotId));
+            }
         }
     }
 
@@ -244,14 +316,53 @@ public class TowerManager {
                         }
                         continue;
                     }
+
+                    // Redstone passive towers don't fire active attacks, they only boost nearby towers
+                    if (tower.getType() == TowerType.REDSTONE) {
+                        if (tick % 20 == 0) {
+                            Location center = tower.getCenterLocation();
+                            double range = tower.getRange();
+                            String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                            for (Tower other : placedTowers.values()) {
+                                if (other != tower && other.getType() != TowerType.REDSTONE) {
+                                    String otherArena = plugin.getPlotConfigManager().getPlotArena(other.getPlotId());
+                                    if (arena.equals(otherArena) && other.getCenterLocation().distanceSquared(center) <= range * range) {
+                                        Location otherHolo = other.getCenterLocation().clone().add(0, 3.5, 0);
+                                        otherHolo.getWorld().spawnParticle(
+                                            org.bukkit.Particle.DUST,
+                                            otherHolo,
+                                            3, 0.2, 0.2, 0.2,
+                                            new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.0f)
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
                     long cooldown = tower.getCooldown();
                     String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
                     if (plugin.getGameManager().isSpellActive(towerArena, "OVERCHARGE")) {
                         cooldown = Math.max(1, cooldown / 2);
                     }
+
+                    // Redstone passive cooldown reduction boost
+                    if (isRedstoneBoosted(tower)) {
+                        cooldown = (long) (cooldown * 0.7); // 30% speed boost
+                        cooldown = Math.max(1L, cooldown);
+                    }
+
                     if (tick - tower.getLastAttackTick() >= cooldown) {
                         Mob target = findTarget(tower);
-                        if (target != null) {
+                        // For AoE towers, they attack if there is any target in range
+                        if (tower.getType() == TowerType.FIRE || tower.getType() == TowerType.PRISMARINE || tower.getType() == TowerType.POISON || tower.getType() == TowerType.ICE) {
+                            java.util.List<Mob> inRadius = getMobsInRadius(tower.getCenterLocation(), tower.getRange(), towerArena);
+                            if (!inRadius.isEmpty()) {
+                                shootTarget(tower, inRadius.get(0));
+                                tower.setLastAttackTick(tick);
+                            }
+                        } else if (target != null) {
                             shootTarget(tower, target);
                             tower.setLastAttackTick(tick);
                         }
@@ -370,34 +481,234 @@ public class TowerManager {
             height = tower.getStructureSize().getBlockY() - 0.5;
         }
         Location start = tower.getCenterLocation().clone().add(0, height, 0);
-        Location end = target.getEyeLocation();
-
-        // 1. Damage target
-        target.damage(tower.getDamage());
-
-        // 2. Play particle and sound effects based on tower type & level
-        org.bukkit.Particle particle = org.bukkit.Particle.CRIT;
-        Sound sound = Sound.ENTITY_ARROW_SHOOT;
+        String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+        double range = tower.getRange();
 
         switch (tower.getType()) {
             case ARCHER -> {
-                particle = tower.getLevel() >= 4 ? org.bukkit.Particle.SOUL_FIRE_FLAME : org.bukkit.Particle.CRIT;
-                sound = Sound.ENTITY_ARROW_SHOOT;
+                target.damage(tower.getDamage());
+                drawParticleLine(start, target.getEyeLocation(), org.bukkit.Particle.CRIT);
+                start.getWorld().playSound(start, Sound.ENTITY_ARROW_SHOOT, 0.8f, 1.2f);
             }
-            case MAGE -> {
-                particle = org.bukkit.Particle.FLAME;
-                sound = Sound.ENTITY_BLAZE_SHOOT;
+            case FIRE -> {
+                int fireTicks = plugin.getConfig().getInt("towers.fire_" + tower.getLevel() + ".fire-ticks", 60 + (tower.getLevel() - 1) * 40);
+                double damage = tower.getDamage();
+                java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
+                org.bukkit.NamespacedKey fireDmgKey = new org.bukkit.NamespacedKey(plugin, "td_fire_damage");
+                for (Mob mob : targets) {
+                    mob.setFireTicks(fireTicks);
+                    mob.getPersistentDataContainer().set(fireDmgKey, org.bukkit.persistence.PersistentDataType.DOUBLE, damage);
+                    drawParticleLine(start, mob.getEyeLocation(), org.bukkit.Particle.FLAME);
+                }
+                start.getWorld().playSound(start, Sound.ENTITY_BLAZE_SHOOT, 0.8f, 1.0f);
             }
-            case FROST -> {
-                particle = org.bukkit.Particle.SNOWFLAKE;
-                sound = Sound.BLOCK_GLASS_BREAK;
-                int amp = tower.getLevel() >= 5 ? 2 : 1; // Slowness III for Level 5
-                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, amp));
+            case PRISMARINE -> {
+                int slowLvl = plugin.getConfig().getInt("towers.prismarine_" + tower.getLevel() + ".slowness-level", tower.getLevel());
+                int slowDur = plugin.getConfig().getInt("towers.prismarine_" + tower.getLevel() + ".slowness-duration", 40 + (tower.getLevel() - 1) * 20);
+                double damage = tower.getDamage();
+                java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
+                for (Mob mob : targets) {
+                    mob.damage(damage);
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowDur, slowLvl - 1));
+                    drawParticleLine(start, mob.getEyeLocation(), org.bukkit.Particle.BUBBLE);
+                }
+                start.getWorld().playSound(start, Sound.ENTITY_PLAYER_SPLASH, 0.8f, 1.2f);
+            }
+            case CHORUS -> {
+                target.damage(tower.getDamage());
+                
+                com.pauljang.towerDefense.entities.TDMob tdMob = null;
+                for (com.pauljang.towerDefense.entities.TDMob active : plugin.getMobManager().getActiveMobs()) {
+                    if (active.getEntity().equals(target)) {
+                        tdMob = active;
+                        break;
+                    }
+                }
+                if (tdMob != null) {
+                    java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(towerArena);
+                    if (!waypoints.isEmpty()) {
+                        int currentWpIndex = tdMob.getCurrentWaypointIndex();
+                        Location mobLoc = target.getLocation();
+                        
+                        double distanceToGoBack = 8.0;
+                        Location newTargetLocation = null;
+                        int newWpIndex = currentWpIndex;
+                        
+                        if (currentWpIndex > 0) {
+                            Location currentTargetWp = waypoints.get(currentWpIndex);
+                            Location previousWp = waypoints.get(currentWpIndex - 1);
+                            
+                            // Project the mob's position onto the segment vector between previousWp and currentTargetWp
+                            org.bukkit.util.Vector segment = currentTargetWp.toVector().subtract(previousWp.toVector());
+                            double segmentLength = segment.length();
+                            org.bukkit.util.Vector segmentDir = segmentLength > 0 ? segment.clone().normalize() : new org.bukkit.util.Vector(0,0,0);
+                            
+                            org.bukkit.util.Vector mobToPrev = mobLoc.toVector().subtract(previousWp.toVector());
+                            double projDist = segmentDir.lengthSquared() > 0 ? mobToPrev.dot(segmentDir) : 0.0;
+                            projDist = Math.max(0.0, Math.min(segmentLength, projDist));
+                            
+                            double remainingBack = distanceToGoBack;
+                            if (projDist >= remainingBack) {
+                                double targetDist = projDist - remainingBack;
+                                newTargetLocation = previousWp.clone().add(segmentDir.multiply(targetDist));
+                                newWpIndex = currentWpIndex;
+                            } else {
+                                remainingBack -= projDist;
+                                int segmentEndIdx = currentWpIndex - 1;
+                                while (segmentEndIdx > 0 && remainingBack > 0) {
+                                    Location segStart = waypoints.get(segmentEndIdx - 1);
+                                    Location segEnd = waypoints.get(segmentEndIdx);
+                                    org.bukkit.util.Vector segVec = segEnd.toVector().subtract(segStart.toVector());
+                                    double segLen = segVec.length();
+                                    org.bukkit.util.Vector segDir = segLen > 0 ? segVec.clone().normalize() : new org.bukkit.util.Vector(0,0,0);
+                                    
+                                    if (segLen >= remainingBack) {
+                                        double targetDist = segLen - remainingBack;
+                                        newTargetLocation = segStart.clone().add(segDir.multiply(targetDist));
+                                        newWpIndex = segmentEndIdx;
+                                        remainingBack = 0;
+                                        break;
+                                    } else {
+                                        remainingBack -= segLen;
+                                        segmentEndIdx--;
+                                    }
+                                }
+                                if (newTargetLocation == null) {
+                                    newTargetLocation = waypoints.get(0).clone();
+                                    newWpIndex = 1;
+                                }
+                            }
+                        } else {
+                            newTargetLocation = waypoints.get(0).clone();
+                            newWpIndex = 1;
+                        }
+                        
+                        tdMob.setCurrentWaypointIndex(newWpIndex);
+                        
+                        target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, target.getLocation(), 15, 0.5, 0.5, 0.5, 0.1);
+                        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                        
+                        String presetKey = target.getPersistentDataContainer().get(
+                            new org.bukkit.NamespacedKey(plugin, "td_preset"),
+                            org.bukkit.persistence.PersistentDataType.STRING
+                        );
+                        if (presetKey == null) presetKey = target.getType().name().toLowerCase();
+                        double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
+                        
+                        Location teleportLoc = newTargetLocation.clone();
+                        if (heightOffset > 0.0) {
+                            teleportLoc.add(0, heightOffset, 0);
+                        }
+                        
+                        target.teleport(teleportLoc);
+                        target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, teleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
+                        
+                        double speed = 1.0;
+                        org.bukkit.attribute.AttributeInstance speedAttr = target.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
+                        if (speedAttr != null) {
+                            speed = speedAttr.getValue();
+                        }
+                        target.getPathfinder().moveTo(newTargetLocation, speed);
+                    }
+                }
+            }
+            case POISON -> {
+                int poisonLvl = plugin.getConfig().getInt("towers.poison_" + tower.getLevel() + ".poison-level", tower.getLevel());
+                int poisonDur = plugin.getConfig().getInt("towers.poison_" + tower.getLevel() + ".poison-duration", 60 + (tower.getLevel() - 1) * 20);
+                double damage = tower.getDamage();
+                java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
+                
+                // Draw radial/area poison cloud instead of focused witch particle beams
+                Location center = tower.getCenterLocation();
+                for (double r = 1.0; r <= range; r += 1.5) {
+                    int count = (int) (2 * Math.PI * r * 1.5);
+                    for (int i = 0; i < count; i++) {
+                        double angle = (2 * Math.PI / count) * i;
+                        double x = Math.cos(angle) * r;
+                        double z = Math.sin(angle) * r;
+                        Location pLoc = center.clone().add(x, 1.0, z);
+                        center.getWorld().spawnParticle(org.bukkit.Particle.WITCH, pLoc, 1, 0.1, 0.1, 0.1, 0.0);
+                    }
+                }
+
+                org.bukkit.NamespacedKey poisonDmgKey = new org.bukkit.NamespacedKey(plugin, "td_poison_damage");
+                for (Mob mob : targets) {
+                    if (mob.getType() == org.bukkit.entity.EntityType.SPIDER) {
+                        continue; // Spider immune to poison tower
+                    }
+                    mob.getPersistentDataContainer().set(poisonDmgKey, org.bukkit.persistence.PersistentDataType.DOUBLE, damage);
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonDur, poisonLvl - 1));
+                }
+                start.getWorld().playSound(start, Sound.BLOCK_BREWING_STAND_BREW, 0.8f, 1.0f);
+            }
+            case ICE -> {
+                int slowDur = plugin.getConfig().getInt("towers.ice_" + tower.getLevel() + ".slowness-duration", 40 + (tower.getLevel() - 1) * 20);
+                double damage = tower.getDamage();
+                java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
+                org.bukkit.NamespacedKey freezeKey = new org.bukkit.NamespacedKey(plugin, "td_frozen_until");
+                org.bukkit.NamespacedKey slowImmuneKey = new org.bukkit.NamespacedKey(plugin, "td_slow_immune");
+
+                for (Mob mob : targets) {
+                    if (mob.getPersistentDataContainer().has(slowImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)) {
+                        continue; // Skip slow-immune mobs
+                    }
+                    mob.damage(damage);
+                    
+                    // Freeze for slowDur ticks (50ms per tick)
+                    long freezeEndTime = System.currentTimeMillis() + (slowDur * 50L);
+                    mob.getPersistentDataContainer().set(freezeKey, org.bukkit.persistence.PersistentDataType.LONG, freezeEndTime);
+                    
+                    // Apply slowness II to visually slow/halt animations and trigger the snowflake indicator
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowDur, 2));
+                    drawParticleLine(start, mob.getEyeLocation(), org.bukkit.Particle.SNOWFLAKE);
+                }
+                start.getWorld().playSound(start, Sound.BLOCK_POWDER_SNOW_BREAK, 0.8f, 1.2f);
+            }
+            case REDSTONE -> {
+                // Passive Redstone Tower
             }
         }
+    }
 
-        drawParticleLine(start, end, particle);
-        start.getWorld().playSound(start, sound, 0.8f, 1.2f);
+    private java.util.List<Mob> getMobsInRadius(Location center, double radius, String arena) {
+        java.util.List<Mob> result = new java.util.ArrayList<>();
+        double radiusSq = radius * radius;
+        for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
+            Mob mob = tdMob.getEntity();
+            if (mob == null || mob.isDead() || !mob.isValid()) continue;
+            if (!mob.getWorld().equals(center.getWorld())) continue;
+
+            String mobArena = mob.getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, "td_arena"),
+                org.bukkit.persistence.PersistentDataType.STRING
+            );
+            if (mobArena == null) mobArena = "1";
+            if (!arena.equals(mobArena)) continue;
+
+            if (mob.getLocation().distanceSquared(center) <= radiusSq) {
+                result.add(mob);
+            }
+        }
+        return result;
+    }
+
+    private boolean isRedstoneBoosted(Tower targetTower) {
+        if (targetTower.getType() == TowerType.REDSTONE) return false;
+        Location targetLoc = targetTower.getCenterLocation();
+        String targetArena = plugin.getPlotConfigManager().getPlotArena(targetTower.getPlotId());
+        
+        for (Tower tower : placedTowers.values()) {
+            if (tower.getType() == TowerType.REDSTONE && !tower.isDisabled()) {
+                String redstoneArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                if (!targetArena.equals(redstoneArena)) continue;
+                
+                double range = tower.getRange();
+                if (tower.getCenterLocation().distanceSquared(targetLoc) <= range * range) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void drawParticleLine(Location start, Location end, org.bukkit.Particle particle) {
@@ -423,33 +734,56 @@ public class TowerManager {
         }
 
         // Slot 13: Tower Info
-        gui.setItem(13, createGUIItem(
-            Material.BOOK,
-            ChatColor.GREEN + "Tower Stats (" + tower.getType().getDisplayName() + ")",
-            ChatColor.GRAY + "Level: " + ChatColor.YELLOW + tower.getLevel(),
-            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + tower.getRange(),
-            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + String.format("%.1f", tower.getDamage()),
-            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + String.format("%.1fs", tower.getCooldown() / 20.0),
-            ChatColor.GRAY + "Targeting: " + ChatColor.YELLOW + tower.getTargetingMode().getDisplayName()
-        ));
+        if (tower.getType() == TowerType.REDSTONE) {
+            gui.setItem(13, createGUIItem(
+                Material.BOOK,
+                ChatColor.GREEN + "Tower Stats (" + tower.getType().getDisplayName() + ")",
+                ChatColor.GRAY + "Level: " + ChatColor.YELLOW + tower.getLevel(),
+                ChatColor.GRAY + "Boost Range: " + ChatColor.YELLOW + tower.getRange() + " blocks",
+                ChatColor.GRAY + "Speed Boost: " + ChatColor.YELLOW + "30% (x0.7 Cooldown)"
+            ));
+        } else {
+            gui.setItem(13, createGUIItem(
+                Material.BOOK,
+                ChatColor.GREEN + "Tower Stats (" + tower.getType().getDisplayName() + ")",
+                ChatColor.GRAY + "Level: " + ChatColor.YELLOW + tower.getLevel(),
+                ChatColor.GRAY + "Range: " + ChatColor.YELLOW + tower.getRange(),
+                ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + String.format("%.1f", tower.getDamage()),
+                ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + String.format("%.1fs", tower.getCooldown() / 20.0),
+                ChatColor.GRAY + "Targeting: " + ChatColor.YELLOW + tower.getTargetingMode().getDisplayName()
+            ));
+        }
 
         // Slot 22: Upgrade Tower
         int nextLvl = tower.getLevel() + 1;
         int cost = tower.getUpgradeCost();
         if (cost != -1) {
-            double nextRange = tower.getRange() + 1.5;
-            double nextDamage = tower.getDamage() + (tower.getType() == TowerType.MAGE ? 2.5 : (tower.getType() == TowerType.FROST ? 0.8 : 1.5));
-            long nextCooldown = Math.max(8L, tower.getCooldown() - (tower.getType() == TowerType.MAGE ? 3L : 2L));
-            gui.setItem(22, createGUIItem(
-                Material.ANVIL,
-                ChatColor.GOLD + "Upgrade Tower (Lvl " + tower.getLevel() + " -> " + nextLvl + ")",
-                ChatColor.GRAY + "Cost: " + ChatColor.YELLOW + cost + " Gold",
-                "",
-                ChatColor.GRAY + "Stats Increase:",
-                ChatColor.GRAY + " - Range: " + ChatColor.YELLOW + tower.getRange() + ChatColor.GREEN + " -> " + nextRange,
-                ChatColor.GRAY + " - Damage: " + ChatColor.YELLOW + String.format("%.1f", tower.getDamage()) + ChatColor.GREEN + " -> " + String.format("%.1f", nextDamage),
-                ChatColor.GRAY + " - Speed: " + ChatColor.YELLOW + String.format("%.1fs", tower.getCooldown() / 20.0) + ChatColor.GREEN + " -> " + String.format("%.1fs", nextCooldown / 20.0)
-            ));
+            String nextKey = tower.getType().name().toLowerCase() + "_" + nextLvl;
+            double nextRange = plugin.getConfig().getDouble("towers." + nextKey + ".range", tower.getRange() + 1.5);
+            double nextDamage = plugin.getConfig().getDouble("towers." + nextKey + ".damage", tower.getDamage() + 1.5);
+            long nextCooldown = plugin.getConfig().getLong("towers." + nextKey + ".cooldown", Math.max(8L, tower.getCooldown() - 2L));
+            
+            if (tower.getType() == TowerType.REDSTONE) {
+                gui.setItem(22, createGUIItem(
+                    Material.ANVIL,
+                    ChatColor.GOLD + "Upgrade Tower (Lvl " + tower.getLevel() + " -> " + nextLvl + ")",
+                    ChatColor.GRAY + "Cost: " + ChatColor.YELLOW + cost + " Gold",
+                    "",
+                    ChatColor.GRAY + "Stats Increase:",
+                    ChatColor.GRAY + " - Boost Range: " + ChatColor.YELLOW + tower.getRange() + ChatColor.GREEN + " -> " + nextRange
+                ));
+            } else {
+                gui.setItem(22, createGUIItem(
+                    Material.ANVIL,
+                    ChatColor.GOLD + "Upgrade Tower (Lvl " + tower.getLevel() + " -> " + nextLvl + ")",
+                    ChatColor.GRAY + "Cost: " + ChatColor.YELLOW + cost + " Gold",
+                    "",
+                    ChatColor.GRAY + "Stats Increase:",
+                    ChatColor.GRAY + " - Range: " + ChatColor.YELLOW + tower.getRange() + ChatColor.GREEN + " -> " + nextRange,
+                    ChatColor.GRAY + " - Damage: " + ChatColor.YELLOW + String.format("%.1f", tower.getDamage()) + ChatColor.GREEN + " -> " + String.format("%.1f", nextDamage),
+                    ChatColor.GRAY + " - Speed: " + ChatColor.YELLOW + String.format("%.1fs", tower.getCooldown() / 20.0) + ChatColor.GREEN + " -> " + String.format("%.1fs", nextCooldown / 20.0)
+                ));
+            }
         } else {
             gui.setItem(22, createGUIItem(
                 Material.BEDROCK,
@@ -458,15 +792,47 @@ public class TowerManager {
             ));
         }
 
-        // Slot 31: Targeting Mode
-        gui.setItem(31, createGUIItem(
-            Material.COMPASS,
-            ChatColor.AQUA + "Targeting Mode",
-            ChatColor.GRAY + "Current Priority: " + ChatColor.YELLOW + tower.getTargetingMode().getDisplayName(),
-            "",
-            ChatColor.GRAY + "Click to cycle priorities:",
-            ChatColor.GRAY + " -> FIRST -> LAST -> STRONG -> WEAK -> CLOSE"
-        ));
+        // Slot 31: Targeting Mode / Affected Towers for Redstone
+        if (tower.getType() == TowerType.REDSTONE) {
+            java.util.List<String> affectedLores = new java.util.ArrayList<>();
+            affectedLores.add(ChatColor.GRAY + "Provides a " + ChatColor.RED + "30% attack speed boost" + ChatColor.GRAY + " (x0.7 Cooldown) to nearby towers.");
+            affectedLores.add(ChatColor.GRAY + "Range: " + ChatColor.YELLOW + tower.getRange() + " blocks");
+            affectedLores.add("");
+            affectedLores.add(ChatColor.GOLD + "Affected Towers:");
+            
+            Location rsLoc = tower.getCenterLocation();
+            double range = tower.getRange();
+            String rsArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+            int count = 0;
+            
+            for (Tower other : placedTowers.values()) {
+                if (other != tower && other.getType() != TowerType.REDSTONE) {
+                    String otherArena = plugin.getPlotConfigManager().getPlotArena(other.getPlotId());
+                    if (rsArena.equals(otherArena) && other.getCenterLocation().distanceSquared(rsLoc) <= range * range) {
+                        affectedLores.add(ChatColor.YELLOW + " - " + other.getType().getDisplayName() + " (" + other.getPlotId() + ") [Lvl " + other.getLevel() + "]");
+                        count++;
+                    }
+                }
+            }
+            if (count == 0) {
+                affectedLores.add(ChatColor.RED + " (No towers in range)");
+            }
+            
+            gui.setItem(31, createGUIItem(
+                Material.REDSTONE,
+                ChatColor.RED + "" + ChatColor.BOLD + "Redstone Boost Status",
+                affectedLores.toArray(new String[0])
+            ));
+        } else {
+            gui.setItem(31, createGUIItem(
+                Material.COMPASS,
+                ChatColor.AQUA + "Targeting Mode",
+                ChatColor.GRAY + "Current Priority: " + ChatColor.YELLOW + tower.getTargetingMode().getDisplayName(),
+                "",
+                ChatColor.GRAY + "Click to cycle priorities:",
+                ChatColor.GRAY + " -> FIRST -> LAST -> STRONG -> WEAK -> CLOSE"
+            ));
+        }
 
         // Slot 40: Destroy/Sell Tower
         int refund = tower.getTotalValue() / 2;
@@ -490,12 +856,12 @@ public class TowerManager {
             gui.setItem(i, filler);
         }
 
-        // Slot 11: Archer Tower
-        int archerCost = plugin.getConfig().getInt("towers.archer.cost", 100);
-        double archerRange = plugin.getConfig().getDouble("towers.archer.range", 15.0);
-        double archerDamage = plugin.getConfig().getDouble("towers.archer.damage", 1.5);
-        double archerSpeed = plugin.getConfig().getLong("towers.archer.cooldown", 20L) / 20.0;
-        gui.setItem(11, createGUIItem(
+        // Slot 10: Archer Tower
+        int archerCost = plugin.getConfig().getInt("towers.archer_1.cost", 100);
+        double archerRange = plugin.getConfig().getDouble("towers.archer_1.range", 15.0);
+        double archerDamage = plugin.getConfig().getDouble("towers.archer_1.damage", 1.5);
+        double archerSpeed = plugin.getConfig().getLong("towers.archer_1.cooldown", 20L) / 20.0;
+        gui.setItem(10, createGUIItem(
             Material.DISPENSER,
             ChatColor.GREEN + "Archer Tower",
             ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + archerCost + " Gold",
@@ -506,36 +872,96 @@ public class TowerManager {
             ChatColor.GRAY + "Shoots single targets fast."
         ));
 
-        // Slot 13: Mage Tower
-        int mageCost = plugin.getConfig().getInt("towers.mage.cost", 175);
-        double mageRange = plugin.getConfig().getDouble("towers.mage.range", 12.0);
-        double mageDamage = plugin.getConfig().getDouble("towers.mage.damage", 3.0);
-        double mageSpeed = plugin.getConfig().getLong("towers.mage.cooldown", 30L) / 20.0;
-        gui.setItem(13, createGUIItem(
+        // Slot 11: Fire Tower
+        int fireCost = plugin.getConfig().getInt("towers.fire_1.cost", 175);
+        double fireRange = plugin.getConfig().getDouble("towers.fire_1.range", 8.0);
+        double fireDamage = plugin.getConfig().getDouble("towers.fire_1.damage", 1.0);
+        double fireSpeed = plugin.getConfig().getLong("towers.fire_1.cooldown", 30L) / 20.0;
+        gui.setItem(11, createGUIItem(
             Material.REDSTONE_LAMP,
-            ChatColor.RED + "Mage Tower",
-            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + mageCost + " Gold",
-            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + mageRange + " blocks",
-            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + mageDamage + " HP",
-            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + mageSpeed + "s",
+            ChatColor.RED + "Fire Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + fireCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + fireRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + fireDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + fireSpeed + "s",
             "",
-            ChatColor.GRAY + "Slow but deals heavy fire damage."
+            ChatColor.GRAY + "Lights all mobs in radius on fire."
         ));
 
-        // Slot 15: Frost Tower
-        int frostCost = plugin.getConfig().getInt("towers.frost.cost", 125);
-        double frostRange = plugin.getConfig().getDouble("towers.frost.range", 15.0);
-        double frostDamage = plugin.getConfig().getDouble("towers.frost.damage", 0.5);
-        double frostSpeed = plugin.getConfig().getLong("towers.frost.cooldown", 20L) / 20.0;
-        gui.setItem(15, createGUIItem(
-            Material.PACKED_ICE,
-            ChatColor.AQUA + "Frost Tower",
-            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + frostCost + " Gold",
-            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + frostRange + " blocks",
-            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + frostDamage + " HP",
-            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + frostSpeed + "s",
+        // Slot 12: Prismarine Tower
+        int prismarineCost = plugin.getConfig().getInt("towers.prismarine_1.cost", 125);
+        double prismarineRange = plugin.getConfig().getDouble("towers.prismarine_1.range", 8.0);
+        double prismarineDamage = plugin.getConfig().getDouble("towers.prismarine_1.damage", 0.5);
+        double prismarineSpeed = plugin.getConfig().getLong("towers.prismarine_1.cooldown", 30L) / 20.0;
+        gui.setItem(12, createGUIItem(
+            Material.PRISMARINE_BRICKS,
+            ChatColor.DARK_AQUA + "Prismarine Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + prismarineCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + prismarineRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + prismarineDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + prismarineSpeed + "s",
             "",
-            ChatColor.GRAY + "Applies Slowness II (2s) on hit."
+            ChatColor.GRAY + "Applies Slowness to all mobs in radius."
+        ));
+
+        // Slot 13: Chorus Tower
+        int chorusCost = plugin.getConfig().getInt("towers.chorus_1.cost", 150);
+        double chorusRange = plugin.getConfig().getDouble("towers.chorus_1.range", 8.0);
+        double chorusDamage = plugin.getConfig().getDouble("towers.chorus_1.damage", 0.0);
+        double chorusSpeed = plugin.getConfig().getLong("towers.chorus_1.cooldown", 120L) / 20.0;
+        gui.setItem(13, createGUIItem(
+            Material.CHORUS_FLOWER,
+            ChatColor.LIGHT_PURPLE + "Chorus Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + chorusCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + chorusRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + chorusDamage + " HP",
+            ChatColor.GRAY + "Teleport Cooldown: " + ChatColor.YELLOW + chorusSpeed + "s",
+            "",
+            ChatColor.GRAY + "Teleports leading mob backwards on path."
+        ));
+
+        // Slot 14: Redstone Tower
+        int redstoneCost = plugin.getConfig().getInt("towers.redstone_1.cost", 200);
+        double redstoneRange = plugin.getConfig().getDouble("towers.redstone_1.range", 10.0);
+        gui.setItem(14, createGUIItem(
+            Material.REDSTONE_BLOCK,
+            ChatColor.DARK_RED + "Redstone Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + redstoneCost + " Gold",
+            ChatColor.GRAY + "Boost Radius: " + ChatColor.YELLOW + redstoneRange + " blocks",
+            "",
+            ChatColor.GRAY + "Passive: Boosts attack speed of nearby towers."
+        ));
+
+        // Slot 15: Poison Tower
+        int poisonCost = plugin.getConfig().getInt("towers.poison_1.cost", 150);
+        double poisonRange = plugin.getConfig().getDouble("towers.poison_1.range", 8.0);
+        double poisonDamage = plugin.getConfig().getDouble("towers.poison_1.damage", 0.5);
+        double poisonSpeed = plugin.getConfig().getLong("towers.poison_1.cooldown", 30L) / 20.0;
+        gui.setItem(15, createGUIItem(
+            Material.MUD_BRICKS,
+            ChatColor.DARK_GREEN + "Poison Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + poisonCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + poisonRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + poisonDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + poisonSpeed + "s",
+            "",
+            ChatColor.GRAY + "Poisons all mobs in radius (spiders immune)."
+        ));
+
+        // Slot 16: Ice Tower
+        int iceCost = plugin.getConfig().getInt("towers.ice_1.cost", 125);
+        double iceRange = plugin.getConfig().getDouble("towers.ice_1.range", 8.0);
+        double iceDamage = plugin.getConfig().getDouble("towers.ice_1.damage", 0.5);
+        double iceSpeed = plugin.getConfig().getLong("towers.ice_1.cooldown", 30L) / 20.0;
+        gui.setItem(16, createGUIItem(
+            Material.PACKED_ICE,
+            ChatColor.AQUA + "Ice Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + iceCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + iceRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + iceDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + iceSpeed + "s",
+            "",
+            ChatColor.GRAY + "Applies Slowness to all mobs in radius."
         ));
 
         player.openInventory(gui);
@@ -551,6 +977,16 @@ public class TowerManager {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private void clearNearbyDroppedItemsLater(Location center) {
+        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (center.getWorld() != null) {
+                center.getWorld().getNearbyEntities(center, 6.0, 8.0, 6.0).stream()
+                    .filter(e -> e instanceof org.bukkit.entity.Item)
+                    .forEach(org.bukkit.entity.Entity::remove);
+            }
+        }, 1L);
     }
 
     public void cleanup() {

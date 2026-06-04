@@ -115,10 +115,9 @@ public class MobManager {
             hoglin.setImmuneToZombification(true);
         }
 
-        // Set size if it's a Slime/Magma Cube
+        // Set size if it's a Slime/Magma Cube (start at size 4, the largest)
         if (entity instanceof org.bukkit.entity.Slime slime) {
-            int size = plugin.getConfig().getInt("mobs." + presetKey + ".slime-size", 2);
-            slime.setSize(size);
+            slime.setSize(4);
         }
 
         // Mark slow and fire immunities if requested or SLOW_SHIELD is active on the arena
@@ -210,6 +209,20 @@ public class MobManager {
             bar.append("■");
         }
 
+        StringBuilder status = new StringBuilder();
+        if (mob.getFireTicks() > 0) {
+            status.append(" ").append(org.bukkit.ChatColor.GOLD).append("🔥");
+        }
+        if (mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON)) {
+            status.append(" ").append(org.bukkit.ChatColor.GREEN).append("🤢");
+        }
+        if (mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS)) {
+            status.append(" ").append(org.bukkit.ChatColor.AQUA).append("❄");
+        }
+        if (status.length() > 0) {
+            bar.append(status);
+        }
+
         mob.setCustomName(bar.toString());
         mob.setCustomNameVisible(true);
     }
@@ -227,6 +240,10 @@ public class MobManager {
                     if (mob.getEntity().isDead() || !mob.getEntity().isValid()) {
                         iterator.remove();
                         continue;
+                    }
+
+                    if (tickCounter % 5 == 0) {
+                        updateHealthBar(mob.getEntity());
                     }
 
                     // Damage Storm check
@@ -260,6 +277,48 @@ public class MobManager {
             org.bukkit.persistence.PersistentDataType.STRING
         );
         if (mobArena == null) mobArena = "1";
+
+        // Freeze status check (applied by Ice Towers)
+        boolean isFrozen = false;
+        org.bukkit.NamespacedKey freezeUntilKey = new org.bukkit.NamespacedKey(plugin, "td_frozen_until");
+        if (mob.getEntity().getPersistentDataContainer().has(freezeUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
+            long frozenUntil = mob.getEntity().getPersistentDataContainer().get(freezeUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
+            if (System.currentTimeMillis() < frozenUntil) {
+                isFrozen = true;
+            }
+        }
+
+        if (isFrozen) {
+            // Stop pathfinding
+            mob.getEntity().getPathfinder().stopPathfinding();
+            // Zero out horizontal velocity, keep vertical velocity (Y) so gravity still works
+            org.bukkit.util.Vector currentVel = mob.getEntity().getVelocity();
+            mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, currentVel.getY(), 0));
+
+            // Spawn ice/snowflake particles periodically
+            if (currentTick % 5 == 0) {
+                mob.getEntity().getWorld().spawnParticle(
+                    org.bukkit.Particle.SNOWFLAKE,
+                    mob.getEntity().getLocation().add(0, 0.5, 0),
+                    3, 0.2, 0.2, 0.2, 0.02
+                );
+            }
+            
+            // Bypass progression and target-setting
+            if (mob.hasReachedFinalWaypoint()) {
+                Location finalTarget = mob.getFinalOffsetWaypoint();
+                if (finalTarget != null) {
+                    // Attack logic: damage castle every 40 ticks
+                    if (currentTick - mob.getLastAttackTick() >= 40) {
+                        mob.setLastAttackTick(currentTick);
+                        plugin.getGameManager().damageCastle(mobArena, 1);
+                        mob.getEntity().swingMainHand();
+                        mob.getEntity().getWorld().playSound(mob.getEntity().getLocation(), org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1.0f, 1.0f);
+                    }
+                }
+            }
+            return;
+        }
 
         boolean isFreezeActive = plugin.getGameManager().isSpellActive(mobArena, "FREEZE");
         boolean isHasteActive = plugin.getGameManager().isSpellActive(mobArena, "HASTE_RUSH");
@@ -307,7 +366,7 @@ public class MobManager {
                 Location finalTargetLoc = finalTarget.clone().add(0, heightOffset, 0);
                 // Periodically repath back to their offset spot if pushed away
                 if (currentTick % 10 == 0) {
-                    if (mob.getEntity().getType() == EntityType.GIANT || heightOffset > 0.0) {
+                    if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.MAGMA_CUBE || heightOffset > 0.0) {
                         Location loc = mob.getEntity().getLocation();
                         org.bukkit.util.Vector dir = finalTargetLoc.clone().subtract(loc).toVector();
                         if (dir.lengthSquared() > 0.01) {
@@ -379,7 +438,7 @@ public class MobManager {
 
         Location targetLoc = target.clone().add(0, heightOffset, 0);
 
-        if (mob.getEntity().getType() == EntityType.GIANT || heightOffset > 0.0) {
+        if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.MAGMA_CUBE || heightOffset > 0.0) {
             // Manually move the giant or flying mob towards the target
             Location loc = mob.getEntity().getLocation();
             org.bukkit.util.Vector dir = targetLoc.clone().subtract(loc).toVector();
@@ -400,7 +459,7 @@ public class MobManager {
             if (isHasteActive) {
                 speed = speed * hasteMult;
                 if (currentTick % 20 == 0) {
-                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, 1, false, false, true));
+                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, 0, false, false, true));
                 }
             }
 
@@ -431,7 +490,7 @@ public class MobManager {
             if (isHasteActive) {
                 pathfinderSpeed = pathfinderSpeed * hasteMult;
                 if (currentTick % 20 == 0) {
-                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, 1, false, false, true));
+                    mob.getEntity().addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, 0, false, false, true));
                 }
             }
 
@@ -443,7 +502,7 @@ public class MobManager {
         }
 
         // Check if they are close enough to the waypoint to target the next one
-        double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || heightOffset > 0.0) ? 4.0 : 1.5;
+        double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.MAGMA_CUBE || heightOffset > 0.0) ? 4.0 : 1.5;
         if (mob.getEntity().getLocation().distanceSquared(targetLoc) < reachDistance) {
             mob.incrementWaypointIndex();
         }
@@ -490,6 +549,10 @@ public class MobManager {
         for (PresetMobType type : PresetMobType.values()) {
             queue.put(type, 0);
         }
+    }
+
+    public void clearAllQueues() {
+        playerQueues.clear();
     }
 
     public void sendQueue(UUID uuid) {
@@ -595,7 +658,9 @@ public class MobManager {
             boolean fireImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".fire-immune", preset.isFireImmune());
 
             lore.add(ChatColor.GREEN + "Left-Click" + ChatColor.GRAY + " to add +1 to queue.");
+            lore.add(ChatColor.GREEN + "Shift + Left-Click" + ChatColor.GRAY + " to add +10 to queue.");
             lore.add(ChatColor.RED + "Right-Click" + ChatColor.GRAY + " to remove -1 from queue.");
+            lore.add(ChatColor.RED + "Shift + Right-Click" + ChatColor.GRAY + " to remove -10 from queue.");
             lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + spawnCost + " Gold");
             lore.add(ChatColor.GOLD + "Queued Count: " + ChatColor.YELLOW + count);
             lore.add("");
