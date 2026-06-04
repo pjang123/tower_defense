@@ -7,6 +7,10 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class WaypointConfigManager {
 
@@ -35,24 +39,71 @@ public class WaypointConfigManager {
         config = YamlConfiguration.loadConfiguration(file);
     }
 
+    // Graph-based methods
+    public void addWaypoint(String arena, String id, Location loc, List<String> nextIds) {
+        String path = "waypoints." + arena + "." + id;
+        config.set(path + ".world", loc.getWorld().getName());
+        config.set(path + ".x", loc.getX());
+        config.set(path + ".y", loc.getY());
+        config.set(path + ".z", loc.getZ());
+        config.set(path + ".next", nextIds);
+        saveFile();
+    }
+
+    public void addConnection(String arena, String fromId, String toId) {
+        String path = "waypoints." + arena + "." + fromId + ".next";
+        List<String> next = config.getStringList(path);
+        if (!next.contains(toId)) {
+            next.add(toId);
+            config.set(path, next);
+            saveFile();
+        }
+    }
+
+    public Map<String, TDWaypoint> getWaypointGraph(String arena) {
+        Map<String, TDWaypoint> graph = new HashMap<>();
+        String arenaPath = "waypoints." + arena;
+        if (!config.contains(arenaPath)) return graph;
+
+        for (String key : config.getConfigurationSection(arenaPath).getKeys(false)) {
+            String path = arenaPath + "." + key;
+            String worldName = config.getString(path + ".world");
+            double x = config.getDouble(path + ".x");
+            double y = config.getDouble(path + ".y");
+            double z = config.getDouble(path + ".z");
+            List<String> next = config.getStringList(path + ".next");
+
+            org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+            if (world != null) {
+                Location loc = new Location(world, x, y, z);
+                graph.put(key, new TDWaypoint(key, loc, next));
+            }
+        }
+        return graph;
+    }
+
+    // Legacy / fallback list-based methods for backwards compatibility
     public void addWaypoint(Location loc) {
         addWaypoint("1", loc);
     }
 
     public void addWaypoint(String arena, Location loc) {
+        // Convert to sequential string ID
         int nextId = 0;
         String arenaPath = "waypoints." + arena;
         if (config.contains(arenaPath)) {
             nextId = config.getConfigurationSection(arenaPath).getKeys(false).size();
         }
-
-        String path = arenaPath + "." + nextId;
-        config.set(path + ".world", loc.getWorld().getName());
-        config.set(path + ".x", loc.getX());
-        config.set(path + ".y", loc.getY());
-        config.set(path + ".z", loc.getZ());
-
-        saveFile();
+        String idStr = String.valueOf(nextId);
+        
+        // If there was a previous waypoint, connect it to this one
+        if (nextId > 0) {
+            String prevIdStr = String.valueOf(nextId - 1);
+            addWaypoint(arena, idStr, loc, new ArrayList<>());
+            addConnection(arena, prevIdStr, idStr);
+        } else {
+            addWaypoint(arena, idStr, loc, new ArrayList<>());
+        }
     }
 
     public void clearAllWaypoints() {
@@ -64,28 +115,28 @@ public class WaypointConfigManager {
         saveFile();
     }
 
-    public java.util.List<Location> getWaypoints() {
+    public List<Location> getWaypoints() {
         return getWaypoints("1");
     }
 
-    public java.util.List<Location> getWaypoints(String arena) {
-        java.util.List<Location> waypoints = new java.util.ArrayList<>();
-        String arenaPath = "waypoints." + arena;
-        if (!config.contains(arenaPath)) return waypoints;
-
-        for (String key : config.getConfigurationSection(arenaPath).getKeys(false)) {
-            String path = arenaPath + "." + key;
-            String worldName = config.getString(path + ".world");
-            double x = config.getDouble(path + ".x");
-            double y = config.getDouble(path + ".y");
-            double z = config.getDouble(path + ".z");
-
-            org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
-            if (world != null) {
-                waypoints.add(new Location(world, x, y, z));
+    public List<Location> getWaypoints(String arena) {
+        List<Location> list = new ArrayList<>();
+        Map<String, TDWaypoint> graph = getWaypointGraph(arena);
+        
+        // Sort keys numerically if possible for backwards compatibility
+        List<String> keys = new ArrayList<>(graph.keySet());
+        keys.sort((a, b) -> {
+            try {
+                return Integer.compare(Integer.parseInt(a), Integer.parseInt(b));
+            } catch (NumberFormatException e) {
+                return a.compareTo(b);
             }
+        });
+        
+        for (String key : keys) {
+            list.add(graph.get(key).getLocation());
         }
-        return waypoints;
+        return list;
     }
 
     private void saveFile() {

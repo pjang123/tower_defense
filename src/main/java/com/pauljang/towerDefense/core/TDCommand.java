@@ -154,9 +154,9 @@ public class TDCommand implements CommandExecutor {
                     if (!player.getInventory().contains(Material.BLAZE_ROD)) {
                         giveWand(player);
                     }
-                    plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.AWAITING_PLOT_P1);
+                    plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.AWAITING_PLOT);
                     player.sendMessage(ChatColor.AQUA + "--- Plot Setup Mode: ENABLED (Arena " + arena + ") ---");
-                    player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK the first corner of a plot.");
+                    player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK a block to place a plot. RIGHT-CLICK to toggle size (3x3 / 5x5).");
                 }
                 // If they are already in setup mode, turn it OFF
                 else {
@@ -179,7 +179,7 @@ public class TDCommand implements CommandExecutor {
                     }
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.WAYPOINT_MODE);
                     player.sendMessage(ChatColor.AQUA + "--- Waypoint Mode: ENABLED (Arena " + arena + ") ---");
-                    player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK blocks to add waypoints in order. Type /td waypointmode to exit.");
+                    player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK a block to create a new waypoint. Left-click an existing waypoint to select it. Right-click another waypoint to connect them (split path).");
                 } else {
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.IDLE);
                     player.sendMessage(ChatColor.RED + "--- Waypoint Mode: DISABLED ---");

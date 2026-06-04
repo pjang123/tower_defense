@@ -466,7 +466,7 @@ public class TowerManager {
     }
 
     private double getMobProgress(com.pauljang.towerDefense.entities.TDMob tdMob) {
-        double progress = tdMob.getCurrentWaypointIndex() * 10000.0;
+        double progress = tdMob.getPathHistory().size() * 10000.0;
         Location nextWp = tdMob.getNextWaypoint();
         Mob mob = tdMob.getEntity();
         if (nextWp != null && mob.getWorld().equals(nextWp.getWorld())) {
@@ -525,65 +525,84 @@ public class TowerManager {
                     }
                 }
                 if (tdMob != null) {
-                    java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(towerArena);
-                    if (!waypoints.isEmpty()) {
-                        int currentWpIndex = tdMob.getCurrentWaypointIndex();
+                    java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = tdMob.getWaypointGraph();
+                    java.util.List<String> history = tdMob.getPathHistory();
+                    
+                    if (history.size() >= 1) {
                         Location mobLoc = target.getLocation();
-                        
-                        double distanceToGoBack = 8.0;
+                        double remaining = 8.0;
                         Location newTargetLocation = null;
-                        int newWpIndex = currentWpIndex;
+                        String newWpId = tdMob.getCurrentWaypointId();
                         
-                        if (currentWpIndex > 0) {
-                            Location currentTargetWp = waypoints.get(currentWpIndex);
-                            Location previousWp = waypoints.get(currentWpIndex - 1);
-                            
-                            // Project the mob's position onto the segment vector between previousWp and currentTargetWp
-                            org.bukkit.util.Vector segment = currentTargetWp.toVector().subtract(previousWp.toVector());
-                            double segmentLength = segment.length();
-                            org.bukkit.util.Vector segmentDir = segmentLength > 0 ? segment.clone().normalize() : new org.bukkit.util.Vector(0,0,0);
-                            
-                            org.bukkit.util.Vector mobToPrev = mobLoc.toVector().subtract(previousWp.toVector());
-                            double projDist = segmentDir.lengthSquared() > 0 ? mobToPrev.dot(segmentDir) : 0.0;
-                            projDist = Math.max(0.0, Math.min(segmentLength, projDist));
-                            
-                            double remainingBack = distanceToGoBack;
-                            if (projDist >= remainingBack) {
-                                double targetDist = projDist - remainingBack;
-                                newTargetLocation = previousWp.clone().add(segmentDir.multiply(targetDist));
-                                newWpIndex = currentWpIndex;
-                            } else {
-                                remainingBack -= projDist;
-                                int segmentEndIdx = currentWpIndex - 1;
-                                while (segmentEndIdx > 0 && remainingBack > 0) {
-                                    Location segStart = waypoints.get(segmentEndIdx - 1);
-                                    Location segEnd = waypoints.get(segmentEndIdx);
-                                    org.bukkit.util.Vector segVec = segEnd.toVector().subtract(segStart.toVector());
-                                    double segLen = segVec.length();
-                                    org.bukkit.util.Vector segDir = segLen > 0 ? segVec.clone().normalize() : new org.bukkit.util.Vector(0,0,0);
-                                    
-                                    if (segLen >= remainingBack) {
-                                        double targetDist = segLen - remainingBack;
-                                        newTargetLocation = segStart.clone().add(segDir.multiply(targetDist));
-                                        newWpIndex = segmentEndIdx;
-                                        remainingBack = 0;
-                                        break;
-                                    } else {
-                                        remainingBack -= segLen;
-                                        segmentEndIdx--;
-                                    }
-                                }
-                                if (newTargetLocation == null) {
-                                    newTargetLocation = waypoints.get(0).clone();
-                                    newWpIndex = 1;
+                        // We trace backward along the visited path history
+                        int currentWpIdx = history.size() - 1; // index of current target waypoint
+                        int prevWpIdx = history.size() - 2; // index of the waypoint the mob just left
+                        
+                        Location currentStartLoc = mobLoc;
+                        int nextTargetIdxInHistory = currentWpIdx;
+                        
+                        // Step 1: Trace from current location back to the previous waypoint
+                        if (prevWpIdx >= 0) {
+                            com.pauljang.towerDefense.data.TDWaypoint prevWp = graph.get(history.get(prevWpIdx));
+                            if (prevWp != null) {
+                                Location prevLoc = prevWp.getLocation();
+                                double dist = currentStartLoc.distance(prevLoc);
+                                if (dist >= remaining) {
+                                    org.bukkit.util.Vector dir = prevLoc.toVector().subtract(currentStartLoc.toVector()).normalize();
+                                    newTargetLocation = currentStartLoc.clone().add(dir.multiply(remaining));
+                                    newWpId = history.get(currentWpIdx);
+                                    nextTargetIdxInHistory = currentWpIdx;
+                                    remaining = 0;
+                                } else {
+                                    remaining -= dist;
+                                    currentStartLoc = prevLoc;
+                                    newWpId = history.get(prevWpIdx);
+                                    nextTargetIdxInHistory = prevWpIdx;
+                                    prevWpIdx--;
                                 }
                             }
                         } else {
-                            newTargetLocation = waypoints.get(0).clone();
-                            newWpIndex = 1;
+                            // No previous waypoint (still on first segment)
+                            newTargetLocation = graph.get("0").getLocation().clone();
+                            newWpId = "0";
+                            remaining = 0;
                         }
                         
-                        tdMob.setCurrentWaypointIndex(newWpIndex);
+                        // Step 2: Trace back from prevWpIdx to prevWpIdx - 1
+                        while (prevWpIdx >= 0 && remaining > 0) {
+                            com.pauljang.towerDefense.data.TDWaypoint prevWp = graph.get(history.get(prevWpIdx));
+                            if (prevWp == null) break;
+                            
+                            Location prevLoc = prevWp.getLocation();
+                            double dist = currentStartLoc.distance(prevLoc);
+                            
+                            if (dist >= remaining) {
+                                org.bukkit.util.Vector dir = prevLoc.toVector().subtract(currentStartLoc.toVector()).normalize();
+                                newTargetLocation = currentStartLoc.clone().add(dir.multiply(remaining));
+                                newWpId = history.get(nextTargetIdxInHistory);
+                                remaining = 0;
+                                break;
+                            } else {
+                                remaining -= dist;
+                                currentStartLoc = prevLoc;
+                                newWpId = history.get(prevWpIdx);
+                                nextTargetIdxInHistory = prevWpIdx;
+                                prevWpIdx--;
+                            }
+                        }
+                        
+                        if (newTargetLocation == null) {
+                            newTargetLocation = graph.get("0").getLocation().clone();
+                            newWpId = "0";
+                            nextTargetIdxInHistory = 0;
+                        }
+                        
+                        // Clean up history to match the rolled-back target index
+                        while (history.size() > nextTargetIdxInHistory + 1) {
+                            history.remove(history.size() - 1);
+                        }
+                        
+                        tdMob.setCurrentWaypointId(newWpId);
                         
                         target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, target.getLocation(), 15, 0.5, 0.5, 0.5, 0.1);
                         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);

@@ -8,17 +8,14 @@ public class SetupManager {
 
     public enum SetupState {
         IDLE,               // Not currently setting up anything
-        AWAITING_PLOT_P1,   // Waiting for the admin to click the first corner
-        AWAITING_PLOT_P2,    // Waiting for the admin to click the second corner
+        AWAITING_PLOT,      // Admin simply left-clicks to set the plot
         WAYPOINT_MODE
     }
 
     private final HashMap<UUID, SetupState> playerStates = new HashMap<>();
     private final HashMap<UUID, String> playerEditingArenas = new HashMap<>();
-    private final HashMap<UUID, Location> pos1Selections = new HashMap<>();
-    // We don't necessarily need to store Pos2 in the manager if we process it immediately,
-    // but we can keep it for consistency.
-    private final HashMap<UUID, Location> pos2Selections = new HashMap<>();
+    private final HashMap<UUID, Integer> playerPlotSizes = new HashMap<>();
+    private final HashMap<UUID, String> selectedWaypointIds = new HashMap<>();
 
     // --- State Management ---
     public SetupState getState(UUID uuid) {
@@ -37,17 +34,32 @@ public class SetupManager {
         playerEditingArenas.put(playerUUID, arena);
     }
 
-    // --- Location Management ---
-    public void setPos1(UUID playerUUID, Location loc) { pos1Selections.put(playerUUID, loc); }
-    public Location getPos1(UUID playerUUID) { return pos1Selections.get(playerUUID); }
+    // --- Plot Size Management ---
+    public int getPlotSize(UUID uuid) {
+        return playerPlotSizes.getOrDefault(uuid, 3); // Default to 3 (3x3)
+    }
 
-    public void setPos2(UUID playerUUID, Location loc) { pos2Selections.put(playerUUID, loc); }
-    public Location getPos2(UUID playerUUID) { return pos2Selections.get(playerUUID); }
+    public void setPlotSize(UUID uuid, int size) {
+        playerPlotSizes.put(uuid, size);
+    }
+
+    // --- Selected Waypoint ID for Connections ---
+    public String getSelectedWaypointId(UUID uuid) {
+        return selectedWaypointIds.get(uuid);
+    }
+
+    public void setSelectedWaypointId(UUID uuid, String id) {
+        selectedWaypointIds.put(uuid, id);
+    }
+
+    public void clearSelectedWaypointId(UUID uuid) {
+        selectedWaypointIds.remove(uuid);
+    }
 
     public void clearSetupData(UUID uuid) {
-        pos1Selections.remove(uuid);
-        pos2Selections.remove(uuid);
         playerStates.remove(uuid);
         playerEditingArenas.remove(uuid);
+        playerPlotSizes.remove(uuid);
+        selectedWaypointIds.remove(uuid);
     }
 }

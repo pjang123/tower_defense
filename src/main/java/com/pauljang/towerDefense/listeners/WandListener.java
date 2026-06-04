@@ -3,6 +3,7 @@ package com.pauljang.towerDefense.listeners;
 import com.pauljang.towerDefense.TowerDefense;
 import com.pauljang.towerDefense.data.PlotConfigManager;
 import com.pauljang.towerDefense.data.WaypointConfigManager;
+import com.pauljang.towerDefense.data.TDWaypoint;
 import com.pauljang.towerDefense.setup.SetupManager;
 import com.pauljang.towerDefense.setup.SetupManager.SetupState;
 import org.bukkit.ChatColor;
@@ -15,6 +16,9 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class WandListener implements Listener {
 
@@ -22,6 +26,119 @@ public class WandListener implements Listener {
 
     public WandListener(TowerDefense plugin) {
         this.plugin = plugin;
+        startPreviewTask();
+    }
+
+    private void startPreviewTask() {
+        org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
+                SetupManager sm = plugin.getSetupManager();
+                SetupState state = sm.getState(player.getUniqueId());
+                
+                // If they are holding the wand
+                ItemStack item = player.getInventory().getItemInMainHand();
+                if (item != null && item.getType() == Material.BLAZE_ROD && item.hasItemMeta()) {
+                    org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+                    if (meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("TD Setup Wand")) {
+                        
+                        if (state == SetupState.AWAITING_PLOT) {
+                            org.bukkit.block.Block targetBlock = player.getTargetBlockExact(15);
+                            if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+                                Location blockLoc = targetBlock.getLocation();
+                                int size = sm.getPlotSize(player.getUniqueId());
+                                drawPlotHighlight(blockLoc, size);
+                            }
+                        } else if (state == SetupState.WAYPOINT_MODE) {
+                            String arena = sm.getEditingArena(player.getUniqueId());
+                            drawWaypointGraphHighlight(player, arena);
+                        }
+                        
+                    }
+                }
+            }
+        }, 0L, 5L); // every 250ms
+    }
+
+    private void drawPlotHighlight(Location center, int size) {
+        int radius = size / 2;
+        double minX = center.getBlockX() - radius;
+        double maxX = center.getBlockX() + radius + 1.0;
+        double minZ = center.getBlockZ() - radius;
+        double maxZ = center.getBlockZ() + radius + 1.0;
+        double y = center.getBlockY() + 1.02; // slightly above block
+        
+        org.bukkit.World world = center.getWorld();
+        org.bukkit.Color color = (size == 5) ? org.bukkit.Color.YELLOW : org.bukkit.Color.AQUA;
+        org.bukkit.Particle.DustOptions dust = new org.bukkit.Particle.DustOptions(color, 1.0f);
+        
+        for (double x = minX; x <= maxX; x += 0.5) {
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, minZ), 1, 0, 0, 0, 0, dust);
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, maxZ), 1, 0, 0, 0, 0, dust);
+        }
+        for (double z = minZ; z <= maxZ; z += 0.5) {
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, minX, y, z), 1, 0, 0, 0, 0, dust);
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, maxX, y, z), 1, 0, 0, 0, 0, dust);
+        }
+    }
+
+    private void drawWaypointGraphHighlight(Player player, String arena) {
+        Map<String, TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        String selectedWpId = plugin.getSetupManager().getSelectedWaypointId(player.getUniqueId());
+        
+        for (TDWaypoint wp : graph.values()) {
+            Location loc = wp.getLocation();
+            org.bukkit.World world = loc.getWorld();
+            
+            boolean isSelected = wp.getId().equals(selectedWpId);
+            org.bukkit.Color dotColor = isSelected ? org.bukkit.Color.fromRGB(255, 215, 0) : org.bukkit.Color.LIME;
+            org.bukkit.Particle.DustOptions dotDust = new org.bukkit.Particle.DustOptions(dotColor, 2.0f);
+            
+            // vertical column showing waypoint node
+            for (double dy = 0; dy <= 2.0; dy += 0.5) {
+                world.spawnParticle(org.bukkit.Particle.DUST, loc.clone().add(0, dy - 0.8, 0), 1, 0, 0, 0, 0, dotDust);
+            }
+            
+            if (isSelected) {
+                world.spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, loc.clone().add(0, 1.5, 0), 1, 0.1, 0.1, 0.1, 0);
+            }
+            
+            // connections paths
+            for (String nextId : wp.getNextIds()) {
+                TDWaypoint nextWp = graph.get(nextId);
+                if (nextWp != null) {
+                    Location targetLoc = nextWp.getLocation();
+                    drawMovingParticleLine(loc.clone().add(0, 0.2, 0), targetLoc.clone().add(0, 0.2, 0), isSelected ? org.bukkit.Color.ORANGE : org.bukkit.Color.AQUA);
+                }
+            }
+        }
+    }
+
+    private void drawMovingParticleLine(Location start, Location end, org.bukkit.Color color) {
+        double distance = start.distance(end);
+        org.bukkit.util.Vector direction = end.toVector().subtract(start.toVector()).normalize();
+        org.bukkit.World world = start.getWorld();
+        org.bukkit.Particle.DustOptions dust = new org.bukkit.Particle.DustOptions(color, 1.0f);
+        
+        long time = System.currentTimeMillis();
+        double offset = (time / 150.0) % 1.0; // animation flow speed
+        
+        for (double d = offset; d < distance; d += 1.0) {
+            Location point = start.clone().add(direction.clone().multiply(d));
+            world.spawnParticle(org.bukkit.Particle.DUST, point, 1, 0, 0, 0, 0, dust);
+        }
+    }
+
+    private TDWaypoint findWaypointAt(String arena, Location blockLoc) {
+        Map<String, TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        for (TDWaypoint wp : graph.values()) {
+            Location wpLoc = wp.getLocation();
+            if (wpLoc.getBlockX() == blockLoc.getBlockX() &&
+                wpLoc.getBlockY() == blockLoc.getBlockY() + 1 &&
+                wpLoc.getBlockZ() == blockLoc.getBlockZ()) {
+                return wp;
+            }
+        }
+        return null;
     }
 
     @EventHandler
@@ -35,107 +152,108 @@ public class WandListener implements Listener {
         if (!meta.hasDisplayName() || !meta.getDisplayName().contains("TD Setup Wand")) return;
 
         event.setCancelled(true);
-        if (event.getClickedBlock() == null) return;
-
         Action action = event.getAction();
-        Location clickedLoc = event.getClickedBlock().getLocation();
         UUID uuid = player.getUniqueId();
         SetupManager setupManager = plugin.getSetupManager();
         SetupState state = setupManager.getState(uuid);
+        String arena = setupManager.getEditingArena(uuid);
 
-        // --- The Interactive Flow ---
-
-        if (state == SetupState.AWAITING_PLOT_P1) {
-            // We only want them to left-click for Corner 1
-            if (action == Action.LEFT_CLICK_BLOCK) {
-                setupManager.setPos1(uuid, clickedLoc);
-                player.sendMessage(ChatColor.GREEN + "Corner 1 saved at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ());
-
-                // Move them to the next step
-                setupManager.setState(uuid, SetupState.AWAITING_PLOT_P2);
-                player.sendMessage(ChatColor.YELLOW + "Now, please RIGHT-CLICK the opposite corner of the plot.");
-            } else {
-                player.sendMessage(ChatColor.RED + "Please LEFT-CLICK to select the first corner!");
-            }
+        // A. Toggle sizes for Plot placement on Right-click
+        if (state == SetupState.AWAITING_PLOT && (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK)) {
+            int currentSize = setupManager.getPlotSize(uuid);
+            int nextSize = (currentSize == 3) ? 5 : 3;
+            setupManager.setPlotSize(uuid, nextSize);
+            player.sendMessage(ChatColor.YELLOW + "Switched plot placement size to: " + ChatColor.GOLD + nextSize + "x" + nextSize);
+            player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.2f);
+            return;
         }
 
-        else if (state == SetupState.AWAITING_PLOT_P2) {
-            if (action == Action.RIGHT_CLICK_BLOCK) {
-                Location pos1 = setupManager.getPos1(uuid);
+        // B. Clear waypoint selection on Right-click air / non-waypoint block
+        if (state == SetupState.WAYPOINT_MODE && (action == Action.RIGHT_CLICK_AIR || 
+            (action == Action.RIGHT_CLICK_BLOCK && event.getClickedBlock() != null && findWaypointAt(arena, event.getClickedBlock().getLocation()) == null))) {
+            setupManager.clearSelectedWaypointId(uuid);
+            player.sendMessage(ChatColor.YELLOW + "Cleared waypoint selection.");
+            player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 0.5f, 0.8f);
+            return;
+        }
+
+        if (event.getClickedBlock() == null) return;
+        Location clickedLoc = event.getClickedBlock().getLocation();
+
+        // C. Plot Placement Flow
+        if (state == SetupState.AWAITING_PLOT) {
+            if (action == Action.LEFT_CLICK_BLOCK) {
+                int size = setupManager.getPlotSize(uuid);
+                int radius = size / 2;
                 
-                if (pos1 == null) {
-                    player.sendMessage(ChatColor.RED + "Error: Corner 1 is missing! Restarting setup...");
-                    setupManager.setState(uuid, SetupState.AWAITING_PLOT_P1);
+                Location pos1 = clickedLoc.clone().subtract(radius, 0, radius);
+                Location pos2 = clickedLoc.clone().add(radius, 0, radius);
+                
+                if (plugin.getPlotConfigManager().isPlotOverlapping(pos1, pos2)) {
+                    player.sendMessage(ChatColor.RED + "Error: This " + size + "x" + size + " plot overlaps with an existing one!");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
                     return;
                 }
-
-                if (!pos1.getWorld().equals(clickedLoc.getWorld())) {
-                    player.sendMessage(ChatColor.RED + "Error: Both corners must be in the same world!");
-                    return;
-                }
-
-                // Calculate the actual block dimensions (Difference + 1)
-                int sizeX = Math.abs(pos1.getBlockX() - clickedLoc.getBlockX()) + 1;
-                int sizeZ = Math.abs(pos1.getBlockZ() - clickedLoc.getBlockZ()) + 1;
-                int diffY = Math.abs(pos1.getBlockY() - clickedLoc.getBlockY());
-
-                // 1. Force the plot to be flat
-                if (diffY != 0) {
-                    player.sendMessage(ChatColor.RED + "Error: Both corners must be on the exact same Y-level!");
-                    player.sendMessage(ChatColor.YELLOW + "Please RIGHT-CLICK a valid block to fix Corner 2.");
-                    return; // Stop the code here, let them try again
-                }
-
-                // 2. Force the plot to be 3x3 or 5x5
-                boolean is3x3 = (sizeX == 3 && sizeZ == 3);
-                boolean is5x5 = (sizeX == 5 && sizeZ == 5);
-
-                if (!is3x3 && !is5x5) {
-                    player.sendMessage(ChatColor.RED + "Error: Plots must be exactly 3x3 or 5x5! You selected " + sizeX + "x" + sizeZ + ".");
-                    player.sendMessage(ChatColor.YELLOW + "Please RIGHT-CLICK a valid block to fix Corner 2.");
-                    return; // Stop the code here, let them try again
-                }
-
-                // 3. Check for overlapping plots
-                if (plugin.getPlotConfigManager().isPlotOverlapping(pos1, clickedLoc)) {
-                    player.sendMessage(ChatColor.RED + "Error: This plot overlaps with an existing one!");
-                    player.sendMessage(ChatColor.YELLOW + "Please RIGHT-CLICK a different block for Corner 2.");
-                    return;
-                }
-
-                // 4. If it passes all checks, save it!
-                setupManager.setPos2(uuid, clickedLoc);
-                player.sendMessage(ChatColor.GREEN + "Corner 2 saved at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ());
-
-                String arena = setupManager.getEditingArena(uuid);
-                plugin.getPlotConfigManager().savePlot(arena, pos1, clickedLoc);
-                player.sendMessage(ChatColor.AQUA + "Valid " + sizeX + "x" + sizeZ + " plot finalized and saved for Arena " + arena + "!");
-
-                setupManager.setState(uuid, SetupState.AWAITING_PLOT_P1);
-                player.sendMessage(ChatColor.YELLOW + "Ready for next plot: LEFT-CLICK the first corner, or type /td plotmode to exit.");
-            } else if (action == Action.LEFT_CLICK_BLOCK) {
-                // Allow them to re-select Corner 1 if they LEFT-CLICK again
-                setupManager.setPos1(uuid, clickedLoc);
-                player.sendMessage(ChatColor.GREEN + "Corner 1 UPDATED at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ());
-                player.sendMessage(ChatColor.YELLOW + "Now, please RIGHT-CLICK the opposite corner of the plot.");
+                
+                plugin.getPlotConfigManager().savePlot(arena, pos1, pos2);
+                player.sendMessage(ChatColor.GREEN + "Successfully set and saved a " + size + "x" + size + " plot centered at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ() + " for Arena " + arena + "!");
+                player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
             }
         }
 
+        // D. Split Waypoint graph creation flow
         else if (state == SetupState.WAYPOINT_MODE) {
+            TDWaypoint clickedWp = findWaypointAt(arena, clickedLoc);
+            
             if (action == Action.LEFT_CLICK_BLOCK) {
-                // We add 0.5 to X and Z so the mob walks to the exact center of the block,
-                // and 1.0 to Y so they walk ON TOP of the block, not inside it!
-                Location wpLoc = clickedLoc.clone().add(0.5, 1.0, 0.5);
-
-                String arena = setupManager.getEditingArena(uuid);
-                plugin.getWaypointConfigManager().addWaypoint(arena, wpLoc);
-                player.sendMessage(ChatColor.LIGHT_PURPLE + "Waypoint added for Arena " + arena + " at " + wpLoc.getBlockX() + ", " + wpLoc.getBlockY() + ", " + wpLoc.getBlockZ());
+                if (clickedWp != null) {
+                    // Selected existing waypoint
+                    setupManager.setSelectedWaypointId(uuid, clickedWp.getId());
+                    player.sendMessage(ChatColor.GREEN + "Selected waypoint: " + ChatColor.GOLD + "WP " + clickedWp.getId());
+                    player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.2f);
+                } else {
+                    // Create new waypoint and link it
+                    Location wpLoc = clickedLoc.clone().add(0.5, 1.0, 0.5);
+                    Map<String, TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+                    int nextIntId = 0;
+                    while (graph.containsKey(String.valueOf(nextIntId))) {
+                        nextIntId++;
+                    }
+                    String newWpId = String.valueOf(nextIntId);
+                    
+                    plugin.getWaypointConfigManager().addWaypoint(arena, newWpId, wpLoc, new ArrayList<>());
+                    
+                    String selectedId = setupManager.getSelectedWaypointId(uuid);
+                    if (selectedId != null && graph.containsKey(selectedId)) {
+                        plugin.getWaypointConfigManager().addConnection(arena, selectedId, newWpId);
+                        player.sendMessage(ChatColor.LIGHT_PURPLE + "Created waypoint " + ChatColor.GOLD + "WP " + newWpId + ChatColor.LIGHT_PURPLE + " and connected " + ChatColor.GOLD + "WP " + selectedId + ChatColor.LIGHT_PURPLE + " -> " + ChatColor.GOLD + "WP " + newWpId);
+                    } else {
+                        player.sendMessage(ChatColor.LIGHT_PURPLE + "Created waypoint " + ChatColor.GOLD + "WP " + newWpId);
+                    }
+                    
+                    setupManager.setSelectedWaypointId(uuid, newWpId);
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.5f);
+                }
+            } else if (action == Action.RIGHT_CLICK_BLOCK) {
+                if (clickedWp != null) {
+                    String selectedId = setupManager.getSelectedWaypointId(uuid);
+                    if (selectedId != null) {
+                        if (selectedId.equals(clickedWp.getId())) {
+                            player.sendMessage(ChatColor.RED + "Cannot connect a waypoint to itself!");
+                            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                            return;
+                        }
+                        plugin.getWaypointConfigManager().addConnection(arena, selectedId, clickedWp.getId());
+                        player.sendMessage(ChatColor.LIGHT_PURPLE + "Connected " + ChatColor.GOLD + "WP " + selectedId + ChatColor.LIGHT_PURPLE + " -> " + ChatColor.GOLD + "WP " + clickedWp.getId());
+                        setupManager.setSelectedWaypointId(uuid, clickedWp.getId());
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.5f);
+                    } else {
+                        setupManager.setSelectedWaypointId(uuid, clickedWp.getId());
+                        player.sendMessage(ChatColor.GREEN + "Selected waypoint: " + ChatColor.GOLD + "WP " + clickedWp.getId());
+                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.2f);
+                    }
+                }
             }
-        }
-
-        else {
-            // They clicked with the wand, but didn't run /td saveplot first
-            player.sendMessage(ChatColor.RED + "You must type /td saveplot before selecting corners!");
         }
     }
 
@@ -145,7 +263,6 @@ public class WandListener implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         if (event.getClickedBlock() == null) return;
 
-        // If they are holding the wand, skip placement triggers
         ItemStack item = event.getItem();
         if (item != null && item.getType() == Material.BLAZE_ROD && item.hasItemMeta()) {
             org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
@@ -172,16 +289,5 @@ public class WandListener implements Listener {
                 plugin.getTowerManager().openBuyTowerGUI(player, plotId);
             }
         }
-    }
-
-    private ItemStack createGUIItem(Material material, String name, String... lore) {
-        ItemStack item = new ItemStack(material);
-        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(name);
-            meta.setLore(java.util.Arrays.asList(lore));
-            item.setItemMeta(meta);
-        }
-        return item;
     }
 }

@@ -65,13 +65,13 @@ public class MobManager {
     }
 
     public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward, String presetKey) {
-        List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
-        if (waypoints.isEmpty()) {
-            plugin.getLogger().warning("Cannot spawn mob: No waypoints defined for arena " + arena + "!");
+        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        if (graph.isEmpty() || !graph.containsKey("0")) {
+            plugin.getLogger().warning("Cannot spawn mob: No starting waypoint '0' defined for arena " + arena + "!");
             return;
         }
 
-        Location startLocation = waypoints.get(0);
+        Location startLocation = graph.get("0").getLocation();
         
         // Flying check: spawn slightly higher if height-offset > 0
         double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
@@ -176,7 +176,7 @@ public class MobManager {
         // Initialize healthbar
         updateHealthBar(entity);
 
-        TDMob tdMob = new TDMob(entity, waypoints);
+        TDMob tdMob = new TDMob(entity, graph);
         activeMobs.add(tdMob);
     }
 
@@ -494,17 +494,18 @@ public class MobManager {
                 }
             }
 
-            // Re-calculate pathing only when target waypoint index changes or periodically (every 5 ticks / 250ms)
-            if (mob.getCurrentWaypointIndex() != mob.getLastPathfindWaypointIndex() || currentTick % 5 == 0) {
+            // Re-calculate pathing only when target waypoint ID changes or periodically (every 5 ticks / 250ms)
+            String currentWpId = mob.getCurrentWaypointId();
+            if (currentWpId == null || !currentWpId.equals(mob.getLastPathfindWaypointId()) || currentTick % 5 == 0) {
                 mob.getEntity().getPathfinder().moveTo(targetLoc, pathfinderSpeed);
-                mob.setLastPathfindWaypointIndex(mob.getCurrentWaypointIndex());
+                mob.setLastPathfindWaypointId(currentWpId);
             }
         }
 
         // Check if they are close enough to the waypoint to target the next one
         double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.MAGMA_CUBE || heightOffset > 0.0) ? 4.0 : 1.5;
         if (mob.getEntity().getLocation().distanceSquared(targetLoc) < reachDistance) {
-            mob.incrementWaypointIndex();
+            mob.advanceToNextWaypoint();
         }
     }
     

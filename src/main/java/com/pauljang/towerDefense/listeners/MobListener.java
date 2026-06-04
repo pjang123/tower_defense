@@ -256,14 +256,14 @@ public class MobListener implements Listener {
             if (entity instanceof org.bukkit.entity.Slime || entity instanceof org.bukkit.entity.MagmaCube) {
                 final Location deathLoc = entity.getLocation();
                 final String arena = mobArena;
-                int parentWpIndex = 0;
+                String parentWpId = "0";
                 for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
                     if (tdMob.getEntity().equals(entity)) {
-                        parentWpIndex = tdMob.getCurrentWaypointIndex();
+                        parentWpId = tdMob.getCurrentWaypointId();
                         break;
                     }
                 }
-                final int wpIndex = parentWpIndex;
+                final String wpId = parentWpId;
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     double radius = 3.0;
                     for (org.bukkit.entity.Entity nearby : deathLoc.getWorld().getNearbyEntities(deathLoc, radius, radius, radius)) {
@@ -281,9 +281,9 @@ public class MobListener implements Listener {
                                     kbResist.setBaseValue(1.0);
                                 }
                                 
-                                java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
-                                com.pauljang.towerDefense.entities.TDMob childTDMob = new com.pauljang.towerDefense.entities.TDMob(child, waypoints);
-                                childTDMob.setCurrentWaypointIndex(wpIndex);
+                                java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+                                com.pauljang.towerDefense.entities.TDMob childTDMob = new com.pauljang.towerDefense.entities.TDMob(child, graph);
+                                childTDMob.setCurrentWaypointId(wpId);
                                 plugin.getMobManager().getActiveMobs().add(childTDMob);
                                 plugin.getMobManager().updateHealthBar(child);
                             }

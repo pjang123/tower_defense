@@ -3,26 +3,35 @@ package com.pauljang.towerDefense.entities;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Mob;
+import com.pauljang.towerDefense.data.TDWaypoint;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class TDMob {
 
     private final Mob entity;
-    private final List<Location> waypoints;
-    private int currentWaypointIndex = 0;
-    private int lastPathfindWaypointIndex = -1;
+    private final Map<String, TDWaypoint> waypointGraph;
+    private String currentWaypointId;
+    private final List<String> pathHistory = new ArrayList<>();
+    private String lastPathfindWaypointId = null;
     private long lastAttackTick = 0;
     private final Location finalOffsetWaypoint;
 
-    public TDMob(Mob entity, List<Location> waypoints) {
+    public TDMob(Mob entity, Map<String, TDWaypoint> waypointGraph) {
         this.entity = entity;
-        this.waypoints = waypoints;
+        this.waypointGraph = waypointGraph;
 
-        if (!waypoints.isEmpty()) {
-            Location last = waypoints.get(waypoints.size() - 1);
-            // Random offset within a circle of radius 2.0 to spread out
+        // Start at waypoint "0"
+        this.currentWaypointId = "0";
+        this.pathHistory.add("0");
+
+        // Random offset for final waypoint (find an end waypoint - i.e. a waypoint with no outgoing connections)
+        String endId = findEndWaypointId();
+        if (endId != null && waypointGraph.containsKey(endId)) {
+            Location last = waypointGraph.get(endId).getLocation();
             double angle = Math.random() * 2 * Math.PI;
-            double radius = Math.random() * 2.0; // max 2 blocks spread out
+            double radius = Math.random() * 2.0;
             double offsetX = Math.cos(angle) * radius;
             double offsetZ = Math.sin(angle) * radius;
             this.finalOffsetWaypoint = last.clone().add(offsetX, 0, offsetZ);
@@ -30,45 +39,72 @@ public class TDMob {
             this.finalOffsetWaypoint = null;
         }
 
-        // Modern Spigot/Paper API way to wipe all vanilla AI goals
-        // (stops wandering, targeting players, etc.)
         Bukkit.getMobGoals().removeAllGoals(entity);
+    }
+
+    private String findEndWaypointId() {
+        for (TDWaypoint wp : waypointGraph.values()) {
+            if (wp.getNextIds().isEmpty()) {
+                return wp.getId();
+            }
+        }
+        return null;
     }
 
     public Mob getEntity() {
         return entity;
     }
 
-    public int getCurrentWaypointIndex() {
-        return currentWaypointIndex;
+    public String getCurrentWaypointId() {
+        return currentWaypointId;
     }
 
-    public void incrementWaypointIndex() {
-        currentWaypointIndex++;
+    public void setCurrentWaypointId(String currentWaypointId) {
+        this.currentWaypointId = currentWaypointId;
+        if (currentWaypointId != null && !pathHistory.contains(currentWaypointId)) {
+            pathHistory.add(currentWaypointId);
+        }
     }
 
-    public void setCurrentWaypointIndex(int currentWaypointIndex) {
-        this.currentWaypointIndex = currentWaypointIndex;
+    public List<String> getPathHistory() {
+        return pathHistory;
+    }
+
+    public void advanceToNextWaypoint() {
+        if (currentWaypointId == null) return;
+        TDWaypoint current = waypointGraph.get(currentWaypointId);
+        if (current == null) return;
+
+        List<String> nextIds = current.getNextIds();
+        if (nextIds.isEmpty()) {
+            currentWaypointId = null; // Reached end
+        } else {
+            // Select a random next waypoint (implements SPLIT)
+            int index = (int) (Math.random() * nextIds.size());
+            String nextId = nextIds.get(index);
+            currentWaypointId = nextId;
+            pathHistory.add(nextId);
+        }
     }
 
     public Location getNextWaypoint() {
-        if (currentWaypointIndex >= waypoints.size()) return null;
-        if (currentWaypointIndex == waypoints.size() - 1) {
+        if (currentWaypointId == null) {
             return finalOffsetWaypoint;
         }
-        return waypoints.get(currentWaypointIndex);
+        TDWaypoint wp = waypointGraph.get(currentWaypointId);
+        return wp != null ? wp.getLocation() : null;
     }
 
     public boolean hasReachedFinalWaypoint() {
-        return currentWaypointIndex >= waypoints.size();
+        return currentWaypointId == null;
     }
 
-    public int getLastPathfindWaypointIndex() {
-        return lastPathfindWaypointIndex;
+    public String getLastPathfindWaypointId() {
+        return lastPathfindWaypointId;
     }
 
-    public void setLastPathfindWaypointIndex(int lastPathfindWaypointIndex) {
-        this.lastPathfindWaypointIndex = lastPathfindWaypointIndex;
+    public void setLastPathfindWaypointId(String lastPathfindWaypointId) {
+        this.lastPathfindWaypointId = lastPathfindWaypointId;
     }
 
     public long getLastAttackTick() {
@@ -81,5 +117,9 @@ public class TDMob {
 
     public Location getFinalOffsetWaypoint() {
         return finalOffsetWaypoint;
+    }
+
+    public Map<String, TDWaypoint> getWaypointGraph() {
+        return waypointGraph;
     }
 }
