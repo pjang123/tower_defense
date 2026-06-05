@@ -68,12 +68,22 @@ public class WaypointConfigManager {
         for (String key : config.getConfigurationSection(arenaPath).getKeys(false)) {
             String path = arenaPath + "." + key;
             String worldName = config.getString(path + ".world");
+            
+            // Normalize game_world_template to game_world
+            if ("game_world_template".equals(worldName)) {
+                worldName = "game_world";
+            }
+            
             double x = config.getDouble(path + ".x");
             double y = config.getDouble(path + ".y");
             double z = config.getDouble(path + ".z");
             List<String> next = config.getStringList(path + ".next");
 
             org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+            if (world == null) {
+                // Fallback to active game world
+                world = org.bukkit.Bukkit.getWorld("game_world");
+            }
             if (world != null) {
                 Location loc = new Location(world, x, y, z);
                 graph.put(key, new TDWaypoint(key, loc, next));

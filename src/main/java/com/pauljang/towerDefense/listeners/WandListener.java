@@ -48,6 +48,14 @@ public class WandListener implements Listener {
                                 int size = sm.getPlotSize(player.getUniqueId());
                                 drawPlotHighlight(blockLoc, size);
                             }
+                        } else if (state == SetupState.DELETING_PLOT) {
+                            org.bukkit.block.Block targetBlock = player.getTargetBlockExact(15);
+                            if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+                                String plotId = plugin.getPlotConfigManager().getPlotAt(targetBlock.getLocation());
+                                if (plotId != null) {
+                                    drawTargetedPlotHighlight(plotId);
+                                }
+                            }
                         } else if (state == SetupState.WAYPOINT_MODE) {
                             String arena = sm.getEditingArena(player.getUniqueId());
                             drawWaypointGraphHighlight(player, arena);
@@ -70,6 +78,31 @@ public class WandListener implements Listener {
         org.bukkit.World world = center.getWorld();
         org.bukkit.Color color = (size == 5) ? org.bukkit.Color.YELLOW : org.bukkit.Color.AQUA;
         org.bukkit.Particle.DustOptions dust = new org.bukkit.Particle.DustOptions(color, 1.0f);
+        
+        for (double x = minX; x <= maxX; x += 0.5) {
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, minZ), 1, 0, 0, 0, 0, dust);
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, maxZ), 1, 0, 0, 0, 0, dust);
+        }
+        for (double z = minZ; z <= maxZ; z += 0.5) {
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, minX, y, z), 1, 0, 0, 0, 0, dust);
+            world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, maxX, y, z), 1, 0, 0, 0, 0, dust);
+        }
+    }
+
+    private void drawTargetedPlotHighlight(String plotId) {
+        Location[] bounds = plugin.getPlotConfigManager().getPlotBounds(plotId);
+        if (bounds == null) return;
+        Location minLoc = bounds[0];
+        Location maxLoc = bounds[1];
+        
+        double minX = minLoc.getX();
+        double maxX = maxLoc.getX() + 1.0;
+        double minZ = minLoc.getZ();
+        double maxZ = maxLoc.getZ() + 1.0;
+        double y = minLoc.getY() + 1.02; // slightly above block
+        
+        org.bukkit.World world = minLoc.getWorld();
+        org.bukkit.Particle.DustOptions dust = new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.0f);
         
         for (double x = minX; x <= maxX; x += 0.5) {
             world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, minZ), 1, 0, 0, 0, 0, dust);
@@ -198,6 +231,22 @@ public class WandListener implements Listener {
                 plugin.getPlotConfigManager().savePlot(arena, pos1, pos2);
                 player.sendMessage(ChatColor.GREEN + "Successfully set and saved a " + size + "x" + size + " plot centered at " + clickedLoc.getBlockX() + ", " + clickedLoc.getBlockY() + ", " + clickedLoc.getBlockZ() + " for Arena " + arena + "!");
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
+            }
+        }
+
+        // C2. Plot Deletion Flow
+        else if (state == SetupState.DELETING_PLOT) {
+            if (action == Action.LEFT_CLICK_BLOCK) {
+                String plotId = plugin.getPlotConfigManager().getPlotAt(clickedLoc);
+                if (plotId == null) {
+                    player.sendMessage(ChatColor.RED + "Error: There is no plot at this location!");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                    return;
+                }
+                
+                plugin.getPlotConfigManager().deletePlot(plotId);
+                player.sendMessage(ChatColor.GREEN + "Successfully deleted plot (ID: " + plotId + ") for Arena " + arena + "!");
+                player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_BREAK, 0.8f, 1.0f);
             }
         }
 

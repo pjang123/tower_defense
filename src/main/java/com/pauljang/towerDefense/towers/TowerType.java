@@ -9,7 +9,9 @@ public enum TowerType {
     CHORUS("Chorus Tower", Material.CHORUS_FLOWER, Material.PURPUR_BLOCK, Material.PURPUR_PILLAR, ChatColor.LIGHT_PURPLE, 8.0, 0.0, 120L, 150),
     REDSTONE("Redstone Tower", Material.REDSTONE_BLOCK, Material.SMOOTH_STONE, Material.STONE_BRICK_WALL, ChatColor.DARK_RED, 10.0, 0.0, 20L, 200),
     POISON("Poison Tower", Material.MUD_BRICKS, Material.MOSS_BLOCK, Material.MANGROVE_FENCE, ChatColor.DARK_GREEN, 8.0, 0.5, 80L, 150),
-    ICE("Ice Tower", Material.PACKED_ICE, Material.SNOW_BLOCK, Material.BLUE_ICE, ChatColor.AQUA, 8.0, 0.5, 30L, 125);
+    ICE("Ice Tower", Material.PACKED_ICE, Material.SNOW_BLOCK, Material.BLUE_ICE, ChatColor.AQUA, 8.0, 0.5, 30L, 125),
+    GOLEM("Golem Tower", Material.IRON_BLOCK, Material.SMOOTH_STONE, Material.IRON_BARS, ChatColor.GRAY, 10.0, 20.0, 40L, 400),
+    HAPPY_GHAST("Happy Ghast Tower", Material.GHAST_SPAWN_EGG, Material.SOUL_SAND, Material.NETHERRACK, ChatColor.LIGHT_PURPLE, 15.0, 15.0, 50L, 500);
 
     private final String displayName;
     private final Material blockMaterial;

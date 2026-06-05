@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]|challenge [player]|accept>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]|challenge [player]|accept>");
             return true;
         }
 
@@ -48,6 +48,7 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td status " + ChatColor.WHITE + "- Show current game state");
                 player.sendMessage(ChatColor.YELLOW + "/td wand " + ChatColor.WHITE + "- Gives you the Setup Wand");
                 player.sendMessage(ChatColor.YELLOW + "/td plotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Setup mode for an arena");
+                player.sendMessage(ChatColor.YELLOW + "/td deleteplotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Deletion mode for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td waypointmode [arena] " + ChatColor.WHITE + "- Toggle Waypoint Setup mode for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints [arena] " + ChatColor.WHITE + "- Wipe waypoints for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td spawnmob [type] [speed] [health] [armor] [slowImmune] [fireImmune] " + ChatColor.WHITE + "- Spawn a custom test mob");
@@ -64,6 +65,10 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "spawnmob":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 org.bukkit.entity.EntityType mobType = org.bukkit.entity.EntityType.ZOMBIE;
                 double speedMult = 1.0;
                 double maxHealth = -1.0;
@@ -113,6 +118,10 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "start":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 if (gameManager.getCurrentState() == GameState.ACTIVE || gameManager.getCurrentState() == GameState.STARTING) {
                     player.sendMessage(ChatColor.YELLOW + "A game is already active! Gracefully restarting the match...");
                     gameManager.setGameState(GameState.ENDED);
@@ -128,6 +137,10 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "stop":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 gameManager.setGameState(GameState.ENDED);
                 player.sendMessage(ChatColor.RED + "Forcing game to ENDED state!");
                 break;
@@ -137,11 +150,19 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "wand":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 giveWand(player);
                 break;
 
             case "plotmode":
             case "saveplot":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 SetupManager.SetupState state = plugin.getSetupManager().getState(player.getUniqueId());
 
                 // If they are IDLE, turn the mode ON
@@ -165,7 +186,36 @@ public class TDCommand implements CommandExecutor {
                 }
                 break;
 
+            case "deleteplotmode":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
+                SetupManager.SetupState delState = plugin.getSetupManager().getState(player.getUniqueId());
+
+                if (delState == SetupManager.SetupState.IDLE) {
+                    String arena = "1";
+                    if (args.length > 1) {
+                        arena = args[1];
+                    }
+                    plugin.getSetupManager().setEditingArena(player.getUniqueId(), arena);
+                    if (!player.getInventory().contains(Material.BLAZE_ROD)) {
+                        giveWand(player);
+                    }
+                    plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.DELETING_PLOT);
+                    player.sendMessage(ChatColor.AQUA + "--- Plot Deletion Mode: ENABLED (Arena " + arena + ") ---");
+                    player.sendMessage(ChatColor.YELLOW + "LEFT-CLICK a plot block to delete the plot.");
+                } else {
+                    plugin.getSetupManager().clearSetupData(player.getUniqueId());
+                    player.sendMessage(ChatColor.RED + "--- Plot Deletion Mode: DISABLED ---");
+                }
+                break;
+
             case "waypointmode":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 SetupManager.SetupState wpState = plugin.getSetupManager().getState(player.getUniqueId());
 
                 if (wpState != SetupManager.SetupState.WAYPOINT_MODE) {
@@ -187,6 +237,10 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "clearwaypoints":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
+                    break;
+                }
                 String clearArena = "1";
                 if (args.length > 1) {
                     clearArena = args[1];
@@ -225,8 +279,8 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "givegold":
-                if (!player.isOp()) {
-                    player.sendMessage(ChatColor.RED + "You must be OP to use testing/admin commands.");
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use testing/admin commands.");
                     break;
                 }
                 int goldAmount = 1000;
@@ -242,8 +296,8 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "givexp":
-                if (!player.isOp()) {
-                    player.sendMessage(ChatColor.RED + "You must be OP to use testing/admin commands.");
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use testing/admin commands.");
                     break;
                 }
                 int xpAmount = 100;
@@ -258,8 +312,8 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "setarena":
-                if (!player.isOp()) {
-                    player.sendMessage(ChatColor.RED + "You must be OP to use testing/admin commands.");
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use testing/admin commands.");
                     break;
                 }
                 if (args.length < 3) {

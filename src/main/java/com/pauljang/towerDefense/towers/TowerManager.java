@@ -80,8 +80,12 @@ public class TowerManager {
         clearTowerBlocks(tower);
 
         // 2. Try loading level-specific NBT structure (e.g., structures/archer_1.nbt)
-        File levelSpecificFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + "_" + level + ".nbt");
-        File genericFile = new File(plugin.getDataFolder(), "structures/" + type.name().toLowerCase() + ".nbt");
+        String fileName = type.name().toLowerCase();
+        if (type == TowerType.HAPPY_GHAST) {
+            fileName = "happy";
+        }
+        File levelSpecificFile = new File(plugin.getDataFolder(), "structures/" + fileName + "_" + level + ".nbt");
+        File genericFile = new File(plugin.getDataFolder(), "structures/" + fileName + ".nbt");
         File targetFile = levelSpecificFile.exists() ? levelSpecificFile : (genericFile.exists() ? genericFile : null);
         
         Structure structure = null;
@@ -111,13 +115,90 @@ public class TowerManager {
         } else {
             // Fallback default 3-block multiblock
             tower.setStructureSize(null);
-            center.clone().add(0, 1, 0).getBlock().setType(type.getBaseMaterial(), false);
-            center.clone().add(0, 2, 0).getBlock().setType(type.getMiddleMaterial(), false);
-            center.clone().add(0, 3, 0).getBlock().setType(type.getBlockMaterial(), false);
+            org.bukkit.Material baseMat = type.getBaseMaterial();
+            org.bukkit.Material midMat = type.getMiddleMaterial();
+            org.bukkit.Material topMat = type.getBlockMaterial();
+            
+            center.clone().add(0, 1, 0).getBlock().setType(baseMat.isBlock() ? baseMat : org.bukkit.Material.SOUL_SAND, false);
+            center.clone().add(0, 2, 0).getBlock().setType(midMat.isBlock() ? midMat : org.bukkit.Material.NETHERRACK, false);
+            center.clone().add(0, 3, 0).getBlock().setType(topMat.isBlock() ? topMat : org.bukkit.Material.RED_NETHER_BRICKS, false);
         }
         
         isolateTowerBlocks(center, tower.getStructureSize());
         clearNearbyDroppedItemsLater(center);
+
+        // Handle Golem and Happy Ghast entity spawns
+        if (type == TowerType.GOLEM) {
+            if (tower.getSpawnedGolem() != null && tower.getSpawnedGolem().isValid()) {
+                tower.getSpawnedGolem().remove();
+            }
+            
+            String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+            java.util.List<Location> wps = plugin.getWaypointConfigManager().getWaypoints(towerArena);
+            Location spawnLoc = (!wps.isEmpty()) ? wps.get(0).clone().add(0, 1.0, 0) : center.clone().add(0, 1.5, 0);
+            
+            org.bukkit.entity.LivingEntity golem = null;
+            if (level == 1) {
+                try {
+                    org.bukkit.entity.EntityType typeEnum = org.bukkit.entity.EntityType.valueOf("COPPER_GOLEM");
+                    org.bukkit.entity.Entity spawnedEnt = center.getWorld().spawn(spawnLoc, typeEnum.getEntityClass());
+                    if (spawnedEnt instanceof org.bukkit.entity.LivingEntity le) {
+                        golem = le;
+                        if (golem instanceof org.bukkit.entity.Mob m) {
+                            m.setAI(true);
+                        }
+                        golem.setInvulnerable(true);
+                        golem.setGravity(true);
+                        golem.setCollidable(false);
+                        golem.setPersistent(true);
+                        golem.setCustomName(org.bukkit.ChatColor.GOLD + "Copper Golem");
+                        golem.setCustomNameVisible(true);
+                    }
+                } catch (Exception ignored) {
+                    golem = center.getWorld().spawn(spawnLoc, org.bukkit.entity.IronGolem.class, g -> {
+                        g.setAI(true);
+                        g.setInvulnerable(true);
+                        g.setGravity(true);
+                        g.setCollidable(false);
+                        g.setPersistent(true);
+                        g.setCustomName(org.bukkit.ChatColor.GOLD + "Copper Golem");
+                        setEntityScale(g, 0.6);
+                        g.setCustomNameVisible(true);
+                    });
+                }
+            } else {
+                golem = center.getWorld().spawn(spawnLoc, org.bukkit.entity.IronGolem.class, g -> {
+                    g.setAI(true);
+                    g.setInvulnerable(true);
+                    g.setGravity(true);
+                    g.setCollidable(false);
+                    g.setPersistent(true);
+                    g.setCustomName(org.bukkit.ChatColor.GRAY + "Iron Golem");
+                    setEntityScale(g, 1.0);
+                    g.setCustomNameVisible(true);
+                });
+            }
+            tower.setSpawnedGolem(golem);
+        } else if (type == TowerType.HAPPY_GHAST) {
+            if (tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
+                tower.getSpawnedGhast().getPassengers().clear();
+                tower.getSpawnedGhast().remove();
+            }
+            double height = tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 4.0;
+            Location spawnLoc = center.clone().add(0, height + 1.0, 0);
+            
+            org.bukkit.entity.Ghast ghast = center.getWorld().spawn(spawnLoc, org.bukkit.entity.Ghast.class, gh -> {
+                gh.setAI(false);
+                gh.setInvulnerable(true);
+                gh.setGravity(false);
+                gh.setCollidable(false);
+                gh.setPersistent(true);
+                gh.setCustomName(org.bukkit.ChatColor.LIGHT_PURPLE + "Happy Ghast [Lvl " + level + "]");
+                gh.setCustomNameVisible(true);
+                setEntityScale(gh, 0.5);
+            });
+            tower.setSpawnedGhast(ghast);
+        }
     }
 
     private void isolateTowerBlocks(Location center, BlockVector size) {
@@ -283,6 +364,15 @@ public class TowerManager {
         if (tower != null) {
             clearTowerBlocks(tower);
             
+            // Clean up spawned entities
+            if (tower.getSpawnedGolem() != null && tower.getSpawnedGolem().isValid()) {
+                tower.getSpawnedGolem().remove();
+            }
+            if (tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
+                tower.getSpawnedGhast().getPassengers().clear();
+                tower.getSpawnedGhast().remove();
+            }
+
             // Clean up hologram ArmorStands
             for (ArmorStand hologram : tower.getHolograms()) {
                 if (hologram != null && hologram.isValid()) {
@@ -339,6 +429,140 @@ public class TowerManager {
                             }
                         }
                         continue;
+                    }
+
+                    // If Happy Ghast is ridden, handle steering and skip autopilot attack
+                    if (tower.getType() == TowerType.HAPPY_GHAST && tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
+                        java.util.List<org.bukkit.entity.Entity> passengers = tower.getSpawnedGhast().getPassengers();
+                        if (!passengers.isEmpty()) {
+                            tower.setAutopilot(false);
+                            org.bukkit.entity.Entity passenger = passengers.get(0);
+                            if (passenger instanceof Player rider) {
+                                double speed = 0.3 + (tower.getLevel() - 1) * 0.15;
+                                org.bukkit.util.Vector dir = rider.getLocation().getDirection();
+                                
+                                Location centerLoc = tower.getCenterLocation();
+                                Location ghastLoc = tower.getSpawnedGhast().getLocation();
+                                if (ghastLoc.distanceSquared(centerLoc) > 25.0 * 25.0) {
+                                    org.bukkit.util.Vector pushBack = centerLoc.toVector().subtract(ghastLoc.toVector()).normalize().multiply(0.5);
+                                    Location target = ghastLoc.clone().add(pushBack);
+                                    target.setYaw(rider.getLocation().getYaw());
+                                    target.setPitch(rider.getLocation().getPitch());
+                                    tower.getSpawnedGhast().teleport(target, io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+                                    if (tick % 20 == 0) {
+                                        rider.sendMessage(org.bukkit.ChatColor.RED + "⚠ You are reaching the edge of the arena boundary! Pushing back.");
+                                    }
+                                } else {
+                                    Location target = ghastLoc.clone().add(dir.multiply(speed));
+                                    if (target.getY() < centerLoc.getY() + 2.0) {
+                                        target.setY(centerLoc.getY() + 2.0);
+                                    } else if (target.getY() > centerLoc.getY() + 18.0) {
+                                        target.setY(centerLoc.getY() + 18.0);
+                                    }
+                                    target.setYaw(rider.getLocation().getYaw());
+                                    target.setPitch(rider.getLocation().getPitch());
+                                    tower.getSpawnedGhast().teleport(target, io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+                                }
+                            }
+                            continue; // Skip automated attack
+                        } else {
+                            tower.setAutopilot(true);
+                        }
+                    }
+
+                    // Golem pathing movement tick
+                    if (tower.getType() == TowerType.GOLEM && tower.getSpawnedGolem() != null && tower.getSpawnedGolem().isValid()) {
+                        org.bukkit.entity.LivingEntity golem = tower.getSpawnedGolem();
+                        org.bukkit.NamespacedKey wpKey = new org.bukkit.NamespacedKey(plugin, "golem_wp_index");
+                        org.bukkit.NamespacedKey dirKey = new org.bukkit.NamespacedKey(plugin, "golem_wp_dir");
+                        
+                        int wpIndex = 0;
+                        int dirVal = 1;
+                        if (golem.getPersistentDataContainer().has(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER)) {
+                            wpIndex = golem.getPersistentDataContainer().get(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER);
+                        }
+                        if (golem.getPersistentDataContainer().has(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER)) {
+                            dirVal = golem.getPersistentDataContainer().get(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER);
+                        }
+                        
+                        String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                        java.util.List<Location> wps = plugin.getWaypointConfigManager().getWaypoints(towerArena);
+                        if (!wps.isEmpty()) {
+                            Location centerLoc = tower.getCenterLocation();
+                            double range = tower.getRange();
+                            
+                            // Find closest waypoint on the path to the tower center
+                            int closestIndex = 0;
+                            double closestDistSq = Double.MAX_VALUE;
+                            for (int i = 0; i < wps.size(); i++) {
+                                Location wp = wps.get(i);
+                                if (wp.getWorld().equals(centerLoc.getWorld())) {
+                                    double distSq = wp.distanceSquared(centerLoc);
+                                    if (distSq < closestDistSq) {
+                                        closestDistSq = distSq;
+                                        closestIndex = i;
+                                    }
+                                }
+                            }
+                            
+                            int minIndex = closestIndex;
+                            int maxIndex = closestIndex;
+                            
+                            // Expand left (downwards in indices) while within range
+                            while (minIndex > 0) {
+                                Location wp = wps.get(minIndex - 1);
+                                if (wp.getWorld().equals(centerLoc.getWorld()) && wp.distanceSquared(centerLoc) <= range * range) {
+                                    minIndex--;
+                                } else {
+                                    break;
+                                }
+                            }
+                            
+                            // Expand right (upwards in indices) while within range
+                            while (maxIndex < wps.size() - 1) {
+                                Location wp = wps.get(maxIndex + 1);
+                                if (wp.getWorld().equals(centerLoc.getWorld()) && wp.distanceSquared(centerLoc) <= range * range) {
+                                    maxIndex++;
+                                } else {
+                                    break;
+                                }
+                            }
+                            
+                            // Adjust wpIndex if it falls outside of [minIndex, maxIndex]
+                            if (wpIndex < minIndex || wpIndex > maxIndex) {
+                                wpIndex = closestIndex;
+                                dirVal = 1;
+                                golem.getPersistentDataContainer().set(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER, wpIndex);
+                                golem.getPersistentDataContainer().set(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER, dirVal);
+                            }
+                            
+                            Location targetWp = wps.get(wpIndex);
+                            
+                            if (golem instanceof org.bukkit.entity.Mob mob) {
+                                if (tick % 5 == 0) {
+                                    mob.getPathfinder().moveTo(targetWp, 1.25);
+                                }
+                            }
+                            
+                            if (golem.getLocation().distanceSquared(targetWp) < 2.25) {
+                                if (minIndex == maxIndex) {
+                                    wpIndex = minIndex;
+                                } else {
+                                    wpIndex += dirVal;
+                                    if (wpIndex > maxIndex) {
+                                        dirVal = -1;
+                                        wpIndex = maxIndex - 1;
+                                        if (wpIndex < minIndex) wpIndex = minIndex;
+                                    } else if (wpIndex < minIndex) {
+                                        dirVal = 1;
+                                        wpIndex = minIndex + 1;
+                                        if (wpIndex > maxIndex) wpIndex = maxIndex;
+                                    }
+                                }
+                                golem.getPersistentDataContainer().set(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER, wpIndex);
+                                golem.getPersistentDataContainer().set(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER, dirVal);
+                            }
+                        }
                     }
 
                     long cooldown = tower.getCooldown();
@@ -683,13 +907,91 @@ public class TowerManager {
                 }
                 start.getWorld().playSound(start, Sound.BLOCK_POWDER_SNOW_BREAK, 0.8f, 1.2f);
             }
+            case GOLEM -> {
+                double damage = tower.getDamage();
+                if (tower.getLevel() == 1) {
+                    damage = plugin.getConfig().getDouble("towers.golem_1.damage", 20.0);
+                } else {
+                    damage = plugin.getConfig().getDouble("towers.golem_2.damage", 40.0);
+                }
+                
+                target.damage(damage);
+                
+                if (tower.getSpawnedGolem() != null && tower.getSpawnedGolem().isValid()) {
+                    tower.getSpawnedGolem().swingMainHand();
+                    Location golemLoc = tower.getSpawnedGolem().getLocation();
+                    org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(golemLoc.toVector()).normalize();
+                    golemLoc.setDirection(dir);
+                    tower.getSpawnedGolem().teleport(golemLoc);
+                }
+                
+                if (tower.getLevel() == 2) {
+                    target.setVelocity(new org.bukkit.util.Vector(0, 0.8, 0));
+                    start.getWorld().playSound(target.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 1.0f);
+                    start.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, target.getLocation(), 5, 0.2, 0.2, 0.2, 0.1);
+                } else {
+                    start.getWorld().playSound(target.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 0.8f, 1.3f);
+                }
+            }
+            case HAPPY_GHAST -> {
+                if (tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
+                    org.bukkit.entity.Ghast ghast = tower.getSpawnedGhast();
+                    
+                    Location ghastLoc = ghast.getLocation();
+                    org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(ghastLoc.toVector()).normalize();
+                    ghastLoc.setDirection(dir);
+                    ghast.teleport(ghastLoc);
+                    
+                    org.bukkit.Location spawnLoc = ghast.getLocation().add(dir.clone().multiply(3.0));
+                    org.bukkit.entity.LargeFireball fireball = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.LargeFireball.class, fb -> {
+                        fb.setShooter(ghast);
+                        fb.setDirection(dir);
+                        fb.setIsIncendiary(false);
+                        fb.setYield(0.0f);
+                        fb.setMetadata("td_happy_fireball", new org.bukkit.metadata.FixedMetadataValue(plugin, tower));
+                    });
+                    ghast.getWorld().playSound(ghast.getLocation(), Sound.ENTITY_GHAST_SHOOT, 1.0f, 1.0f);
+                }
+            }
             case REDSTONE -> {
                 // Passive Redstone Tower
             }
         }
     }
 
-    private java.util.List<Mob> getMobsInRadius(Location center, double radius, String arena) {
+    private void setEntityScale(org.bukkit.entity.LivingEntity entity, double value) {
+        try {
+            org.bukkit.attribute.Attribute scaleAttr = null;
+            String foundFieldName = "";
+            try {
+                java.lang.reflect.Field field = org.bukkit.attribute.Attribute.class.getField("GENERIC_SCALE");
+                scaleAttr = (org.bukkit.attribute.Attribute) field.get(null);
+                foundFieldName = "GENERIC_SCALE";
+            } catch (Exception e) {
+                try {
+                    java.lang.reflect.Field field = org.bukkit.attribute.Attribute.class.getField("SCALE");
+                    scaleAttr = (org.bukkit.attribute.Attribute) field.get(null);
+                    foundFieldName = "SCALE";
+                } catch (Exception e2) {
+                    plugin.getLogger().warning("Failed to find GENERIC_SCALE or SCALE attribute via reflection!");
+                }
+            }
+            if (scaleAttr != null) {
+                org.bukkit.attribute.AttributeInstance instance = entity.getAttribute(scaleAttr);
+                if (instance != null) {
+                    instance.setBaseValue(value);
+                    plugin.getLogger().info("Successfully set " + entity.getType() + " scale to " + value + " using attribute " + foundFieldName);
+                } else {
+                    plugin.getLogger().warning("AttributeInstance for " + foundFieldName + " was null on " + entity.getType());
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error setting entity scale: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public java.util.List<Mob> getMobsInRadius(Location center, double radius, String arena) {
         java.util.List<Mob> result = new java.util.ArrayList<>();
         double radiusSq = radius * radius;
         for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
@@ -981,6 +1283,40 @@ public class TowerManager {
             ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + iceSpeed + "s",
             "",
             ChatColor.GRAY + "Applies Slowness to all mobs in radius."
+        ));
+
+        // Slot 19: Golem Tower
+        int golemCost = plugin.getConfig().getInt("towers.golem_1.cost", 400);
+        double golemRange = plugin.getConfig().getDouble("towers.golem_1.range", 10.0);
+        double golemDamage = plugin.getConfig().getDouble("towers.golem_1.damage", 20.0);
+        double golemSpeed = plugin.getConfig().getLong("towers.golem_1.cooldown", 40L) / 20.0;
+        gui.setItem(19, createGUIItem(
+            Material.IRON_BLOCK,
+            ChatColor.GRAY + "" + ChatColor.BOLD + "Golem Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + golemCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + golemRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + golemDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + golemSpeed + "s",
+            "",
+            ChatColor.GRAY + "Spawns a Copper Golem (T1) / Iron Golem (T2)",
+            ChatColor.GRAY + "that attacks single targets. Iron Golem knocks up."
+        ));
+
+        // Slot 20: Happy Ghast Tower
+        int happyCost = plugin.getConfig().getInt("towers.happy_ghast_1.cost", 500);
+        double happyRange = plugin.getConfig().getDouble("towers.happy_ghast_1.range", 15.0);
+        double happyDamage = plugin.getConfig().getDouble("towers.happy_ghast_1.damage", 15.0);
+        double happySpeed = plugin.getConfig().getLong("towers.happy_ghast_1.cooldown", 50L) / 20.0;
+        gui.setItem(20, createGUIItem(
+            Material.GHAST_SPAWN_EGG,
+            ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Happy Ghast Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + happyCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + happyRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + happyDamage + " HP (AoE)",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + happySpeed + "s",
+            "",
+            ChatColor.GRAY + "Ridable ghast. Shoots fireballs that deal AoE damage.",
+            ChatColor.GRAY + "Has 3 tiers. Autopilot mode when unridden."
         ));
 
         player.openInventory(gui);

@@ -47,6 +47,9 @@ public final class TowerDefense extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new WandListener(this), this);
         getServer().getPluginManager().registerEvents(new MobListener(this), this);
 
+        // Set up the lobby and game worlds
+        this.gameManager.setupWorlds();
+
         // Set the default state
         this.gameManager.setGameState(GameState.LOBBY);
 

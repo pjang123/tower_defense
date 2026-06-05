@@ -80,6 +80,11 @@ public class MobManager {
             spawnLoc.add(0, heightOffset, 0);
         }
 
+        // Ensure the chunk is loaded before spawning
+        if (spawnLoc.getWorld() != null && !spawnLoc.getChunk().isLoaded()) {
+            spawnLoc.getChunk().load();
+        }
+
         Mob entity = (Mob) spawnLoc.getWorld().spawnEntity(spawnLoc, type);
 
         // Force spawned mobs to be their adult versions

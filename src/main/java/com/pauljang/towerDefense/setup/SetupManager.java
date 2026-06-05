@@ -9,7 +9,8 @@ public class SetupManager {
     public enum SetupState {
         IDLE,               // Not currently setting up anything
         AWAITING_PLOT,      // Admin simply left-clicks to set the plot
-        WAYPOINT_MODE
+        WAYPOINT_MODE,
+        DELETING_PLOT
     }
 
     private final HashMap<UUID, SetupState> playerStates = new HashMap<>();

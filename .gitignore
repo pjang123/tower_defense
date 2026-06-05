@@ -1,2 +1,17 @@
-/.idea/
+# Maven
 /target/
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+*.ipr
+*.iws
+
+# Log files
+*.log
+*.log.gz
+*.gz
+
+# OS files
+.DS_Store
+Thumbs.db

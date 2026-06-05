@@ -15,6 +15,9 @@ public class Tower {
     private BlockVector structureSize = null;
     private TargetingMode targetingMode = TargetingMode.FIRST;
     private long disabledUntil = 0;
+    private org.bukkit.entity.LivingEntity spawnedGolem = null;
+    private org.bukkit.entity.Ghast spawnedGhast = null;
+    private boolean autopilot = true;
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
         this.plotId = plotId;
@@ -78,7 +81,8 @@ public class Tower {
     }
 
     public int getUpgradeCost() {
-        if (level >= 3) {
+        int maxLvl = (type == TowerType.GOLEM) ? 2 : 3;
+        if (level >= maxLvl) {
             return -1; // Max level reached
         }
         TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
@@ -91,8 +95,17 @@ public class Tower {
         int total = 0;
         for (int l = 1; l <= level; l++) {
             String key = type.name().toLowerCase() + "_" + l;
-            total += plugin.getConfig().getInt("towers." + key + ".cost", l * 100);
+            total += plugin.getConfig().getInt("towers." + key + ".cost", l == 1 ? type.getCost() : l * 100);
         }
         return total;
     }
+
+    public org.bukkit.entity.LivingEntity getSpawnedGolem() { return spawnedGolem; }
+    public void setSpawnedGolem(org.bukkit.entity.LivingEntity spawnedGolem) { this.spawnedGolem = spawnedGolem; }
+
+    public org.bukkit.entity.Ghast getSpawnedGhast() { return spawnedGhast; }
+    public void setSpawnedGhast(org.bukkit.entity.Ghast spawnedGhast) { this.spawnedGhast = spawnedGhast; }
+
+    public boolean isAutopilot() { return autopilot; }
+    public void setAutopilot(boolean autopilot) { this.autopilot = autopilot; }
 }

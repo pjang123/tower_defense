@@ -66,7 +66,7 @@ public class PlotConfigManager {
     public boolean isPlotOverlapping(Location newPos1, Location newPos2) {
         if (config.getConfigurationSection("plots") == null) return false;
 
-        String newWorldName = newPos1.getWorld().getName();
+        String newWorldName = normalizeWorldName(newPos1.getWorld().getName());
         int newMinX = Math.min(newPos1.getBlockX(), newPos2.getBlockX());
         int newMaxX = Math.max(newPos1.getBlockX(), newPos2.getBlockX());
         int newMinZ = Math.min(newPos1.getBlockZ(), newPos2.getBlockZ());
@@ -75,7 +75,7 @@ public class PlotConfigManager {
         for (String plotId : config.getConfigurationSection("plots").getKeys(false)) {
             String path = "plots." + plotId + ".";
 
-            String savedWorld = config.getString(path + "pos1.world");
+            String savedWorld = normalizeWorldName(config.getString(path + "pos1.world"));
             if (!newWorldName.equals(savedWorld)) continue;
 
             int savedX1 = config.getInt(path + "pos1.x");
@@ -103,7 +103,7 @@ public class PlotConfigManager {
     public String getPlotAt(Location loc) {
         if (config.getConfigurationSection("plots") == null) return null;
 
-        String worldName = loc.getWorld().getName();
+        String worldName = normalizeWorldName(loc.getWorld().getName());
         int x = loc.getBlockX();
         int y = loc.getBlockY();
         int z = loc.getBlockZ();
@@ -111,7 +111,7 @@ public class PlotConfigManager {
         for (String plotId : config.getConfigurationSection("plots").getKeys(false)) {
             String path = "plots." + plotId + ".";
 
-            String savedWorld = config.getString(path + "pos1.world");
+            String savedWorld = normalizeWorldName(config.getString(path + "pos1.world"));
             if (!worldName.equals(savedWorld)) continue;
 
             int x1 = config.getInt(path + "pos1.x");
@@ -151,7 +151,7 @@ public class PlotConfigManager {
         String path = "plots." + plotId + ".";
         if (config.getConfigurationSection("plots") == null || !config.contains(path)) return null;
 
-        String worldName = config.getString(path + "pos1.world");
+        String worldName = normalizeWorldName(config.getString(path + "pos1.world"));
         int x1 = config.getInt(path + "pos1.x");
         int y1 = config.getInt(path + "pos1.y");
         int z1 = config.getInt(path + "pos1.z");
@@ -160,6 +160,9 @@ public class PlotConfigManager {
         int z2 = config.getInt(path + "pos2.z");
 
         org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+        if (world == null) {
+            world = org.bukkit.Bukkit.getWorld("game_world");
+        }
         if (world == null) return null;
 
         double centerX = (x1 + x2) / 2.0 + 0.5;
@@ -167,6 +170,44 @@ public class PlotConfigManager {
         double centerZ = (z1 + z2) / 2.0 + 0.5;
 
         return new Location(world, centerX, centerY, centerZ);
+    }
+
+    // Delete a plot by ID and remove any tower on it
+    public void deletePlot(String plotId) {
+        if (config.getConfigurationSection("plots") == null) return;
+        if (plugin.getTowerManager() != null) {
+            plugin.getTowerManager().removeTower(plotId);
+        }
+        config.set("plots." + plotId, null);
+        saveFile();
+    }
+
+    // Get the bounding box/corners of a plot
+    public Location[] getPlotBounds(String plotId) {
+        String path = "plots." + plotId + ".";
+        if (config.getConfigurationSection("plots") == null || !config.contains(path)) return null;
+        String worldName = normalizeWorldName(config.getString(path + "pos1.world"));
+        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+        if (world == null) {
+            world = org.bukkit.Bukkit.getWorld("game_world");
+        }
+        if (world == null) return null;
+        int x1 = config.getInt(path + "pos1.x");
+        int y1 = config.getInt(path + "pos1.y");
+        int z1 = config.getInt(path + "pos1.z");
+        int x2 = config.getInt(path + "pos2.x");
+        int y2 = config.getInt(path + "pos2.y");
+        int z2 = config.getInt(path + "pos2.z");
+        Location pos1 = new Location(world, Math.min(x1, x2), y1, Math.min(z1, z2));
+        Location pos2 = new Location(world, Math.max(x1, x2), y2, Math.max(z1, z2));
+        return new Location[]{pos1, pos2};
+    }
+
+    private String normalizeWorldName(String name) {
+        if ("game_world_template".equals(name)) {
+            return "game_world";
+        }
+        return name;
     }
 
     private void saveFile() {

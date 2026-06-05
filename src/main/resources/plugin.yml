@@ -8,5 +8,4 @@ description: pp
 commands:
   td:
       description: Main command for Tower Defense
-      permission: towerdefense.admin
       usage: /td [start/stop/status]

@@ -25,6 +25,17 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onCreatureSpawn(CreatureSpawnEvent event) {
+        org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason = event.getSpawnReason();
+        String worldName = event.getEntity().getWorld().getName();
+        
+        // Disable natural/unwanted mob spawning in game and lobby worlds
+        if (worldName.equals("game_world") || worldName.equals("lobby_world")) {
+            if (reason != org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
         Entity entity = event.getEntity();
         if (entity instanceof org.bukkit.entity.Ageable ageable) {
             ageable.setAdult();
@@ -319,11 +330,46 @@ public class MobListener implements Listener {
             if (state == com.pauljang.towerDefense.core.GameState.ACTIVE) {
                 plugin.getGameManager().giveStarterWeapons(player);
             }
+        } else if (state == com.pauljang.towerDefense.core.GameState.LOBBY) {
+            plugin.getGameManager().giveLobbyItems(player);
+            player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            player.setAllowFlight(true);
+        }
+        plugin.getGameManager().updateTabNames();
+    }
+
+    @EventHandler
+    public void onPlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
+        if (plugin.getGameManager().getCurrentState() == com.pauljang.towerDefense.core.GameState.ACTIVE) {
+            String arena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
+            java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+            if (waypoints != null && !waypoints.isEmpty()) {
+                event.setRespawnLocation(waypoints.get(0).clone().add(0, 1, 0));
+            } else {
+                org.bukkit.World gameWorld = org.bukkit.Bukkit.getWorld("game_world");
+                if (gameWorld != null) {
+                    event.setRespawnLocation(gameWorld.getSpawnLocation());
+                }
+            }
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (plugin.getGameManager().getCurrentState() == com.pauljang.towerDefense.core.GameState.ACTIVE) {
+                    plugin.getGameManager().giveStarterWeapons(player);
+                }
+            }, 1L);
         }
     }
 
     @EventHandler
     public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        // Block offhand slot interactions in player's own inventory only
+        if (event.getClickedInventory() instanceof org.bukkit.inventory.PlayerInventory) {
+            if (event.getSlot() == 40 || event.getClick() == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
         org.bukkit.inventory.ItemStack clickedItem = event.getCurrentItem();
         if (clickedItem != null && clickedItem.hasItemMeta()) {
             org.bukkit.inventory.meta.ItemMeta meta = clickedItem.getItemMeta();
@@ -338,6 +384,20 @@ public class MobListener implements Listener {
         }
 
         String title = event.getView().getTitle();
+        if (title.equals(org.bukkit.ChatColor.DARK_BLUE + "Open Games")) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+
+            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+
+            int slot = event.getRawSlot();
+            if (slot == 13) {
+                player.closeInventory();
+                plugin.getGameManager().toggleQueue(player);
+            }
+            return;
+        }
+
         if (title.equals(org.bukkit.ChatColor.DARK_RED + "TD Mob Spawner")) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
@@ -443,7 +503,10 @@ public class MobListener implements Listener {
                 player.playSound(player.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 0.8f, 1.2f);
                 player.sendMessage(org.bukkit.ChatColor.GREEN + "Spawning the queued mob wave!");
             } else if (slot == 42) { // Open upgrades screen
-                plugin.getGameManager().openUpgradesGUI(player);
+                player.closeInventory();
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    plugin.getGameManager().openUpgradesGUI(player);
+                }, 1L);
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 0.8f, 1.2f);
             }
         } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ")) {
@@ -464,6 +527,8 @@ public class MobListener implements Listener {
                 case 14 -> type = com.pauljang.towerDefense.towers.TowerType.REDSTONE;
                 case 15 -> type = com.pauljang.towerDefense.towers.TowerType.POISON;
                 case 16 -> type = com.pauljang.towerDefense.towers.TowerType.ICE;
+                case 19 -> type = com.pauljang.towerDefense.towers.TowerType.GOLEM;
+                case 20 -> type = com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST;
             }
 
             if (type != null) {
@@ -687,7 +752,10 @@ public class MobListener implements Listener {
                     }
                 }
                 case 45 -> { // Back to spawner GUI
-                    plugin.getMobManager().openMobSpawnerGUI(player);
+                    player.closeInventory();
+                    org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        plugin.getMobManager().openMobSpawnerGUI(player);
+                    }, 1L);
                     player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 0.8f, 0.8f);
                     return;
                 }
@@ -703,6 +771,80 @@ public class MobListener implements Listener {
             org.bukkit.Material type = event.getItem().getType();
             if (type == org.bukkit.Material.BOW || type == org.bukkit.Material.CROSSBOW || type.name().endsWith("_SWORD")) {
                 event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+    public void onCompassInteract(org.bukkit.event.player.PlayerInteractEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
+        org.bukkit.inventory.ItemStack item = event.getItem();
+        if (item == null) return;
+
+        // Compass click handling
+        if (item.getType() == org.bukkit.Material.COMPASS && item.hasItemMeta()) {
+            if (event.getHand() == org.bukkit.inventory.EquipmentSlot.OFF_HAND) return;
+            org.bukkit.event.block.Action action = event.getAction();
+            String worldName = player.getWorld().getName();
+            
+            // Lobby World Behavior: ONLY right-click to open games GUI (no teleport forward)
+            if (worldName.equals("lobby_world")) {
+                event.setCancelled(true);
+                if (action == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || action == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+                    plugin.getGameManager().openGamesGUI(player);
+                }
+                return;
+            }
+            
+            // Game World Behavior (before active match)
+            if (worldName.equals("game_world") && plugin.getGameManager().getCurrentState() != com.pauljang.towerDefense.core.GameState.ACTIVE) {
+                // RIGHT-CLICK: Teleport player forward 8 blocks horizontally
+                if (action == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || action == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+                    event.setCancelled(true);
+                    
+                    Location start = player.getLocation().add(0, 0.5, 0); // start slightly above feet to avoid ground collision
+                    double yawRad = Math.toRadians(player.getLocation().getYaw());
+                    double dx = -Math.sin(yawRad);
+                    double dz = Math.cos(yawRad);
+                    org.bukkit.util.Vector dir = new org.bukkit.util.Vector(dx, 0.0, dz).normalize();
+                    
+                    double distance = 8.0;
+                    org.bukkit.util.RayTraceResult rayTrace = player.getWorld().rayTraceBlocks(start, dir, distance, org.bukkit.FluidCollisionMode.NEVER, true);
+                    Location targetLoc;
+                    if (rayTrace != null && rayTrace.getHitBlock() != null) {
+                        targetLoc = rayTrace.getHitPosition().toLocation(player.getWorld()).subtract(dir.multiply(0.5));
+                    } else {
+                        targetLoc = start.clone().add(dir.multiply(distance));
+                    }
+                    targetLoc.subtract(0, 0.5, 0); // adjust back to feet level
+                    targetLoc.setYaw(player.getLocation().getYaw());
+                    targetLoc.setPitch(player.getLocation().getPitch());
+
+                    // Ensure target location is safe from clipping
+                    if (targetLoc.getBlock().getType().isSolid() || targetLoc.clone().add(0, 1, 0).getBlock().getType().isSolid()) {
+                        int attempts = 0;
+                        while ((targetLoc.getBlock().getType().isSolid() || targetLoc.clone().add(0, 1, 0).getBlock().getType().isSolid()) && attempts < 5) {
+                            targetLoc.add(0, 1, 0);
+                            attempts++;
+                        }
+                    }
+                    
+                    player.teleport(targetLoc);
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                    player.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, player.getLocation(), 15, 0.5, 0.5, 0.5, 0.1);
+                    return;
+                }
+                
+                // LEFT-CLICK: Return to lobby
+                if (action == org.bukkit.event.block.Action.LEFT_CLICK_AIR || action == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) {
+                    event.setCancelled(true);
+                    org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
+                    if (lobbyWorld != null) {
+                        player.teleport(lobbyWorld.getSpawnLocation());
+                        player.sendMessage(org.bukkit.ChatColor.YELLOW + "Returned to the lobby.");
+                    }
+                    return;
+                }
             }
         }
     }
@@ -793,6 +935,34 @@ public class MobListener implements Listener {
     @EventHandler
     public void onEntityDamageByEntity(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         org.bukkit.entity.Entity victim = event.getEntity();
+
+        // Prevent players from hurting each other (PvP prevention)
+        if (victim instanceof org.bukkit.entity.Player) {
+            org.bukkit.entity.Entity damager = event.getDamager();
+            org.bukkit.entity.Player attacker = null;
+
+            if (damager instanceof org.bukkit.entity.Player p) {
+                attacker = p;
+            } else if (damager instanceof org.bukkit.entity.Projectile proj) {
+                if (proj.getShooter() instanceof org.bukkit.entity.Player p) {
+                    attacker = p;
+                }
+            } else if (damager instanceof org.bukkit.entity.AreaEffectCloud cloud) {
+                if (cloud.getSource() instanceof org.bukkit.entity.Player p) {
+                    attacker = p;
+                }
+            } else if (damager instanceof org.bukkit.entity.ThrownPotion potion) {
+                if (potion.getShooter() instanceof org.bukkit.entity.Player p) {
+                    attacker = p;
+                }
+            }
+
+            if (attacker != null) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
         NamespacedKey tdKey = new NamespacedKey(plugin, "td_mob");
         
         // Only run checks for custom TD Mobs
@@ -842,11 +1012,165 @@ public class MobListener implements Listener {
     @EventHandler
     public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
         plugin.getGameManager().handlePlayerDisconnect(event.getPlayer());
+        org.bukkit.entity.Player player = event.getPlayer();
+        if (player.getWorld().getName().equals("game_world")) {
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                plugin.getGameManager().checkGameStopConditions();
+            }, 1L);
+        }
     }
 
     @EventHandler
     public void onPlayerKick(org.bukkit.event.player.PlayerKickEvent event) {
         plugin.getGameManager().handlePlayerDisconnect(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerInteractEntity(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
+        org.bukkit.entity.Entity clicked = event.getRightClicked();
+
+        // Check if we are in LOBBY state
+        if (plugin.getGameManager().getCurrentState() != com.pauljang.towerDefense.core.GameState.LOBBY) {
+            return;
+        }
+
+        // Check if player clicked a lobby NPC (e.g. Villager or ArmorStand)
+        if (clicked instanceof org.bukkit.entity.Villager || clicked instanceof org.bukkit.entity.ArmorStand) {
+            // Check if they are in the lobby world
+            if (clicked.getWorld().getName().equals("lobby_world")) {
+                event.setCancelled(true);
+                plugin.getGameManager().toggleQueue(player);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (event.getEntity() instanceof org.bukkit.entity.Player player) {
+            String worldName = player.getWorld().getName();
+            if (worldName.equals("lobby_world")) {
+                event.setCancelled(true);
+                if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.VOID) {
+                    org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
+                    if (lobbyWorld != null) {
+                        player.teleport(lobbyWorld.getSpawnLocation());
+                    }
+                }
+            } else if (worldName.equals("game_world")) {
+                event.setCancelled(true);
+                if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.VOID) {
+                    String arena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
+                    java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+                    if (waypoints != null && !waypoints.isEmpty()) {
+                        player.teleport(waypoints.get(0).clone().add(0, 1, 0));
+                    } else {
+                        player.teleport(player.getWorld().getSpawnLocation());
+                    }
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onFoodLevelChange(org.bukkit.event.entity.FoodLevelChangeEvent event) {
+        if (event.getEntity() instanceof org.bukkit.entity.Player player) {
+            if (player.getWorld().getName().equals("lobby_world")) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerRideGhast(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        org.bukkit.entity.Entity clicked = event.getRightClicked();
+        if (clicked instanceof org.bukkit.entity.Ghast ghast) {
+            for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
+                if (ghast.equals(tower.getSpawnedGhast())) {
+                    event.setCancelled(true);
+                    
+                    String playerArena = plugin.getGameManager().getPlayerArena(event.getPlayer().getUniqueId());
+                    String plotArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                    if (!playerArena.equals(plotArena)) {
+                        event.getPlayer().sendMessage(org.bukkit.ChatColor.RED + "You cannot ride the opponent's Ghast!");
+                        return;
+                    }
+                    
+                    ghast.addPassenger(event.getPlayer());
+                    event.getPlayer().sendMessage(org.bukkit.ChatColor.GREEN + "You are now riding the Happy Ghast! Look to steer. Left-click to shoot!");
+                    return;
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerLeftClick(org.bukkit.event.player.PlayerAnimationEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
+        if (player.getVehicle() instanceof org.bukkit.entity.Ghast ghast) {
+            for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
+                if (ghast.equals(tower.getSpawnedGhast())) {
+                    if (player.hasCooldown(org.bukkit.Material.COMPASS)) {
+                        return;
+                    }
+                    
+                    int cooldownTicks = 50 - (tower.getLevel() - 1) * 10; // Tier 1: 50, Tier 2: 40, Tier 3: 30
+                    player.setCooldown(org.bukkit.Material.COMPASS, cooldownTicks);
+                    
+                    org.bukkit.util.Vector dir = player.getEyeLocation().getDirection();
+                    org.bukkit.Location spawnLoc = ghast.getLocation().add(dir.clone().multiply(3.0));
+                    
+                    org.bukkit.entity.LargeFireball fireball = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.LargeFireball.class, fb -> {
+                        fb.setShooter(player);
+                        fb.setDirection(dir);
+                        fb.setIsIncendiary(false);
+                        fb.setYield(0.0f);
+                        fb.setMetadata("td_happy_fireball", new org.bukkit.metadata.FixedMetadataValue(plugin, tower));
+                    });
+                    
+                    ghast.getWorld().playSound(ghast.getLocation(), org.bukkit.Sound.ENTITY_GHAST_SHOOT, 1.0f, 1.0f);
+                    break;
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onWorldChange(org.bukkit.event.player.PlayerChangedWorldEvent event) {
+        org.bukkit.entity.Player player = event.getPlayer();
+        String fromWorld = event.getFrom().getName();
+        String toWorld = player.getWorld().getName();
+        
+        if (toWorld.equals("game_world")) {
+            if (plugin.getGameManager().getCurrentState() == com.pauljang.towerDefense.core.GameState.LOBBY) {
+                plugin.getGameManager().giveLobbyItems(player);
+                player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+                player.setAllowFlight(true);
+            }
+            plugin.getGameManager().checkGameStartConditions();
+        } else if (toWorld.equals("lobby_world")) {
+            plugin.getGameManager().giveLobbyItems(player);
+            player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            player.setAllowFlight(true);
+        }
+        
+        if (fromWorld.equals("game_world")) {
+            plugin.getGameManager().checkGameStopConditions();
+        }
+        plugin.getGameManager().updateTabNames();
+    }
+
+    @EventHandler
+    public void onPlayerSwapHandItems(org.bukkit.event.player.PlayerSwapHandItemsEvent event) {
+        event.setCancelled(true);
+    }
+
+    @EventHandler
+    public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
+        if (event.getInventorySlots().contains(40) || event.getRawSlots().contains(45)) {
+            event.setCancelled(true);
+        }
     }
 }
 

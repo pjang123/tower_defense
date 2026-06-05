@@ -5,7 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 
 public enum PresetMobType {
-    ZOMBIE(EntityType.ZOMBIE, 1.0, 20.0, 2.0, false, false, Material.ZOMBIE_SPAWN_EGG, ChatColor.GREEN, "Zombie", 15, 5, 15),
+    ZOMBIE(EntityType.ZOMBIE, 1.0, 20.0, 2.0, false, false, Material.ZOMBIE_SPAWN_EGG, ChatColor.GREEN, "Zombie", 15, 5, 25),
     SKELETON(EntityType.SKELETON, 1.1, 30.0, 2.0, false, false, Material.SKELETON_SPAWN_EGG, ChatColor.GRAY, "Skeleton", 45, 15, 60),
     SILVERFISH(EntityType.SILVERFISH, 1.6, 8.0, 0.0, false, false, Material.SILVERFISH_SPAWN_EGG, ChatColor.DARK_GRAY, "Silverfish", 80, 25, 120),
     SPIDER(EntityType.SPIDER, 1.4, 40.0, 2.0, false, false, Material.SPIDER_SPAWN_EGG, ChatColor.RED, "Spider", 100, 30, 150),
