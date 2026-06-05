@@ -31,6 +31,7 @@ public class GameManager {
     
     private final java.util.Map<java.util.UUID, Integer> playerGold = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> playerExp = new java.util.HashMap<>();
+    private final java.util.Map<java.util.UUID, java.util.Set<com.pauljang.towerDefense.entities.PresetMobType>> playerUnlockedMobs = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> goldGenLevels = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> swordLevels = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, Integer> bowLevels = new java.util.HashMap<>();
@@ -247,12 +248,12 @@ public class GameManager {
 
         if (hp1 <= 0 && hp2 > 0) {
             titleMsg = ChatColor.GREEN + "VICTORY";
-            subtitleMsg = (player2 != null ? player2.getName() : "Arena 2") + " wins the game!";
-            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + (player2 != null ? player2.getName() : "Arena 2") + " has won the duel!");
+            subtitleMsg = (player2 != null ? player2.getName() : "Red Team") + " wins the game!";
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + (player2 != null ? player2.getName() : "Red Team") + " has won the duel!");
         } else if (hp2 <= 0 && hp1 > 0) {
             titleMsg = ChatColor.GREEN + "VICTORY";
-            subtitleMsg = (player1 != null ? player1.getName() : "Arena 1") + " wins the game!";
-            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + (player1 != null ? player1.getName() : "Arena 1") + " has won the duel!");
+            subtitleMsg = (player1 != null ? player1.getName() : "Blue Team") + " wins the game!";
+            Bukkit.broadcastMessage(ChatColor.GOLD + "[Tower Defense] " + (player1 != null ? player1.getName() : "Blue Team") + " has won the duel!");
         } else if (hp1 <= 0 && hp2 <= 0) {
             titleMsg = ChatColor.RED + "DRAW";
             subtitleMsg = "Both castles were overrun!";
@@ -282,6 +283,7 @@ public class GameManager {
         // Reset individual player stats
         playerGold.clear();
         playerExp.clear();
+        playerUnlockedMobs.clear();
         goldGenLevels.clear();
         swordLevels.clear();
         bowLevels.clear();
@@ -593,8 +595,11 @@ public class GameManager {
         updateCastleHologram(arena);
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
-            player.sendActionBar(ChatColor.RED + "⚠ Arena " + arena + " Damaged! Health: " + updated + "/" + maxCastleHealth + " ⚠");
+            if (arena.equals(getPlayerArena(player.getUniqueId()))) {
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
+            }
+            String teamName = "1".equals(arena) ? "Blue Team" : "Red Team";
+            player.sendActionBar(ChatColor.RED + "⚠ " + teamName + " Damaged! Health: " + updated + "/" + maxCastleHealth + " ⚠");
         }
 
         if (updated <= 0) {
@@ -605,9 +610,9 @@ public class GameManager {
     public void showBossBar() {
         if (castleBossBar == null) {
             castleBossBar = Bukkit.createBossBar(
-                ChatColor.GREEN + "Arena 1: " + ChatColor.WHITE + arenaHealth.getOrDefault("1", maxCastleHealth) + " HP " +
+                ChatColor.BLUE + "Blue Team: " + ChatColor.WHITE + arenaHealth.getOrDefault("1", maxCastleHealth) + " HP " +
                 ChatColor.GRAY + "| " +
-                ChatColor.RED + "Arena 2: " + ChatColor.WHITE + arenaHealth.getOrDefault("2", maxCastleHealth) + " HP",
+                ChatColor.RED + "Red Team: " + ChatColor.WHITE + arenaHealth.getOrDefault("2", maxCastleHealth) + " HP",
                 BarColor.RED,
                 BarStyle.SOLID
             );
@@ -623,9 +628,9 @@ public class GameManager {
         int hp1 = arenaHealth.getOrDefault("1", maxCastleHealth);
         int hp2 = arenaHealth.getOrDefault("2", maxCastleHealth);
         castleBossBar.setTitle(
-            ChatColor.GREEN + "Arena 1: " + ChatColor.WHITE + hp1 + " HP " +
+            ChatColor.BLUE + "Blue Team: " + ChatColor.WHITE + hp1 + " HP " +
             ChatColor.GRAY + "| " +
-            ChatColor.RED + "Arena 2: " + ChatColor.WHITE + hp2 + " HP"
+            ChatColor.RED + "Red Team: " + ChatColor.WHITE + hp2 + " HP"
         );
         double progress1 = (double) hp1 / maxCastleHealth;
         double progress2 = (double) hp2 / maxCastleHealth;
@@ -1017,6 +1022,27 @@ public class GameManager {
         }
     }
 
+    public boolean removeExp(java.util.UUID uuid, int amount) {
+        int current = getExp(uuid);
+        if (current >= amount) {
+            playerExp.put(uuid, current - amount);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isMobUnlocked(java.util.UUID uuid, com.pauljang.towerDefense.entities.PresetMobType type) {
+        if (type == com.pauljang.towerDefense.entities.PresetMobType.ZOMBIE) {
+            return true; // Zombie is always unlocked
+        }
+        java.util.Set<com.pauljang.towerDefense.entities.PresetMobType> unlocked = playerUnlockedMobs.get(uuid);
+        return unlocked != null && unlocked.contains(type);
+    }
+
+    public void unlockMob(java.util.UUID uuid, com.pauljang.towerDefense.entities.PresetMobType type) {
+        playerUnlockedMobs.computeIfAbsent(uuid, k -> new java.util.HashSet<>()).add(type);
+    }
+
     // --- Scoreboard HUD ---
 
     public void updateScoreboard(Player player) {
@@ -1048,8 +1074,8 @@ public class GameManager {
         long sec = elapsedSeconds % 60;
         lines.add(ChatColor.YELLOW + "Time: " + ChatColor.WHITE + String.format("%02d:%02d", min, sec));
         
-        lines.add(ChatColor.GREEN + "Arena 1 Health: " + ChatColor.WHITE + arenaHealth.getOrDefault("1", maxCastleHealth) + "/" + maxCastleHealth);
-        lines.add(ChatColor.RED + "Arena 2 Health: " + ChatColor.WHITE + arenaHealth.getOrDefault("2", maxCastleHealth) + "/" + maxCastleHealth);
+        lines.add(ChatColor.BLUE + "Blue Team Health: " + ChatColor.WHITE + arenaHealth.getOrDefault("1", maxCastleHealth) + "/" + maxCastleHealth);
+        lines.add(ChatColor.RED + "Red Team Health: " + ChatColor.WHITE + arenaHealth.getOrDefault("2", maxCastleHealth) + "/" + maxCastleHealth);
         lines.add(" ");
         lines.add(ChatColor.GOLD + "Your Gold: " + ChatColor.YELLOW + "$" + getGold(player.getUniqueId()));
         lines.add(ChatColor.GREEN + "Your EXP: " + ChatColor.LIGHT_PURPLE + getExp(player.getUniqueId()) + " XP");
@@ -1079,9 +1105,9 @@ public class GameManager {
                     if (matchQueue.contains(p.getUniqueId())) {
                         String arena = getPlayerArena(p.getUniqueId());
                         if ("1".equals(arena)) {
-                            prefix = ChatColor.GREEN + "[Arena 1] ";
+                            prefix = ChatColor.BLUE + "[Blue Team] ";
                         } else if ("2".equals(arena)) {
-                            prefix = ChatColor.RED + "[Arena 2] ";
+                            prefix = ChatColor.RED + "[Red Team] ";
                         } else {
                             prefix = ChatColor.GRAY + "[Spectator] ";
                         }
@@ -1092,9 +1118,9 @@ public class GameManager {
                     if (matchQueue.contains(p.getUniqueId())) {
                         String arena = getPlayerArena(p.getUniqueId());
                         if ("1".equals(arena)) {
-                            prefix = ChatColor.GREEN + "[Arena 1] ";
+                            prefix = ChatColor.BLUE + "[Blue Team] ";
                         } else if ("2".equals(arena)) {
-                            prefix = ChatColor.RED + "[Arena 2] ";
+                            prefix = ChatColor.RED + "[Red Team] ";
                         } else {
                             prefix = ChatColor.YELLOW + "[Waiting] ";
                         }
@@ -1130,10 +1156,6 @@ public class GameManager {
         };
     }
 
-    public void removeExp(java.util.UUID uuid, int amount) {
-        int current = getExp(uuid);
-        playerExp.put(uuid, Math.max(0, current - amount));
-    }
 
     public int getGoldGenLevel(java.util.UUID uuid) {
         return goldGenLevels.getOrDefault(uuid, 1);
@@ -1467,12 +1489,12 @@ public class GameManager {
     public void startLobbyQueueCountdown() {
         if (lobbyQueueTask != null) return;
         
-        lobbyQueueSecondsLeft = 30;
+        lobbyQueueSecondsLeft = 10;
         
         for (java.util.UUID uuid : matchQueue) {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
-                p.sendMessage(ChatColor.GREEN + "Match found! Transporting to game in 30 seconds.");
+                p.sendMessage(ChatColor.GREEN + "Match found! Transporting to game in 10 seconds.");
                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
             }
         }

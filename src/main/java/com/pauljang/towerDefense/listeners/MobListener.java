@@ -314,12 +314,31 @@ public class MobListener implements Listener {
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             event.setCancelled(true);
             event.setTarget(null);
+            return;
+        }
+
+        // Prevent Tower Ghasts and Golems from targeting players
+        if (entity instanceof org.bukkit.entity.HappyGhast || entity instanceof org.bukkit.entity.Ghast || entity instanceof org.bukkit.entity.IronGolem) {
+            for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
+                if (entity.equals(tower.getSpawnedGhast()) || entity.equals(tower.getSpawnedGolem())) {
+                    if (event.getTarget() instanceof org.bukkit.entity.Player) {
+                        event.setCancelled(true);
+                        event.setTarget(null);
+                        return;
+                    }
+                }
+            }
         }
     }
 
     @EventHandler
     public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
         org.bukkit.entity.Player player = event.getPlayer();
+        
+        org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
+        org.bukkit.Location lobbySpawn = lobbyWorld != null ? lobbyWorld.getSpawnLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
+        player.teleport(lobbySpawn);
+
         if (plugin.getGameManager().getBossBar() != null) {
             plugin.getGameManager().getBossBar().addPlayer(player);
         }
@@ -357,11 +376,31 @@ public class MobListener implements Listener {
                     plugin.getGameManager().giveStarterWeapons(player);
                 }
             }, 1L);
+        } else {
+            org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
+            org.bukkit.Location lobbySpawn = lobbyWorld != null ? lobbyWorld.getSpawnLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
+            event.setRespawnLocation(lobbySpawn);
         }
     }
 
     @EventHandler
     public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (isLobbyCompass(event.getCurrentItem()) || isLobbyCompass(event.getCursor())) {
+            event.setCancelled(true);
+            return;
+        }
+
+        if (event.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY) {
+            int hotbarSlot = event.getHotbarButton();
+            if (hotbarSlot >= 0 && hotbarSlot < 9) {
+                org.bukkit.inventory.ItemStack hotbarItem = event.getWhoClicked().getInventory().getItem(hotbarSlot);
+                if (isLobbyCompass(hotbarItem)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+
         // Block offhand slot interactions in player's own inventory only
         if (event.getClickedInventory() instanceof org.bukkit.inventory.PlayerInventory) {
             if (event.getSlot() == 40 || event.getClick() == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND) {
@@ -421,6 +460,22 @@ public class MobListener implements Listener {
             }
 
             if (presetType != null) {
+                boolean unlocked = plugin.getGameManager().isMobUnlocked(player.getUniqueId(), presetType);
+                if (!unlocked) {
+                    double health = plugin.getConfig().getDouble("mobs." + presetType.name().toLowerCase() + ".health", presetType.getHealth());
+                    int expCost = (int) (health * 5.0);
+                    if (plugin.getGameManager().removeExp(player.getUniqueId(), expCost)) {
+                        plugin.getGameManager().unlockMob(player.getUniqueId(), presetType);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "🎉 Successfully unlocked " + presetType.getDisplayName() + "!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough EXP to unlock! Requires " + expCost + " EXP.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                    plugin.getMobManager().openMobSpawnerGUI(player);
+                    return;
+                }
+
                 org.bukkit.event.inventory.ClickType clickType = event.getClick();
                 int cost = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
                 
@@ -532,6 +587,23 @@ public class MobListener implements Listener {
             }
 
             if (type != null) {
+                org.bukkit.Location[] bounds = plugin.getPlotConfigManager().getPlotBounds(plotId);
+                int plotSize = 3;
+                if (bounds != null) {
+                    int plotWidth = Math.abs(bounds[1].getBlockX() - bounds[0].getBlockX()) + 1;
+                    int plotLength = Math.abs(bounds[1].getBlockZ() - bounds[0].getBlockZ()) + 1;
+                    plotSize = Math.max(plotWidth, plotLength);
+                }
+
+                boolean is5x5Tower = (type == com.pauljang.towerDefense.towers.TowerType.GOLEM || 
+                                     type == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST);
+                if (is5x5Tower && plotSize < 5) {
+                    player.sendMessage(org.bukkit.ChatColor.RED + "You cannot place a 5x5 tower (" + type.getDisplayName() + ") on a 3x3 plot!");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    player.closeInventory();
+                    return;
+                }
+
                 String nameKey = type.name().toLowerCase() + "_1";
                 int cost = plugin.getConfig().getInt("towers." + nameKey + ".cost", type.getCost());
                 if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
@@ -920,6 +992,10 @@ public class MobListener implements Listener {
     @EventHandler
     public void onPlayerDropItem(org.bukkit.event.player.PlayerDropItemEvent event) {
         org.bukkit.inventory.ItemStack item = event.getItemDrop().getItemStack();
+        if (isLobbyCompass(item)) {
+            event.setCancelled(true);
+            return;
+        }
         if (item.hasItemMeta()) {
             org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
             if (meta != null && meta.hasDisplayName()) {
@@ -1075,17 +1151,15 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onFoodLevelChange(org.bukkit.event.entity.FoodLevelChangeEvent event) {
-        if (event.getEntity() instanceof org.bukkit.entity.Player player) {
-            if (player.getWorld().getName().equals("lobby_world")) {
-                event.setCancelled(true);
-            }
+        if (event.getEntity() instanceof org.bukkit.entity.Player) {
+            event.setCancelled(true);
         }
     }
 
     @EventHandler
     public void onPlayerRideGhast(org.bukkit.event.player.PlayerInteractEntityEvent event) {
         org.bukkit.entity.Entity clicked = event.getRightClicked();
-        if (clicked instanceof org.bukkit.entity.Ghast ghast) {
+        if (clicked instanceof org.bukkit.entity.HappyGhast ghast) {
             for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
                 if (ghast.equals(tower.getSpawnedGhast())) {
                     event.setCancelled(true);
@@ -1098,6 +1172,7 @@ public class MobListener implements Listener {
                     }
                     
                     ghast.addPassenger(event.getPlayer());
+                    ghast.setAI(true);
                     event.getPlayer().sendMessage(org.bukkit.ChatColor.GREEN + "You are now riding the Happy Ghast! Look to steer. Left-click to shoot!");
                     return;
                 }
@@ -1108,7 +1183,7 @@ public class MobListener implements Listener {
     @EventHandler
     public void onPlayerLeftClick(org.bukkit.event.player.PlayerAnimationEvent event) {
         org.bukkit.entity.Player player = event.getPlayer();
-        if (player.getVehicle() instanceof org.bukkit.entity.Ghast ghast) {
+        if (player.getVehicle() instanceof org.bukkit.entity.HappyGhast ghast) {
             for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
                 if (ghast.equals(tower.getSpawnedGhast())) {
                     if (player.hasCooldown(org.bukkit.Material.COMPASS)) {
@@ -1171,6 +1246,65 @@ public class MobListener implements Listener {
         if (event.getInventorySlots().contains(40) || event.getRawSlots().contains(45)) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler
+    public void onProjectileHit(org.bukkit.event.entity.ProjectileHitEvent event) {
+        if (event.getEntity() instanceof org.bukkit.entity.LargeFireball fireball) {
+            if (fireball.hasMetadata("td_happy_fireball")) {
+                if (event.getHitEntity() instanceof org.bukkit.entity.Player) {
+                    event.setCancelled(true);
+                    return;
+                }
+                java.util.List<org.bukkit.metadata.MetadataValue> metadata = fireball.getMetadata("td_happy_fireball");
+                if (!metadata.isEmpty()) {
+                    org.bukkit.metadata.MetadataValue val = metadata.get(0);
+                    if (val.value() instanceof com.pauljang.towerDefense.towers.Tower tower) {
+                        Location impactLoc = fireball.getLocation();
+                        String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                        double damage = tower.getDamage();
+                        
+                        // Spawn custom explosion effect (non-destructive)
+                        impactLoc.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION_EMITTER, impactLoc, 1);
+                        impactLoc.getWorld().playSound(impactLoc, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+                        
+                        // Damage mobs in 5.0 block radius
+                        java.util.List<org.bukkit.entity.Mob> targets = plugin.getTowerManager().getMobsInRadius(impactLoc, 5.0, towerArena);
+                        for (org.bukkit.entity.Mob mob : targets) {
+                            mob.damage(damage);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onEntityDismount(org.bukkit.event.entity.EntityDismountEvent event) {
+        if (event.getDismounted() instanceof org.bukkit.entity.HappyGhast ghast) {
+            ghast.setAI(false);
+            ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+        }
+    }
+
+    @EventHandler
+    public void onBlockFade(org.bukkit.event.block.BlockFadeEvent event) {
+        org.bukkit.Material type = event.getBlock().getType();
+        if (type == org.bukkit.Material.ICE || type == org.bukkit.Material.FROSTED_ICE || type == org.bukkit.Material.SNOW) {
+            event.setCancelled(true);
+        }
+    }
+
+    private boolean isLobbyCompass(org.bukkit.inventory.ItemStack item) {
+        if (item == null || item.getType() != org.bukkit.Material.COMPASS || !item.hasItemMeta()) {
+            return false;
+        }
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()) {
+            return false;
+        }
+        String displayName = org.bukkit.ChatColor.stripColor(meta.getDisplayName());
+        return displayName.equals("Game Selector") || displayName.equals("Return to Lobby");
     }
 }
 

@@ -16,7 +16,7 @@ public class Tower {
     private TargetingMode targetingMode = TargetingMode.FIRST;
     private long disabledUntil = 0;
     private org.bukkit.entity.LivingEntity spawnedGolem = null;
-    private org.bukkit.entity.Ghast spawnedGhast = null;
+    private org.bukkit.entity.HappyGhast spawnedGhast = null;
     private boolean autopilot = true;
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
@@ -103,8 +103,8 @@ public class Tower {
     public org.bukkit.entity.LivingEntity getSpawnedGolem() { return spawnedGolem; }
     public void setSpawnedGolem(org.bukkit.entity.LivingEntity spawnedGolem) { this.spawnedGolem = spawnedGolem; }
 
-    public org.bukkit.entity.Ghast getSpawnedGhast() { return spawnedGhast; }
-    public void setSpawnedGhast(org.bukkit.entity.Ghast spawnedGhast) { this.spawnedGhast = spawnedGhast; }
+    public org.bukkit.entity.HappyGhast getSpawnedGhast() { return spawnedGhast; }
+    public void setSpawnedGhast(org.bukkit.entity.HappyGhast spawnedGhast) { this.spawnedGhast = spawnedGhast; }
 
     public boolean isAutopilot() { return autopilot; }
     public void setAutopilot(boolean autopilot) { this.autopilot = autopilot; }

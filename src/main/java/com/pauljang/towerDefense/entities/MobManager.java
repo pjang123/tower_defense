@@ -120,9 +120,10 @@ public class MobManager {
             hoglin.setImmuneToZombification(true);
         }
 
-        // Set size if it's a Slime/Magma Cube (start at size 4, the largest)
+        // Set size if it's a Slime/Magma Cube (start at size 4, the largest) and disable AI to prevent jumping
         if (entity instanceof org.bukkit.entity.Slime slime) {
             slime.setSize(4);
+            slime.setAI(false);
         }
 
         // Mark slow and fire immunities if requested or SLOW_SHIELD is active on the arena
@@ -318,7 +319,11 @@ public class MobManager {
                         mob.setLastAttackTick(currentTick);
                         plugin.getGameManager().damageCastle(mobArena, 1);
                         mob.getEntity().swingMainHand();
-                        mob.getEntity().getWorld().playSound(mob.getEntity().getLocation(), org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1.0f, 1.0f);
+                        for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                            if (mobArena.equals(plugin.getGameManager().getPlayerArena(p.getUniqueId()))) {
+                                p.playSound(mob.getEntity().getLocation(), org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1.0f, 1.0f);
+                            }
+                        }
                     }
                 }
             }
@@ -419,12 +424,16 @@ public class MobManager {
 
                 // Play custom swing animation & strike sound/particles at the mob's position
                 mob.getEntity().swingMainHand();
-                mob.getEntity().getWorld().playSound(
-                    mob.getEntity().getLocation(),
-                    org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR,
-                    1.0f,
-                    1.0f
-                );
+                for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                    if (mobArena.equals(plugin.getGameManager().getPlayerArena(p.getUniqueId()))) {
+                        p.playSound(
+                            mob.getEntity().getLocation(),
+                            org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR,
+                            1.0f,
+                            1.0f
+                        );
+                    }
+                }
                 mob.getEntity().getWorld().spawnParticle(
                     org.bukkit.Particle.SWEEP_ATTACK,
                     mob.getEntity().getEyeLocation().add(mob.getEntity().getLocation().getDirection().multiply(0.8)),
@@ -453,6 +462,9 @@ public class MobManager {
             org.bukkit.attribute.AttributeInstance speedAttr = mob.getEntity().getAttribute(Attribute.MOVEMENT_SPEED);
             if (speedAttr != null) {
                 speed = speedAttr.getValue();
+            }
+            if (mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.MAGMA_CUBE) {
+                speed = 0.05; // Make their movement speed slow
             }
 
             if (isFreezeActive && !isSlowImmune) {
@@ -505,6 +517,8 @@ public class MobManager {
                 mob.getEntity().getPathfinder().moveTo(targetLoc, pathfinderSpeed);
                 mob.setLastPathfindWaypointId(currentWpId);
             }
+
+
         }
 
         // Check if they are close enough to the waypoint to target the next one
@@ -619,20 +633,19 @@ public class MobManager {
                 gui.setItem(i, border);
             }
         }
-
-        // Place spawn items (slots 10-16 for Row 1, and slots 20-23 for Row 2)
-        gui.setItem(10, createMobGUIItem(PresetMobType.ZOMBIE, queue.getOrDefault(PresetMobType.ZOMBIE, 0)));
-        gui.setItem(11, createMobGUIItem(PresetMobType.SKELETON, queue.getOrDefault(PresetMobType.SKELETON, 0)));
-        gui.setItem(12, createMobGUIItem(PresetMobType.SILVERFISH, queue.getOrDefault(PresetMobType.SILVERFISH, 0)));
-        gui.setItem(13, createMobGUIItem(PresetMobType.SPIDER, queue.getOrDefault(PresetMobType.SPIDER, 0)));
-        gui.setItem(14, createMobGUIItem(PresetMobType.PIGMAN, queue.getOrDefault(PresetMobType.PIGMAN, 0)));
-        gui.setItem(15, createMobGUIItem(PresetMobType.SLIME, queue.getOrDefault(PresetMobType.SLIME, 0)));
-        gui.setItem(16, createMobGUIItem(PresetMobType.CREEPER, queue.getOrDefault(PresetMobType.CREEPER, 0)));
-
-        gui.setItem(20, createMobGUIItem(PresetMobType.BLAZE, queue.getOrDefault(PresetMobType.BLAZE, 0)));
-        gui.setItem(21, createMobGUIItem(PresetMobType.MAGMA_CUBE, queue.getOrDefault(PresetMobType.MAGMA_CUBE, 0)));
-        gui.setItem(22, createMobGUIItem(PresetMobType.GHAST, queue.getOrDefault(PresetMobType.GHAST, 0)));
-        gui.setItem(23, createMobGUIItem(PresetMobType.GIANT, queue.getOrDefault(PresetMobType.GIANT, 0)));
+         // Place spawn items (slots 10-16 for Row 1, and slots 20-23 for Row 2)
+        gui.setItem(10, createMobGUIItem(player, PresetMobType.ZOMBIE, queue.getOrDefault(PresetMobType.ZOMBIE, 0)));
+        gui.setItem(11, createMobGUIItem(player, PresetMobType.SKELETON, queue.getOrDefault(PresetMobType.SKELETON, 0)));
+        gui.setItem(12, createMobGUIItem(player, PresetMobType.SILVERFISH, queue.getOrDefault(PresetMobType.SILVERFISH, 0)));
+        gui.setItem(13, createMobGUIItem(player, PresetMobType.SPIDER, queue.getOrDefault(PresetMobType.SPIDER, 0)));
+        gui.setItem(14, createMobGUIItem(player, PresetMobType.PIGMAN, queue.getOrDefault(PresetMobType.PIGMAN, 0)));
+        gui.setItem(15, createMobGUIItem(player, PresetMobType.SLIME, queue.getOrDefault(PresetMobType.SLIME, 0)));
+        gui.setItem(16, createMobGUIItem(player, PresetMobType.CREEPER, queue.getOrDefault(PresetMobType.CREEPER, 0)));
+ 
+        gui.setItem(20, createMobGUIItem(player, PresetMobType.BLAZE, queue.getOrDefault(PresetMobType.BLAZE, 0)));
+        gui.setItem(21, createMobGUIItem(player, PresetMobType.MAGMA_CUBE, queue.getOrDefault(PresetMobType.MAGMA_CUBE, 0)));
+        gui.setItem(22, createMobGUIItem(player, PresetMobType.GHAST, queue.getOrDefault(PresetMobType.GHAST, 0)));
+        gui.setItem(23, createMobGUIItem(player, PresetMobType.GIANT, queue.getOrDefault(PresetMobType.GIANT, 0)));
 
         // Place control buttons (slots 38, 40, and 42)
         int totalCost = 0;
@@ -647,12 +660,18 @@ public class MobManager {
         player.openInventory(gui);
     }
 
-    private org.bukkit.inventory.ItemStack createMobGUIItem(PresetMobType preset, int count) {
+    private org.bukkit.inventory.ItemStack createMobGUIItem(Player player, PresetMobType preset, int count) {
         int amount = Math.max(1, count);
         org.bukkit.inventory.ItemStack item = new org.bukkit.inventory.ItemStack(preset.getMaterial(), amount);
         org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(preset.getColor() + preset.getDisplayName());
+            boolean unlocked = plugin.getGameManager().isMobUnlocked(player.getUniqueId(), preset);
+            
+            if (!unlocked) {
+                meta.setDisplayName(ChatColor.RED + "❌ " + preset.getDisplayName() + " (LOCKED)");
+            } else {
+                meta.setDisplayName(preset.getColor() + preset.getDisplayName());
+            }
             
             List<String> lore = new ArrayList<>();
             String nameKey = preset.name().toLowerCase();
@@ -662,13 +681,24 @@ public class MobManager {
             double armor = plugin.getConfig().getDouble("mobs." + nameKey + ".armor", preset.getArmor());
             boolean slowImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".slow-immune", preset.isSlowImmune());
             boolean fireImmune = plugin.getConfig().getBoolean("mobs." + nameKey + ".fire-immune", preset.isFireImmune());
-
-            lore.add(ChatColor.GREEN + "Left-Click" + ChatColor.GRAY + " to add +1 to queue.");
-            lore.add(ChatColor.GREEN + "Shift + Left-Click" + ChatColor.GRAY + " to add +10 to queue.");
-            lore.add(ChatColor.RED + "Right-Click" + ChatColor.GRAY + " to remove -1 from queue.");
-            lore.add(ChatColor.RED + "Shift + Right-Click" + ChatColor.GRAY + " to remove -10 from queue.");
-            lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + spawnCost + " Gold");
-            lore.add(ChatColor.GOLD + "Queued Count: " + ChatColor.YELLOW + count);
+            int xpReward = plugin.getConfig().getInt("mobs." + nameKey + ".xp-reward", preset.getXpReward());
+ 
+            if (!unlocked) {
+                int expUnlockCost = (int) (health * 5.0);
+                lore.add(ChatColor.RED + "LOCKED! Click to unlock.");
+                lore.add(ChatColor.GOLD + "Unlock Cost: " + ChatColor.LIGHT_PURPLE + expUnlockCost + " EXP");
+                lore.add("");
+            } else {
+                lore.add(ChatColor.GREEN + "Left-Click" + ChatColor.GRAY + " to add +1 to queue.");
+                lore.add(ChatColor.GREEN + "Shift + Left-Click" + ChatColor.GRAY + " to add +10 to queue.");
+                lore.add(ChatColor.RED + "Right-Click" + ChatColor.GRAY + " to remove -1 from queue.");
+                lore.add(ChatColor.RED + "Shift + Right-Click" + ChatColor.GRAY + " to remove -10 from queue.");
+                lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + spawnCost + " Gold");
+                lore.add(ChatColor.GOLD + "Queued Count: " + ChatColor.YELLOW + count);
+                lore.add("");
+            }
+            
+            lore.add(ChatColor.GOLD + "XP Payout: " + ChatColor.LIGHT_PURPLE + xpReward + " XP");
             lore.add("");
             
             lore.add(ChatColor.DARK_GRAY + "Stats:");
@@ -677,7 +707,7 @@ public class MobManager {
             lore.add(ChatColor.DARK_GRAY + " - Armor: " + armor);
             if (slowImmune) lore.add(ChatColor.AQUA + " * Immune to Slow");
             if (fireImmune) lore.add(ChatColor.RED + " * Immune to Fire");
-
+ 
             meta.setLore(lore);
             item.setItemMeta(meta);
         }

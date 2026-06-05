@@ -187,7 +187,7 @@ public class TowerManager {
             double height = tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 4.0;
             Location spawnLoc = center.clone().add(0, height + 1.0, 0);
             
-            org.bukkit.entity.Ghast ghast = center.getWorld().spawn(spawnLoc, org.bukkit.entity.Ghast.class, gh -> {
+            org.bukkit.entity.HappyGhast ghast = center.getWorld().spawn(spawnLoc, org.bukkit.entity.HappyGhast.class, gh -> {
                 gh.setAI(false);
                 gh.setInvulnerable(true);
                 gh.setGravity(false);
@@ -431,37 +431,21 @@ public class TowerManager {
                         continue;
                     }
 
-                    // If Happy Ghast is ridden, handle steering and skip autopilot attack
+                    // If Happy Ghast is ridden, handle boundaries and skip autopilot attack
                     if (tower.getType() == TowerType.HAPPY_GHAST && tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
                         java.util.List<org.bukkit.entity.Entity> passengers = tower.getSpawnedGhast().getPassengers();
                         if (!passengers.isEmpty()) {
                             tower.setAutopilot(false);
                             org.bukkit.entity.Entity passenger = passengers.get(0);
                             if (passenger instanceof Player rider) {
-                                double speed = 0.3 + (tower.getLevel() - 1) * 0.15;
-                                org.bukkit.util.Vector dir = rider.getLocation().getDirection();
-                                
                                 Location centerLoc = tower.getCenterLocation();
                                 Location ghastLoc = tower.getSpawnedGhast().getLocation();
                                 if (ghastLoc.distanceSquared(centerLoc) > 25.0 * 25.0) {
                                     org.bukkit.util.Vector pushBack = centerLoc.toVector().subtract(ghastLoc.toVector()).normalize().multiply(0.5);
-                                    Location target = ghastLoc.clone().add(pushBack);
-                                    target.setYaw(rider.getLocation().getYaw());
-                                    target.setPitch(rider.getLocation().getPitch());
-                                    tower.getSpawnedGhast().teleport(target, io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+                                    tower.getSpawnedGhast().setVelocity(pushBack);
                                     if (tick % 20 == 0) {
                                         rider.sendMessage(org.bukkit.ChatColor.RED + "⚠ You are reaching the edge of the arena boundary! Pushing back.");
                                     }
-                                } else {
-                                    Location target = ghastLoc.clone().add(dir.multiply(speed));
-                                    if (target.getY() < centerLoc.getY() + 2.0) {
-                                        target.setY(centerLoc.getY() + 2.0);
-                                    } else if (target.getY() > centerLoc.getY() + 18.0) {
-                                        target.setY(centerLoc.getY() + 18.0);
-                                    }
-                                    target.setYaw(rider.getLocation().getYaw());
-                                    target.setPitch(rider.getLocation().getPitch());
-                                    tower.getSpawnedGhast().teleport(target, io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
                                 }
                             }
                             continue; // Skip automated attack
@@ -619,6 +603,12 @@ public class TowerManager {
 
             double distSq = mob.getLocation().distanceSquared(towerLoc);
             if (distSq <= rangeSquared) {
+                if (tower.getType() == TowerType.GOLEM) {
+                    org.bukkit.entity.LivingEntity golem = tower.getSpawnedGolem();
+                    if (golem == null || !golem.isValid() || mob.getLocation().distanceSquared(golem.getLocation()) > 3.0 * 3.0) {
+                        continue;
+                    }
+                }
                 candidates.add(tdMob);
             }
         }
@@ -935,7 +925,7 @@ public class TowerManager {
             }
             case HAPPY_GHAST -> {
                 if (tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
-                    org.bukkit.entity.Ghast ghast = tower.getSpawnedGhast();
+                    org.bukkit.entity.HappyGhast ghast = tower.getSpawnedGhast();
                     
                     Location ghastLoc = ghast.getLocation();
                     org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(ghastLoc.toVector()).normalize();

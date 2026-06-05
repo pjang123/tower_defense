@@ -163,15 +163,25 @@ public class WandListener implements Listener {
 
     private TDWaypoint findWaypointAt(String arena, Location blockLoc) {
         Map<String, TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        TDWaypoint closest = null;
+        double closestDistSq = Double.MAX_VALUE;
+        
         for (TDWaypoint wp : graph.values()) {
             Location wpLoc = wp.getLocation();
-            if (wpLoc.getBlockX() == blockLoc.getBlockX() &&
-                wpLoc.getBlockY() == blockLoc.getBlockY() + 1 &&
-                wpLoc.getBlockZ() == blockLoc.getBlockZ()) {
-                return wp;
+            if (!wpLoc.getWorld().equals(blockLoc.getWorld())) continue;
+            
+            // Waypoints are placed at blockLoc + 0.5, 1.0, 0.5.
+            // Check if this waypoint is close (within 1.5 blocks radius) to the clicked block's center at Y+1
+            Location targetLoc = blockLoc.clone().add(0.5, 1.0, 0.5);
+            double distSq = wpLoc.distanceSquared(targetLoc);
+            if (distSq < 1.5 * 1.5) {
+                if (distSq < closestDistSq) {
+                    closestDistSq = distSq;
+                    closest = wp;
+                }
             }
         }
-        return null;
+        return closest;
     }
 
     @EventHandler
