@@ -1,5 +1,11 @@
 package com.pauljang.towerDefense.core;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.Collections;
+
+
 import com.pauljang.towerDefense.TowerDefense;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -13,6 +19,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.ArmorStand;
 
 public class GameManager {
+    // Map of player UUID -> (upgrade chain -> tier)
+    private final Map<UUID, Map<String, Integer>> playerMobTiers = new HashMap<>();
+    // Map of player UUID -> (upgrade chain -> set of unlocked tiers); tier 1 is always unlocked implicitly
+    private final java.util.Map<UUID, Map<String, java.util.Set<Integer>>> playerUnlockedTiers = new java.util.HashMap<>();
 
     private final TowerDefense plugin;
     private GameState currentState = null;
@@ -39,6 +49,39 @@ public class GameManager {
     private final java.util.List<java.util.UUID> matchQueue = new java.util.ArrayList<>();
     private org.bukkit.scheduler.BukkitTask lobbyQueueTask = null;
     private int lobbyQueueSecondsLeft = 0;
+
+    /**
+     * Returns the current tier for a given upgrade chain for the player.
+     * If no tier is stored, defaults to 1.
+     */
+    public int getMobTier(UUID playerId, String upgradeChain) {
+        return playerMobTiers
+                .getOrDefault(playerId, Collections.emptyMap())
+                .getOrDefault(upgradeChain, 1);
+    }
+
+    /**
+     * Sets the tier for a given upgrade chain for the player.
+     */
+    public void setMobTier(UUID playerId, String upgradeChain, int tier) {
+        playerMobTiers.computeIfAbsent(playerId, k -> new HashMap<>()).put(upgradeChain, tier);
+    }
+
+    /** Tier 1 is always unlocked; higher tiers require explicit unlock via XP. */
+    public boolean isTierUnlocked(UUID playerId, String chain, int tier) {
+        if (tier <= 1) return true;
+        return playerUnlockedTiers
+                .getOrDefault(playerId, Collections.emptyMap())
+                .getOrDefault(chain.toLowerCase(), Collections.emptySet())
+                .contains(tier);
+    }
+
+    public void unlockTier(UUID playerId, String chain, int tier) {
+        playerUnlockedTiers
+                .computeIfAbsent(playerId, k -> new HashMap<>())
+                .computeIfAbsent(chain.toLowerCase(), k -> new java.util.HashSet<>())
+                .add(tier);
+    }
 
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
@@ -334,7 +377,6 @@ public class GameManager {
         // Determine the winning arena
         String winningArena = "1".equals(quittingArena) ? "2" : "1";
 
-        // Find the remaining online player in the winning arena
         Player winner = null;
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (!p.getUniqueId().equals(player.getUniqueId())) {

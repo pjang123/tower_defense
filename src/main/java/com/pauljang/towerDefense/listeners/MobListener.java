@@ -440,129 +440,128 @@ public class MobListener implements Listener {
         if (title.equals(org.bukkit.ChatColor.DARK_RED + "TD Mob Spawner")) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
-
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             int slot = event.getRawSlot();
-            com.pauljang.towerDefense.entities.PresetMobType presetType = null;
-            switch (slot) {
-                case 10 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.ZOMBIE;
-                case 11 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SKELETON;
-                case 12 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SILVERFISH;
-                case 13 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SPIDER;
-                case 14 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.PIGMAN;
-                case 15 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SLIME;
-                case 16 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.CREEPER;
-                case 20 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.BLAZE;
-                case 21 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.MAGMA_CUBE;
-                case 22 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GHAST;
-                case 23 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GIANT;
-            }
+            String chainName = plugin.getMobManager().getChainForSlot(slot);
 
-            if (presetType != null) {
-                boolean unlocked = plugin.getGameManager().isMobUnlocked(player.getUniqueId(), presetType);
-                if (!unlocked) {
-                    double health = plugin.getConfig().getDouble("mobs." + presetType.name().toLowerCase() + ".health", presetType.getHealth());
-                    int expCost = (int) (health * 5.0);
-                    if (plugin.getGameManager().removeExp(player.getUniqueId(), expCost)) {
-                        plugin.getGameManager().unlockMob(player.getUniqueId(), presetType);
-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "🎉 Successfully unlocked " + presetType.getDisplayName() + "!");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
-                    } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough EXP to unlock! Requires " + expCost + " EXP.");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
-                    }
-                    plugin.getMobManager().openMobSpawnerGUI(player);
-                    return;
-                }
-
+            if (chainName != null) {
                 org.bukkit.event.inventory.ClickType clickType = event.getClick();
-                int cost = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
-                
-                if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) {
-                    // Add up to 10 mobs based on gold availability
-                    int totalCost = cost * 10;
-                    if (plugin.getGameManager().removeGold(player.getUniqueId(), totalCost)) {
-                        for (int i = 0; i < 10; i++) {
-                            plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
-                        }
-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
-                    } else {
-                        int currentGold = plugin.getGameManager().getGold(player.getUniqueId());
-                        int affordable = currentGold / cost;
-                        int toBuy = Math.min(10, affordable);
-                        if (toBuy > 0) {
-                            if (plugin.getGameManager().removeGold(player.getUniqueId(), cost * toBuy)) {
-                                for (int i = 0; i < toBuy; i++) {
-                                    plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
-                                }
-                                player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
-                                player.sendMessage(org.bukkit.ChatColor.YELLOW + "Only had enough Gold to queue " + toBuy + " mobs.");
-                            }
-                        } else {
-                            player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + totalCost + " Gold for 10 mobs.");
-                            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-                        }
-                    }
-                } else if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
-                    // Remove up to 10 mobs from the queue
-                    java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
-                    int count = queue.getOrDefault(presetType, 0);
-                    int toRemove = Math.min(10, count);
+                if (event.isLeftClick()) {
+                    // Open tier selection sub-GUI
+                    plugin.getMobManager().openMobTierGUI(player, chainName);
+                } else if (event.isRightClick()) {
+                    java.util.Map<String, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+                    int count = queue.getOrDefault(chainName, 0);
+                    int toRemove = (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)
+                            ? Math.min(10, count) : Math.min(1, count);
                     if (toRemove > 0) {
                         for (int i = 0; i < toRemove; i++) {
-                            plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
+                            plugin.getMobManager().removeFromQueue(player.getUniqueId(), chainName);
                         }
-                        int totalRefund = cost * toRemove;
-                        plugin.getGameManager().addGold(player.getUniqueId(), totalRefund, true);
+                        int currentTier = plugin.getGameManager().getMobTier(player.getUniqueId(), chainName);
+                        com.pauljang.towerDefense.entities.MobStateProfile profile =
+                                plugin.getMobManager().getUpgradeRegistry().getProfile(chainName, currentTier);
+                        if (profile != null) {
+                            int refund = (int) profile.getPrice() * toRemove;
+                            plugin.getGameManager().addGold(player.getUniqueId(), refund, true);
+                        }
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
-                    }
-                } else if (event.isLeftClick()) {
-                    if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
-                        plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
-                    } else {
-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-                    }
-                } else if (event.isRightClick()) {
-                    java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
-                    int count = queue.getOrDefault(presetType, 0);
-                    if (count > 0) {
-                        plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
-                        plugin.getGameManager().addGold(player.getUniqueId(), cost, true);
-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
+                        plugin.getMobManager().openMobSpawnerGUI(player);
                     }
                 }
-                plugin.getMobManager().openMobSpawnerGUI(player);
                 return;
             }
 
             if (slot == 38) { // Clear Queue and refund
-                java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+                java.util.Map<String, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
                 int totalRefund = 0;
-                for (java.util.Map.Entry<com.pauljang.towerDefense.entities.PresetMobType, Integer> entry : queue.entrySet()) {
-                    int cost = plugin.getConfig().getInt("mobs." + entry.getKey().name().toLowerCase() + ".spawn-cost", entry.getKey().getSpawnCost());
-                    totalRefund += cost * entry.getValue();
+                for (java.util.Map.Entry<String, Integer> entry : queue.entrySet()) {
+                    if (entry.getValue() <= 0) continue;
+                    int tier = plugin.getGameManager().getMobTier(player.getUniqueId(), entry.getKey());
+                    com.pauljang.towerDefense.entities.MobStateProfile profile =
+                            plugin.getMobManager().getUpgradeRegistry().getProfile(entry.getKey(), tier);
+                    if (profile != null) totalRefund += (int) profile.getPrice() * entry.getValue();
                 }
                 plugin.getMobManager().clearQueue(player.getUniqueId());
-                if (totalRefund > 0) {
-                    plugin.getGameManager().addGold(player.getUniqueId(), totalRefund);
-                }
+                if (totalRefund > 0) plugin.getGameManager().addGold(player.getUniqueId(), totalRefund);
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 0.8f, 0.8f);
+                player.sendMessage(org.bukkit.ChatColor.RED + "Queue cleared. Refunded " + totalRefund + " Gold.");
                 plugin.getMobManager().openMobSpawnerGUI(player);
-                player.sendMessage(org.bukkit.ChatColor.RED + "Cleared the mob spawner queue and refunded " + totalRefund + " Gold!");
             } else if (slot == 40) { // Send Wave
                 plugin.getMobManager().sendQueue(player.getUniqueId());
                 player.closeInventory();
                 player.playSound(player.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 0.8f, 1.2f);
-                player.sendMessage(org.bukkit.ChatColor.GREEN + "Spawning the queued mob wave!");
+                player.sendMessage(org.bukkit.ChatColor.GREEN + "Sending the mob wave!");
             } else if (slot == 42) { // Open upgrades screen
                 player.closeInventory();
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     plugin.getGameManager().openUpgradesGUI(player);
                 }, 1L);
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 0.8f, 1.2f);
+            }
+        } else if (title.startsWith(org.bukkit.ChatColor.DARK_PURPLE + "Mob Tier: ")) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+
+            // Extract chain key (lowercase) from title
+            String rawName = title.substring((org.bukkit.ChatColor.DARK_PURPLE + "Mob Tier: ").length());
+            String chainKey = rawName.toLowerCase();
+
+            int slot = event.getRawSlot();
+
+            if (slot >= 10 && slot <= 14) {
+                int selectedTier = slot - 9; // slot 10 = tier 1, 11 = tier 2, …, 14 = tier 5
+                com.pauljang.towerDefense.entities.MobStateProfile profile =
+                        plugin.getMobManager().getUpgradeRegistry().getProfile(chainKey, selectedTier);
+                if (profile == null) return;
+
+                // If tier is not yet unlocked, spend EXP to unlock it first
+                if (!plugin.getGameManager().isTierUnlocked(player.getUniqueId(), chainKey, selectedTier)) {
+                    int xpCost = com.pauljang.towerDefense.entities.MobManager.getTierUnlockCost(selectedTier);
+                    if (plugin.getGameManager().getExp(player.getUniqueId()) >= xpCost) {
+                        plugin.getGameManager().removeExp(player.getUniqueId(), xpCost);
+                        plugin.getGameManager().unlockTier(player.getUniqueId(), chainKey, selectedTier);
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Unlocked "
+                                + plugin.getMobManager().getChainDisplayName(chainKey)
+                                + " Tier " + selectedTier + "! (" + xpCost + " EXP spent)");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.2f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough EXP to unlock Tier " + selectedTier
+                                + "! Need " + xpCost + " EXP, you have "
+                                + plugin.getGameManager().getExp(player.getUniqueId()) + ".");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                        plugin.getMobManager().openMobTierGUI(player, chainKey);
+                        return;
+                    }
+                }
+
+                int qty = (event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) ? 5 : 1;
+                int totalCost = (int) profile.getPrice() * qty;
+
+                if (plugin.getGameManager().removeGold(player.getUniqueId(), totalCost)) {
+                    plugin.getGameManager().setMobTier(player.getUniqueId(), chainKey, selectedTier);
+                    for (int i = 0; i < qty; i++) {
+                        plugin.getMobManager().addToQueue(player.getUniqueId(), chainKey);
+                    }
+                    player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
+                    player.sendMessage(org.bukkit.ChatColor.GREEN + "Queued " + qty + "x "
+                            + plugin.getMobManager().getChainDisplayName(chainKey)
+                            + " Tier " + selectedTier + " for " + totalCost + " Gold.");
+                } else {
+                    player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + totalCost + " Gold.");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                }
+                plugin.getMobManager().openMobTierGUI(player, chainKey);
+                return;
+            }
+
+            if (slot == 22) { // Back button
+                player.closeInventory();
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    plugin.getMobManager().openMobSpawnerGUI(player);
+                }, 1L);
             }
         } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ")) {
             event.setCancelled(true);
@@ -607,7 +606,7 @@ public class MobListener implements Listener {
                 String nameKey = type.name().toLowerCase() + "_1";
                 int cost = plugin.getConfig().getInt("towers." + nameKey + ".cost", type.getCost());
                 if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
-                    plugin.getTowerManager().placeTower(plotId, type);
+                    plugin.getTowerManager().placeTower(plotId, type, player.getUniqueId());
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName() + " on plot " + plotId + "!");
                     player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
                     player.closeInventory();
@@ -632,6 +631,25 @@ public class MobListener implements Listener {
 
             int slot = event.getRawSlot();
             switch (slot) {
+                case 15 -> { // Return Ghast to Tower
+                    if (tower.getType() == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST) {
+                        org.bukkit.entity.HappyGhast ghast = tower.getSpawnedGhast();
+                        if (ghast != null && ghast.isValid()) {
+                            new java.util.ArrayList<>(ghast.getPassengers()).forEach(p -> ghast.removePassenger(p));
+                            double returnHeight = tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() + 1.0 : 5.0;
+                            org.bukkit.Location returnLoc = tower.getCenterLocation().clone().add(0, returnHeight, 0);
+                            ghast.teleport(returnLoc);
+                            ghast.setAI(false);
+                            ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                            tower.setAutopilot(true);
+                            player.sendMessage(org.bukkit.ChatColor.GREEN + "Happy Ghast returned to its post!");
+                            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.5f);
+                        } else {
+                            player.sendMessage(org.bukkit.ChatColor.RED + "Happy Ghast not found!");
+                        }
+                        plugin.getTowerManager().openManageTowerGUI(player, plotId);
+                    }
+                }
                 case 22 -> { // Upgrade Tower
                     int cost = tower.getUpgradeCost();
                     if (cost == -1) {
@@ -1170,7 +1188,14 @@ public class MobListener implements Listener {
                         event.getPlayer().sendMessage(org.bukkit.ChatColor.RED + "You cannot ride the opponent's Ghast!");
                         return;
                     }
-                    
+
+                    // Only the tower owner can mount the Happy Ghast
+                    java.util.UUID ownerId = tower.getOwnerId();
+                    if (ownerId != null && !ownerId.equals(event.getPlayer().getUniqueId())) {
+                        event.getPlayer().sendMessage(org.bukkit.ChatColor.RED + "Only the player who placed this tower can ride the Happy Ghast!");
+                        return;
+                    }
+
                     ghast.addPassenger(event.getPlayer());
                     ghast.setAI(true);
                     event.getPlayer().sendMessage(org.bukkit.ChatColor.GREEN + "You are now riding the Happy Ghast! Look to steer. Left-click to shoot!");
@@ -1284,6 +1309,14 @@ public class MobListener implements Listener {
         if (event.getDismounted() instanceof org.bukkit.entity.HappyGhast ghast) {
             ghast.setAI(false);
             ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+            // Teleport back to the same spot 2 ticks later to counteract any drift from dismount physics
+            org.bukkit.Location freezeLoc = ghast.getLocation().clone();
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (ghast.isValid()) {
+                    ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                    ghast.teleport(freezeLoc);
+                }
+            }, 2L);
         }
     }
 

@@ -18,6 +18,7 @@ public class Tower {
     private org.bukkit.entity.LivingEntity spawnedGolem = null;
     private org.bukkit.entity.HappyGhast spawnedGhast = null;
     private boolean autopilot = true;
+    private java.util.UUID ownerId = null;
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
         this.plotId = plotId;
@@ -108,4 +109,7 @@ public class Tower {
 
     public boolean isAutopilot() { return autopilot; }
     public void setAutopilot(boolean autopilot) { this.autopilot = autopilot; }
+
+    public java.util.UUID getOwnerId() { return ownerId; }
+    public void setOwnerId(java.util.UUID ownerId) { this.ownerId = ownerId; }
 }

@@ -1,0 +1,101 @@
+--- a/src/main/java/com/pauljang/towerDefense/entities/MobManager.java
++++ b/src/main/java/com/pauljang/towerDefense/entities/MobManager.java
+@@ -175,12 +175,10 @@
+             hoglin.setImmuneToZombification(true);
+         }
+ 
+-        // Set size if it's a Slime/Magma Cube; only disable AI for regular Slime (MagmaCube uses pathfinder)
++        // Set size if it's a Slime/Magma Cube; both need setAI(false) since movement is velocity-driven
+         if (entity instanceof org.bukkit.entity.Slime slime) {
+             slime.setSize(4);
+-            if (!(entity instanceof org.bukkit.entity.MagmaCube)) {
+-                slime.setAI(false);
+-            }
++            slime.setAI(false);
+         }
+ 
+         // Disable Creeper explosion AI; movement is controlled via velocity
+@@ -188,6 +186,22 @@
+             entity.setAI(false);
+         }
+ 
++        // Brain AI mobs ignore removeAllGoals() and override velocity; teleporting Enderman breaks path
++        if (type == EntityType.GIANT
++                || type == EntityType.WARDEN
++                || type == EntityType.ENDERMAN
++                || type == EntityType.ZOMBIFIED_PIGLIN
++                || type == EntityType.HOGLIN
++                || type == EntityType.ZOGLIN
++                || type == EntityType.BREEZE) {
++            entity.setAI(false);
++        }
++
++        // WitherSkeleton (Skeleton T4-T5) is mounted; setAI prevents combat goals fighting vehicle velocity
++        if (type == EntityType.WITHER_SKELETON) {
++            entity.setAI(false);
++        }
++
+         // Mark slow and fire immunities if requested or SLOW_SHIELD is active on the arena
+         boolean isSlowShieldActive = plugin.getGameManager().isSpellActive(arena, "SLOW_SHIELD");
+         if (immuneToSlow || isSlowShieldActive) {
+@@ -526,7 +540,7 @@
+                 Location finalTargetLoc = finalTarget.clone().add(0, heightOffset, 0);
+                 // Periodically repath back to their offset spot if pushed away
+                 if (currentTick % 10 == 0) {
+-                    if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || heightOffset > 0.0) {
++                    if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || mob.getEntity().getType() == EntityType.WARDEN || mob.getEntity().getType() == EntityType.ENDERMAN || mob.getEntity().getType() == EntityType.ZOMBIFIED_PIGLIN || mob.getEntity().getType() == EntityType.HOGLIN || mob.getEntity().getType() == EntityType.ZOGLIN || mob.getEntity().getType() == EntityType.BREEZE || mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob || heightOffset > 0.0) {
+                         org.bukkit.entity.Mob physicalMoverF = mob.getEntity();
+                         if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vm) physicalMoverF = vm;
+                         Location loc = physicalMoverF.getLocation();
+@@ -604,8 +618,8 @@
+ 
+         Location targetLoc = target.clone().add(0, heightOffset, 0);
+ 
+-        if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || heightOffset > 0.0) {
+-            // Velocity-based movement: Giant, Slime, Creeper (NoAI), and flying mobs
++        if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || mob.getEntity().getType() == EntityType.WARDEN || mob.getEntity().getType() == EntityType.ENDERMAN || mob.getEntity().getType() == EntityType.ZOMBIFIED_PIGLIN || mob.getEntity().getType() == EntityType.HOGLIN || mob.getEntity().getType() == EntityType.ZOGLIN || mob.getEntity().getType() == EntityType.BREEZE || mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob || heightOffset > 0.0) {
++            // Velocity-based movement: Brain AI mobs, NoAI mobs, mounted mobs, and flying mobs
+             // For mounted Creepers (T3/T4), drive the vehicle entity so it carries the passenger
+             org.bukkit.entity.Mob physicalMover = mob.getEntity();
+             if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vehicleMob) physicalMover = vehicleMob;
+@@ -677,7 +691,7 @@
+         }
+ 
+         // Check if they are close enough to the waypoint to target the next one
+-        double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || heightOffset > 0.0) ? 4.0 : 1.5;
++        double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || mob.getEntity().getType() == EntityType.WARDEN || mob.getEntity().getType() == EntityType.ENDERMAN || mob.getEntity().getType() == EntityType.ZOMBIFIED_PIGLIN || mob.getEntity().getType() == EntityType.HOGLIN || mob.getEntity().getType() == EntityType.ZOGLIN || mob.getEntity().getType() == EntityType.BREEZE || mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob || heightOffset > 0.0) ? 4.0 : 1.5;
+         if (mob.getEntity().getLocation().distanceSquared(targetLoc) < reachDistance) {
+             mob.advanceToNextWaypoint();
+         }
+--- a/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java
++++ b/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java
+@@ -204,15 +204,20 @@
+             });
+             tower.setSpawnedGhast(ghast);
+ 
+-            // Equip harness so the Happy Ghast can be ridden
+-            org.bukkit.Material harnessMat = org.bukkit.Material.getMaterial("HARNESS");
+-            if (harnessMat != null) {
+-                org.bukkit.inventory.EntityEquipment eq = ghast.getEquipment();
+-                if (eq != null) {
+-                    eq.setHelmet(new org.bukkit.inventory.ItemStack(harnessMat));
+-                    eq.setHelmetDropChance(0.0f);
+-                }
+-            }
++            // Equip harness — try Paper 1.21.5 direct API first, fall back to Material enum
++            try {
++                java.lang.reflect.Method m = ghast.getClass().getMethod("setHarnessed", boolean.class);
++                m.invoke(ghast, true);
++            } catch (NoSuchMethodException ignored) {
++                try {
++                    org.bukkit.Material mat = org.bukkit.Material.valueOf("HARNESS");
++                    org.bukkit.inventory.EntityEquipment eq = ghast.getEquipment();
++                    if (eq != null) {
++                        eq.setHelmet(new org.bukkit.inventory.ItemStack(mat));
++                        eq.setHelmetDropChance(0.0f);
++                    }
++                } catch (IllegalArgumentException ignored2) {}
++            } catch (Exception ignored) {}
+         }
+     }
+ 

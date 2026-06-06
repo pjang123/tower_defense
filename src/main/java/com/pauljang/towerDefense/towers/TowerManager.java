@@ -39,6 +39,10 @@ public class TowerManager {
     }
 
     public void placeTower(String plotId, TowerType type) {
+        placeTower(plotId, type, null);
+    }
+
+    public void placeTower(String plotId, TowerType type, java.util.UUID ownerId) {
         // Remove existing tower if any
         if (hasTower(plotId)) {
             removeTower(plotId);
@@ -61,6 +65,7 @@ public class TowerManager {
             .forEach(org.bukkit.entity.Entity::remove);
 
         Tower tower = new Tower(plotId, center, type);
+        tower.setOwnerId(ownerId);
         placedTowers.put(plotId, tower);
 
         buildTowerStructure(tower);
@@ -198,6 +203,21 @@ public class TowerManager {
                 setEntityScale(gh, 0.5);
             });
             tower.setSpawnedGhast(ghast);
+
+            // Equip harness — try Paper 1.21.5 direct API first, fall back to Material enum
+            try {
+                java.lang.reflect.Method m = ghast.getClass().getMethod("setHarnessed", boolean.class);
+                m.invoke(ghast, true);
+            } catch (NoSuchMethodException ignored) {
+                try {
+                    org.bukkit.Material mat = org.bukkit.Material.valueOf("HARNESS");
+                    org.bukkit.inventory.EntityEquipment eq = ghast.getEquipment();
+                    if (eq != null) {
+                        eq.setHelmet(new org.bukkit.inventory.ItemStack(mat));
+                        eq.setHelmetDropChance(0.0f);
+                    }
+                } catch (IllegalArgumentException ignored2) {}
+            } catch (Exception ignored) {}
         }
     }
 
@@ -1062,6 +1082,19 @@ public class TowerManager {
                 ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + String.format("%.1f", tower.getDamage()),
                 ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + String.format("%.1fs", tower.getCooldown() / 20.0),
                 ChatColor.GRAY + "Targeting: " + ChatColor.YELLOW + tower.getTargetingMode().getDisplayName()
+            ));
+        }
+
+        // Slot 15: Return Ghast button (Happy Ghast towers only)
+        if (tower.getType() == TowerType.HAPPY_GHAST) {
+            boolean ghastValid = tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid();
+            String ghastStatus = ghastValid ? ChatColor.GREEN + "Ghast is active" : ChatColor.RED + "Ghast not found";
+            gui.setItem(15, createGUIItem(
+                Material.FEATHER,
+                ChatColor.AQUA + "Return Ghast to Tower",
+                ghastStatus,
+                ChatColor.GRAY + "Click to teleport the Ghast back to its post",
+                ChatColor.GRAY + "and eject any passengers."
             ));
         }
 
