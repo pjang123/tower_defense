@@ -220,16 +220,23 @@ public class TowerManager {
                 plugin.getLogger().warning("[HappyGhast] setHarnessed() reflection error: " + e);
             }
 
-            // Approach 2: equip harness item in BODY slot (Happy Ghast wears it like a saddle)
+            // Approach 2: equip a colored harness item in the BODY slot (Happy Ghast wears it like
+            // a saddle). There is no generic Material.HARNESS enum — calling Material.valueOf("HARNESS")
+            // threw IllegalArgumentException and left the ghast unsteerable. We must pick a concrete
+            // colored variant; choose it by the ghast's arena (this plugin's team distinction) so the
+            // harness also gives a clear visual team color: arena "2" -> RED, otherwise BLUE.
             if (!harnessApplied) {
                 try {
-                    org.bukkit.Material mat = org.bukkit.Material.valueOf("HARNESS");
+                    String ghastArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                    org.bukkit.Material harnessMaterial = "2".equals(ghastArena)
+                            ? org.bukkit.Material.RED_HARNESS
+                            : org.bukkit.Material.BLUE_HARNESS;
                     org.bukkit.inventory.EntityEquipment eq = ghast.getEquipment();
                     if (eq != null) {
-                        eq.setItem(org.bukkit.inventory.EquipmentSlot.BODY, new org.bukkit.inventory.ItemStack(mat));
+                        eq.setItem(org.bukkit.inventory.EquipmentSlot.BODY, new org.bukkit.inventory.ItemStack(harnessMaterial));
                         eq.setDropChance(org.bukkit.inventory.EquipmentSlot.BODY, 0.0f);
                         harnessApplied = true;
-                        plugin.getLogger().info("[HappyGhast] Harness applied via BODY slot");
+                        plugin.getLogger().info("[HappyGhast] " + harnessMaterial.name() + " applied via BODY slot");
                     }
                 } catch (Exception e) {
                     plugin.getLogger().warning("[HappyGhast] BODY slot equip failed: " + e);

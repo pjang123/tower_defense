@@ -198,6 +198,17 @@ public class MobListener implements Listener {
     }
 
     @EventHandler
+    public void onMobTeleport(org.bukkit.event.entity.EntityTeleportEvent event) {
+        // TD mobs (notably Endermen) now keep their AI enabled so they can be driven along the
+        // track. Vanilla Endermen teleport away when damaged, which would break the path flow, so
+        // cancel any self-initiated teleport for entities tagged as TD mobs.
+        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        if (event.getEntity().getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onMobKnockback(io.papermc.paper.event.entity.EntityKnockbackEvent event) {
         Entity entity = event.getEntity();
         NamespacedKey key = new NamespacedKey(plugin, "td_mob");

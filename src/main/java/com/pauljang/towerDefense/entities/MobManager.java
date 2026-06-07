@@ -76,8 +76,18 @@ public class MobManager {
     // Slot → chain index mapping for the main GUI
     private static final int[] MOB_SLOTS = {10,11,12,13,14,15,16, 19,20,21,22,23,24,25, 28,29};
 
+    /**
+     * Chains shown in the spawner GUI. The standalone Endermite is hidden — players can no longer
+     * select it individually; it only appears as the Tier 4-5 polymorph of the Silverfish chain.
+     */
+    private List<String> getGuiChains() {
+        List<String> chains = new ArrayList<>(upgradeRegistry.getAvailableChains());
+        chains.remove("endermite");
+        return chains;
+    }
+
     public String getChainForSlot(int slot) {
-        List<String> chains = upgradeRegistry.getAvailableChains();
+        List<String> chains = getGuiChains();
         for (int i = 0; i < MOB_SLOTS.length && i < chains.size(); i++) {
             if (MOB_SLOTS[i] == slot) return chains.get(i);
         }
@@ -175,31 +185,13 @@ public class MobManager {
             hoglin.setImmuneToZombification(true);
         }
 
-        // Set size if it's a Slime/Magma Cube; both need setAI(false) since movement is velocity-driven
+        // Set size if it's a Slime/Magma Cube. AI stays ENABLED: the movement task overrides the
+        // entity's velocity every tick to push it along the track. setAI(false) removes the entity
+        // from the horizontal-movement tick loop, so setVelocity() would be ignored and the mob
+        // would freeze in place. Brain-AI mobs (Giant, Warden, Enderman, Zombified Piglin, Hoglin,
+        // Zoglin, Breeze), Creepers, Magma Cubes, and Wither Skeletons are all driven the same way.
         if (entity instanceof org.bukkit.entity.Slime slime) {
             slime.setSize(4);
-            slime.setAI(false);
-        }
-
-        // Disable Creeper explosion AI; movement is controlled via velocity
-        if (entity instanceof org.bukkit.entity.Creeper) {
-            entity.setAI(false);
-        }
-
-        // Brain AI mobs ignore removeAllGoals() and override velocity; teleporting Enderman breaks path
-        if (type == EntityType.GIANT
-                || type == EntityType.WARDEN
-                || type == EntityType.ENDERMAN
-                || type == EntityType.ZOMBIFIED_PIGLIN
-                || type == EntityType.HOGLIN
-                || type == EntityType.ZOGLIN
-                || type == EntityType.BREEZE) {
-            entity.setAI(false);
-        }
-
-        // WitherSkeleton (Skeleton T4-T5) is mounted; setAI prevents combat goals fighting vehicle velocity
-        if (type == EntityType.WITHER_SKELETON) {
-            entity.setAI(false);
         }
 
         // Mark slow and fire immunities if requested or SLOW_SHIELD is active on the arena
@@ -339,9 +331,10 @@ public class MobManager {
             org.bukkit.Location spawnLoc = entity.getLocation();
             if (spawnLoc.getWorld() != null) {
                 org.bukkit.entity.Entity mount = spawnLoc.getWorld().spawnEntity(spawnLoc, profile.getMountType());
-                // Prevent the mount from wandering or being tracked as a TD mob by towers
+                // Strip the mount's wander/combat goals so it doesn't fight the velocity override,
+                // but keep its AI ENABLED so it physically moves when the tick loop sets its velocity.
                 if (mount instanceof Mob mountMob) {
-                    mountMob.setAI(false);
+                    org.bukkit.Bukkit.getMobGoals().removeAllGoals(mountMob);
                 }
                 mount.addPassenger(entity);
             }
@@ -438,6 +431,30 @@ public class MobManager {
                 tickCounter++;
             }
         }.runTaskTimer(plugin, 0L, 1L); // Run every tick (20 times per second) for snappy transitions
+    }
+
+    /**
+     * Returns true if a mob is driven by manual velocity overrides instead of vanilla pathfinding.
+     * Covers brain-AI mobs (which ignore removeAllGoals()), velocity-only mobs (Slime/Magma Cube/
+     * Creeper/Wither Skeleton), any mounted mob, and any flying mob (height-offset &gt; 0).
+     * MAGMA_CUBE and WITHER_SKELETON are included here explicitly — they were previously omitted,
+     * which silently dropped them onto the (AI-disabled, and therefore frozen) vanilla path.
+     */
+    private boolean isVelocityDriven(org.bukkit.entity.Mob entity, double heightOffset) {
+        org.bukkit.entity.EntityType t = entity.getType();
+        return t == org.bukkit.entity.EntityType.GIANT ||
+               t == org.bukkit.entity.EntityType.SLIME ||
+               t == org.bukkit.entity.EntityType.MAGMA_CUBE ||
+               t == org.bukkit.entity.EntityType.WITHER_SKELETON ||
+               t == org.bukkit.entity.EntityType.CREEPER ||
+               t == org.bukkit.entity.EntityType.WARDEN ||
+               t == org.bukkit.entity.EntityType.ENDERMAN ||
+               t == org.bukkit.entity.EntityType.ZOMBIFIED_PIGLIN ||
+               t == org.bukkit.entity.EntityType.HOGLIN ||
+               t == org.bukkit.entity.EntityType.ZOGLIN ||
+               t == org.bukkit.entity.EntityType.BREEZE ||
+               entity.getVehicle() instanceof org.bukkit.entity.Mob ||
+               heightOffset > 0.0;
     }
 
     private void handleMobMovement(TDMob mob, Iterator<TDMob> iterator, long currentTick) {
@@ -542,7 +559,7 @@ public class MobManager {
                 Location finalTargetLoc = finalTarget.clone().add(0, heightOffset, 0);
                 // Periodically repath back to their offset spot if pushed away
                 if (currentTick % 10 == 0) {
-                    if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || mob.getEntity().getType() == EntityType.WARDEN || mob.getEntity().getType() == EntityType.ENDERMAN || mob.getEntity().getType() == EntityType.ZOMBIFIED_PIGLIN || mob.getEntity().getType() == EntityType.HOGLIN || mob.getEntity().getType() == EntityType.ZOGLIN || mob.getEntity().getType() == EntityType.BREEZE || mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob || heightOffset > 0.0) {
+                    if (isVelocityDriven(mob.getEntity(), heightOffset)) {
                         org.bukkit.entity.Mob physicalMoverF = mob.getEntity();
                         if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vm) physicalMoverF = vm;
                         Location loc = physicalMoverF.getLocation();
@@ -620,8 +637,8 @@ public class MobManager {
 
         Location targetLoc = target.clone().add(0, heightOffset, 0);
 
-        if (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || mob.getEntity().getType() == EntityType.WARDEN || mob.getEntity().getType() == EntityType.ENDERMAN || mob.getEntity().getType() == EntityType.ZOMBIFIED_PIGLIN || mob.getEntity().getType() == EntityType.HOGLIN || mob.getEntity().getType() == EntityType.ZOGLIN || mob.getEntity().getType() == EntityType.BREEZE || mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob || heightOffset > 0.0) {
-            // Velocity-based movement: Brain AI mobs, NoAI mobs, mounted mobs, and flying mobs
+        if (isVelocityDriven(mob.getEntity(), heightOffset)) {
+            // Velocity-based movement: Brain AI mobs, velocity-only mobs, mounted mobs, and flying mobs
             // For mounted Creepers (T3/T4), drive the vehicle entity so it carries the passenger
             org.bukkit.entity.Mob physicalMover = mob.getEntity();
             if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vehicleMob) physicalMover = vehicleMob;
@@ -693,7 +710,7 @@ public class MobManager {
         }
 
         // Check if they are close enough to the waypoint to target the next one
-        double reachDistance = (mob.getEntity().getType() == EntityType.GIANT || mob.getEntity().getType() == EntityType.SLIME || mob.getEntity().getType() == EntityType.CREEPER || mob.getEntity().getType() == EntityType.WARDEN || mob.getEntity().getType() == EntityType.ENDERMAN || mob.getEntity().getType() == EntityType.ZOMBIFIED_PIGLIN || mob.getEntity().getType() == EntityType.HOGLIN || mob.getEntity().getType() == EntityType.ZOGLIN || mob.getEntity().getType() == EntityType.BREEZE || mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob || heightOffset > 0.0) ? 4.0 : 1.5;
+        double reachDistance = isVelocityDriven(mob.getEntity(), heightOffset) ? 4.0 : 1.5;
         if (mob.getEntity().getLocation().distanceSquared(targetLoc) < reachDistance) {
             mob.advanceToNextWaypoint();
         }
@@ -811,8 +828,8 @@ public class MobManager {
             }
         }
 
-        // Place all 16 mob chains in order
-        List<String> chains = upgradeRegistry.getAvailableChains();
+        // Place all selectable mob chains in order (standalone Endermite is excluded)
+        List<String> chains = getGuiChains();
         for (int i = 0; i < MOB_SLOTS.length && i < chains.size(); i++) {
             String chain = chains.get(i);
             int queuedCount = queue.getOrDefault(chain, 0);
