@@ -228,11 +228,13 @@ public class MobManager {
         }
 
         // Set max health modifier
+        // Paper 1.21 enforces a hard 1024 ceiling on setHealth() regardless of attribute base value,
+        // so clamp to the attribute's effective value to avoid IllegalArgumentException.
         if (maxHealth > 0) {
             org.bukkit.attribute.AttributeInstance maxHealthAttr = entity.getAttribute(Attribute.MAX_HEALTH);
             if (maxHealthAttr != null) {
                 maxHealthAttr.setBaseValue(maxHealth);
-                entity.setHealth(maxHealth);
+                entity.setHealth(Math.min(maxHealth, maxHealthAttr.getValue()));
             }
         }
 

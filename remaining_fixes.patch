@@ -1,0 +1,547 @@
+diff --git a/project_structure.md b/project_structure.md
+index 763c2ce..5f37bcf 100644
+--- a/project_structure.md
++++ b/project_structure.md
+@@ -44,22 +44,24 @@ Tower Defense/
+ ### 1. Main Entrypoint
+ * **[TowerDefense.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/TowerDefense.java)**
+   * **Role:** The main Bukkit plugin loader class.
+-  * **Functionality:** Handles startup (`onEnable`) and shutdown (`onDisable`) hooks. It instantiates the central manager classes (`GameManager`, `PlotConfigManager`, `WaypointConfigManager`, `SetupManager`, `TowerManager`, `MobManager`), registers command executors (`TDCommand`), and registers event listeners (`WandListener`, `MobListener`).
++  * **Functionality:** Handles startup (`onEnable`) and shutdown (`onDisable`) hooks. It instantiates the central manager classes (`GameManager`, `PlotConfigManager`, `WaypointConfigManager`, `SetupManager`, `TowerManager`, `MobManager`), registers command executors (`TDCommand`), and registers event listeners (`WandListener`, `MobListener`). Initializes base directories like `/structures`.
+ 
+ ### 2. Core Game Loop & Orchestration (`core/`)
+ * **[GameManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/GameManager.java)**
+   * **Role:** The primary manager handling active duel matches, scoreboard renders, and player resources.
+   * **Functionality:** 
+-    * Manages matchmaking lobbies, starting timers (10 seconds when queue is full), and player/arena mapping (Arena 1 mapping to Blue Team and Arena 2 mapping to Red Team).
+-    * Handles global player stats like Gold, Experience (EXP), Income rate, and upgrades (e.g. Gold Generation upgrades).
+-    * Manages spell cards purchase and casting (e.g., *Freeze* spell slow multiplier, *Damage Storm* area effects, *EMP* disabling opponent's towers).
+-    * Restricts castle damage bass sound alerts (`Sound.BLOCK_NOTE_BLOCK_BASS`) to only play for members of the affected team, and renders team-specific action bars.
++    * **Matchmaking & Lobbies:** Automatically triggers a 10-second match starting countdown when $\ge 2$ players enter the `game_world`. Cancels the timer if players leave or disconnect, reverting to the `LOBBY` state. Teleports players to blue/red arena locations upon game start.
++    * **Match Timer:** Tracks the elapsed match duration (`matchStartTime`) and displays it formatted as `MM:SS` (e.g., `Time: 02:15`) on the sidebar scoreboard for active players.
++    * **Lobby Compass & Selector GUI:** Manages the game selector GUI (`openGamesGUI`) displaying open lobbies in slot 13 as a Map item with wait counts (`Players waiting: X/2`). Initializes/configures player compasses based on current worlds.
++    * **Player Stats & Shop:** Handles gold, EXP, income tick rates, and upgrades (e.g. Gold Generation).
++    * **Spells:** Governs spell cards purchase and casting mechanics (Freeze, Damage Storm, EMP).
++    * **Castle Damage Alerts:** Plays castle damage note-block bass sound indicators restricted only to the affected team.
+ * **[GameState.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/GameState.java)**
+   * **Role:** Game lifecycle Enum state definition.
+   * **Values:** `LOBBY` (waiting for queue), `STARTING` (match countdown active), `ACTIVE` (game loop active), `ENDED` (match finalized).
+ * **[TDCommand.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/TDCommand.java)**
+   * **Role:** Administrative and player command execution backend.
+-  * **Functionality:** Implements command execution for `/td`. Supports commands like `start` (forcibly start duel), `stop` (abort active duel), `wand` (give setup wand), `plotmode` (toggle plot creation), `deleteplotmode` (toggle plot deletion), `waypointmode` (toggle path editing), and `upgrades`/`gui` menus.
++  * **Functionality:** Implements command execution for `/td`. Supports subcommands including `start`, `stop`, `status`, `wand`, `plotmode`, `saveplot`, `deleteplotmode`, `waypointmode`, `clearwaypoints`, `gui`, `upgrades`, `giveitems` / `menuitems`, `givegold`, `givexp`, `setarena`, `challenge`, `accept`, `list`, and `spawnmob`.
+ 
+ ### 3. Data & Configuration Persistence (`data/`)
+ * **[PlotConfigManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/data/PlotConfigManager.java)**
+@@ -91,20 +93,24 @@ Tower Defense/
+ * **[MobListener.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/listeners/MobListener.java)**
+   * **Role:** General event listener for interaction, menus, and combat.
+   * **Functionality:**
+-    * Intercepts creature spawning to enforce queue-only custom spawns.
+-    * Blocks custom tower summons (Iron Golems and Happy Ghasts) from targeting players or getting targeting agro.
+-    * Disables player hunger decay globally across matches.
+-    * Governs player right-clicking to mount the `HappyGhast` mount, steering rotation velocity, and left-clicking to shoot non-destructive large fireballs.
+-    * Prevents fireballs from dealing knockback or damage to players by cancelling `ProjectileHitEvent` on players.
+-    * Restricts purchasing 5x5 towers (Golem and Happy Ghast) on plots measured under 5x5 blocks in width/length.
++    * **Offhand Protection:** Disables using the offhand slot by cancelling hand swap events, offhand clicks/drags in inventories, and offhand swap click actions.
++    * **Compass Interaction:** Handles dynamic compass clicks. Right/left clicking opens the Lobby Selector GUI in the lobby world, or teleports the player back to the lobby spawn when clicked in the game world.
++    * **World Change Handler:** Detects world changes to automatically update the player's hotbar with the appropriate compass item and triggers matchmaking checks.
++    * **Custom Summon Protection:** Prevents custom tower entities (Golems and Happy Ghasts) from taking targeting aggro or targeting/attacking players.
++    * **Projectile Protections:** Blocks large fireball damage and knockback on players by cancelling `ProjectileHitEvent` for players. Inflicts AOE damage in a 5-block radius on mobs instead.
++    * **Summon Scale Checks:** Cancels purchasing 5x5 towers (Golem and Happy Ghast) on plots with smaller measurements.
++    * **Environmental Adjustments:** Prevents block fading/melting (ice, frosted ice, snow) and handles Ghast dismount AI reset.
++    * **Game Controls:** Restricts natural mob spawning, manages Slime splitting attributes/health updates on death, and clears drops/XP upon TD mob deaths to award bounty gold instead.
+ * **[WandListener.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/listeners/WandListener.java)**
+   * **Role:** Listener for setup wand usage.
+-  * **Functionality:** Handles left-click/right-click actions on the Setup Wand. Allows admins to place new waypoint nodes, select existing nodes, link multiple existing nodes to create path splits, and delete nodes.
++  * **Functionality:** 
++    * Handles left-click/right-click actions on the Setup Wand. Allows admins to place new waypoint nodes, select existing nodes, link multiple existing nodes to create path splits, and delete nodes.
++    * **Dust Particles Preview:** Starts a periodic preview task (every 5 ticks) to display visual particles (dust particles) to outline targeted plots (yellow for 5x5, aqua for 3x3) and waypoint graphs for admins.
+ 
+ ### 6. Map Construction/Setup (`setup/`)
+ * **[SetupManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/setup/SetupManager.java)**
+   * **Role:** State machine for map setup.
+-  * **Functionality:** Tracks active administrative configuration modes (e.g. plot creation size toggle: 3x3/5x5, waypoint editing, plot deletion) and records temporary click positions.
++  * **Functionality:** Tracks active administrative configuration modes (e.g. plot creation size toggle: 3x3/5x5, waypoint editing, plot deletion, idle), records temporary edit arenas, selected sizes, and the currently selected waypoint ID for making path connections.
+ 
+ ### 7. Custom Towers & Summons (`towers/`)
+ * **[TargetingMode.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/towers/TargetingMode.java)**
+@@ -112,13 +118,14 @@ Tower Defense/
+   * **Values:** `FIRST` (closest to target castle), `LAST` (farthest from target castle), `STRONGEST` (highest HP), `WEAKEST` (lowest HP).
+ * **[Tower.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/towers/Tower.java)**
+   * **Role:** Model tracking a single built tower instance.
+-  * **Functionality:** Holds reference to plot coordinates, type, upgrade level, targeting mode, floating hologram name tags, and active entity summons like `spawnedGhast` (typed as `HappyGhast`) and `spawnedGolem`.
++  * **Functionality:** Holds reference to plot coordinates, type, upgrade level, targeting mode, floating hologram name tags, and active entity summons like `spawnedGhast` and `spawnedGolem`.
+ * **[TowerManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java)**
+   * **Role:** Orchestrates custom tower mechanics, renders, and summons.
+   * **Functionality:**
+-    * Parses NBT structure files from `/structures` folder to place tower blocks.
+-    * Handles Golem path leash restrictions (walking only on path blocks within a 7-block boundary).
+-    * Handles Happy Ghast steering velocity physics (smooth direction look-based flight, bounds enforcement).
+-    * Adjusts Iron Golem scale (0.6x) and Happy Ghast scale (0.5x) dynamically via reflection.
++    * **Structure Loading:** Parses NBT structure files from the `/structures` folder (`golem.nbt`, `happy.nbt` tiers). Contains safe fallback checks for spawn eggs in structure configuration data to prevent block-placement crashes.
++    * **Golem Patrolling Behavior:** Spawns Golems on the lane path at Waypoint 0. Ticks pathfinding to move the golem along the waypoint path, patrolling back and forth continuously within the boundary of its tower's range.
++    * **Happy Ghast Mount:** Spawns an invulnerable AI-disabled Ghast. Purchasing players can right-click to mount and steer it (flies in their look direction). Left-clicking fires fireballs dealing AoE damage. Automatically targets and shoots fireballs on autopilot when unridden.
++    * **Dynamic Entity Scaling:** Uses reflection to safely scale Iron Golem sizes (0.6x Copper Golem fallback) and Happy Ghasts (0.5x).
++    * **Upgrades & Combat:** Adjusts target selection and damage based on tower types and upgrade tiers.
+ * **[TowerType.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/towers/TowerType.java)**
+   * **Role:** Enum cataloging default statistics and block representations for towers (Archer, Fire, Prismarine, Chorus, Redstone, Poison, Ice, Golem, Happy Ghast).
+diff --git a/src/main/java/com/pauljang/towerDefense/core/GameManager.java b/src/main/java/com/pauljang/towerDefense/core/GameManager.java
+index aeaab7f..2509ca9 100644
+--- a/src/main/java/com/pauljang/towerDefense/core/GameManager.java
++++ b/src/main/java/com/pauljang/towerDefense/core/GameManager.java
+@@ -1,5 +1,11 @@
+ package com.pauljang.towerDefense.core;
+ 
++import java.util.HashMap;
++import java.util.Map;
++import java.util.UUID;
++import java.util.Collections;
++
++
+ import com.pauljang.towerDefense.TowerDefense;
+ import org.bukkit.Bukkit;
+ import org.bukkit.ChatColor;
+@@ -13,6 +19,10 @@ import org.bukkit.entity.Player;
+ import org.bukkit.entity.ArmorStand;
+ 
+ public class GameManager {
++    // Map of player UUID -> (upgrade chain -> tier)
++    private final Map<UUID, Map<String, Integer>> playerMobTiers = new HashMap<>();
++    // Map of player UUID -> (upgrade chain -> set of unlocked tiers); tier 1 is always unlocked implicitly
++    private final java.util.Map<UUID, Map<String, java.util.Set<Integer>>> playerUnlockedTiers = new java.util.HashMap<>();
+ 
+     private final TowerDefense plugin;
+     private GameState currentState = null;
+@@ -40,6 +50,39 @@ public class GameManager {
+     private org.bukkit.scheduler.BukkitTask lobbyQueueTask = null;
+     private int lobbyQueueSecondsLeft = 0;
+ 
++    /**
++     * Returns the current tier for a given upgrade chain for the player.
++     * If no tier is stored, defaults to 1.
++     */
++    public int getMobTier(UUID playerId, String upgradeChain) {
++        return playerMobTiers
++                .getOrDefault(playerId, Collections.emptyMap())
++                .getOrDefault(upgradeChain, 1);
++    }
++
++    /**
++     * Sets the tier for a given upgrade chain for the player.
++     */
++    public void setMobTier(UUID playerId, String upgradeChain, int tier) {
++        playerMobTiers.computeIfAbsent(playerId, k -> new HashMap<>()).put(upgradeChain, tier);
++    }
++
++    /** Tier 1 is always unlocked; higher tiers require explicit unlock via XP. */
++    public boolean isTierUnlocked(UUID playerId, String chain, int tier) {
++        if (tier <= 1) return true;
++        return playerUnlockedTiers
++                .getOrDefault(playerId, Collections.emptyMap())
++                .getOrDefault(chain.toLowerCase(), Collections.emptySet())
++                .contains(tier);
++    }
++
++    public void unlockTier(UUID playerId, String chain, int tier) {
++        playerUnlockedTiers
++                .computeIfAbsent(playerId, k -> new HashMap<>())
++                .computeIfAbsent(chain.toLowerCase(), k -> new java.util.HashSet<>())
++                .add(tier);
++    }
++
+     public GameManager(TowerDefense plugin) {
+         this.plugin = plugin;
+         this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 100);
+@@ -334,7 +377,6 @@ public class GameManager {
+         // Determine the winning arena
+         String winningArena = "1".equals(quittingArena) ? "2" : "1";
+ 
+-        // Find the remaining online player in the winning arena
+         Player winner = null;
+         for (Player p : Bukkit.getOnlinePlayers()) {
+             if (!p.getUniqueId().equals(player.getUniqueId())) {
+diff --git a/src/main/java/com/pauljang/towerDefense/entities/MobManager.java b/src/main/java/com/pauljang/towerDefense/entities/MobManager.java
+index e2ac2ad..1d74fe5 100644
+--- a/src/main/java/com/pauljang/towerDefense/entities/MobManager.java
++++ b/src/main/java/com/pauljang/towerDefense/entities/MobManager.java
+@@ -228,11 +228,13 @@ public class MobManager {
+         }
+ 
+         // Set max health modifier
++        // Paper 1.21 enforces a hard 1024 ceiling on setHealth() regardless of attribute base value,
++        // so clamp to the attribute's effective value to avoid IllegalArgumentException.
+         if (maxHealth > 0) {
+             org.bukkit.attribute.AttributeInstance maxHealthAttr = entity.getAttribute(Attribute.MAX_HEALTH);
+             if (maxHealthAttr != null) {
+                 maxHealthAttr.setBaseValue(maxHealth);
+-                entity.setHealth(maxHealth);
++                entity.setHealth(Math.min(maxHealth, maxHealthAttr.getValue()));
+             }
+         }
+ 
+diff --git a/src/main/java/com/pauljang/towerDefense/listeners/MobListener.java b/src/main/java/com/pauljang/towerDefense/listeners/MobListener.java
+index 5407fa0..e6a2832 100644
+--- a/src/main/java/com/pauljang/towerDefense/listeners/MobListener.java
++++ b/src/main/java/com/pauljang/towerDefense/listeners/MobListener.java
+@@ -440,123 +440,59 @@ public class MobListener implements Listener {
+         if (title.equals(org.bukkit.ChatColor.DARK_RED + "TD Mob Spawner")) {
+             event.setCancelled(true);
+             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+-
+             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+ 
+             int slot = event.getRawSlot();
+-            com.pauljang.towerDefense.entities.PresetMobType presetType = null;
+-            switch (slot) {
+-                case 10 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.ZOMBIE;
+-                case 11 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SKELETON;
+-                case 12 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SILVERFISH;
+-                case 13 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SPIDER;
+-                case 14 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.PIGMAN;
+-                case 15 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.SLIME;
+-                case 16 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.CREEPER;
+-                case 20 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.BLAZE;
+-                case 21 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.MAGMA_CUBE;
+-                case 22 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GHAST;
+-                case 23 -> presetType = com.pauljang.towerDefense.entities.PresetMobType.GIANT;
+-            }
+-
+-            if (presetType != null) {
+-                boolean unlocked = plugin.getGameManager().isMobUnlocked(player.getUniqueId(), presetType);
+-                if (!unlocked) {
+-                    double health = plugin.getConfig().getDouble("mobs." + presetType.name().toLowerCase() + ".health", presetType.getHealth());
+-                    int expCost = (int) (health * 5.0);
+-                    if (plugin.getGameManager().removeExp(player.getUniqueId(), expCost)) {
+-                        plugin.getGameManager().unlockMob(player.getUniqueId(), presetType);
+-                        player.sendMessage(org.bukkit.ChatColor.GREEN + "🎉 Successfully unlocked " + presetType.getDisplayName() + "!");
+-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+-                    } else {
+-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough EXP to unlock! Requires " + expCost + " EXP.");
+-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+-                    }
+-                    plugin.getMobManager().openMobSpawnerGUI(player);
+-                    return;
+-                }
++            String chainName = plugin.getMobManager().getChainForSlot(slot);
+ 
++            if (chainName != null) {
+                 org.bukkit.event.inventory.ClickType clickType = event.getClick();
+-                int cost = plugin.getConfig().getInt("mobs." + presetType.name().toLowerCase() + ".spawn-cost", presetType.getSpawnCost());
+-                
+-                if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) {
+-                    // Add up to 10 mobs based on gold availability
+-                    int totalCost = cost * 10;
+-                    if (plugin.getGameManager().removeGold(player.getUniqueId(), totalCost)) {
+-                        for (int i = 0; i < 10; i++) {
+-                            plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
+-                        }
+-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
+-                    } else {
+-                        int currentGold = plugin.getGameManager().getGold(player.getUniqueId());
+-                        int affordable = currentGold / cost;
+-                        int toBuy = Math.min(10, affordable);
+-                        if (toBuy > 0) {
+-                            if (plugin.getGameManager().removeGold(player.getUniqueId(), cost * toBuy)) {
+-                                for (int i = 0; i < toBuy; i++) {
+-                                    plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
+-                                }
+-                                player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
+-                                player.sendMessage(org.bukkit.ChatColor.YELLOW + "Only had enough Gold to queue " + toBuy + " mobs.");
+-                            }
+-                        } else {
+-                            player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + totalCost + " Gold for 10 mobs.");
+-                            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+-                        }
+-                    }
+-                } else if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
+-                    // Remove up to 10 mobs from the queue
+-                    java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+-                    int count = queue.getOrDefault(presetType, 0);
+-                    int toRemove = Math.min(10, count);
++                if (event.isLeftClick()) {
++                    // Open tier selection sub-GUI
++                    plugin.getMobManager().openMobTierGUI(player, chainName);
++                } else if (event.isRightClick()) {
++                    java.util.Map<String, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
++                    int count = queue.getOrDefault(chainName, 0);
++                    int toRemove = (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)
++                            ? Math.min(10, count) : Math.min(1, count);
+                     if (toRemove > 0) {
+                         for (int i = 0; i < toRemove; i++) {
+-                            plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
++                            plugin.getMobManager().removeFromQueue(player.getUniqueId(), chainName);
++                        }
++                        int currentTier = plugin.getGameManager().getMobTier(player.getUniqueId(), chainName);
++                        com.pauljang.towerDefense.entities.MobStateProfile profile =
++                                plugin.getMobManager().getUpgradeRegistry().getProfile(chainName, currentTier);
++                        if (profile != null) {
++                            int refund = (int) profile.getPrice() * toRemove;
++                            plugin.getGameManager().addGold(player.getUniqueId(), refund, true);
+                         }
+-                        int totalRefund = cost * toRemove;
+-                        plugin.getGameManager().addGold(player.getUniqueId(), totalRefund, true);
+-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
+-                    }
+-                } else if (event.isLeftClick()) {
+-                    if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
+-                        plugin.getMobManager().addToQueue(player.getUniqueId(), presetType);
+-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
+-                    } else {
+-                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
+-                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+-                    }
+-                } else if (event.isRightClick()) {
+-                    java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+-                    int count = queue.getOrDefault(presetType, 0);
+-                    if (count > 0) {
+-                        plugin.getMobManager().removeFromQueue(player.getUniqueId(), presetType);
+-                        plugin.getGameManager().addGold(player.getUniqueId(), cost, true);
+                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
++                        plugin.getMobManager().openMobSpawnerGUI(player);
+                     }
+                 }
+-                plugin.getMobManager().openMobSpawnerGUI(player);
+                 return;
+             }
+ 
+             if (slot == 38) { // Clear Queue and refund
+-                java.util.Map<com.pauljang.towerDefense.entities.PresetMobType, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
++                java.util.Map<String, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+                 int totalRefund = 0;
+-                for (java.util.Map.Entry<com.pauljang.towerDefense.entities.PresetMobType, Integer> entry : queue.entrySet()) {
+-                    int cost = plugin.getConfig().getInt("mobs." + entry.getKey().name().toLowerCase() + ".spawn-cost", entry.getKey().getSpawnCost());
+-                    totalRefund += cost * entry.getValue();
++                for (java.util.Map.Entry<String, Integer> entry : queue.entrySet()) {
++                    if (entry.getValue() <= 0) continue;
++                    int tier = plugin.getGameManager().getMobTier(player.getUniqueId(), entry.getKey());
++                    com.pauljang.towerDefense.entities.MobStateProfile profile =
++                            plugin.getMobManager().getUpgradeRegistry().getProfile(entry.getKey(), tier);
++                    if (profile != null) totalRefund += (int) profile.getPrice() * entry.getValue();
+                 }
+                 plugin.getMobManager().clearQueue(player.getUniqueId());
+-                if (totalRefund > 0) {
+-                    plugin.getGameManager().addGold(player.getUniqueId(), totalRefund);
+-                }
++                if (totalRefund > 0) plugin.getGameManager().addGold(player.getUniqueId(), totalRefund);
+                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 0.8f, 0.8f);
++                player.sendMessage(org.bukkit.ChatColor.RED + "Queue cleared. Refunded " + totalRefund + " Gold.");
+                 plugin.getMobManager().openMobSpawnerGUI(player);
+-                player.sendMessage(org.bukkit.ChatColor.RED + "Cleared the mob spawner queue and refunded " + totalRefund + " Gold!");
+             } else if (slot == 40) { // Send Wave
+                 plugin.getMobManager().sendQueue(player.getUniqueId());
+                 player.closeInventory();
+                 player.playSound(player.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 0.8f, 1.2f);
+-                player.sendMessage(org.bukkit.ChatColor.GREEN + "Spawning the queued mob wave!");
++                player.sendMessage(org.bukkit.ChatColor.GREEN + "Sending the mob wave!");
+             } else if (slot == 42) { // Open upgrades screen
+                 player.closeInventory();
+                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+@@ -564,6 +500,69 @@ public class MobListener implements Listener {
+                 }, 1L);
+                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 0.8f, 1.2f);
+             }
++        } else if (title.startsWith(org.bukkit.ChatColor.DARK_PURPLE + "Mob Tier: ")) {
++            event.setCancelled(true);
++            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
++            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
++
++            // Extract chain key (lowercase) from title
++            String rawName = title.substring((org.bukkit.ChatColor.DARK_PURPLE + "Mob Tier: ").length());
++            String chainKey = rawName.toLowerCase();
++
++            int slot = event.getRawSlot();
++
++            if (slot >= 10 && slot <= 14) {
++                int selectedTier = slot - 9; // slot 10 = tier 1, 11 = tier 2, …, 14 = tier 5
++                com.pauljang.towerDefense.entities.MobStateProfile profile =
++                        plugin.getMobManager().getUpgradeRegistry().getProfile(chainKey, selectedTier);
++                if (profile == null) return;
++
++                // If tier is not yet unlocked, spend EXP to unlock it first
++                if (!plugin.getGameManager().isTierUnlocked(player.getUniqueId(), chainKey, selectedTier)) {
++                    int xpCost = com.pauljang.towerDefense.entities.MobManager.getTierUnlockCost(selectedTier);
++                    if (plugin.getGameManager().getExp(player.getUniqueId()) >= xpCost) {
++                        plugin.getGameManager().removeExp(player.getUniqueId(), xpCost);
++                        plugin.getGameManager().unlockTier(player.getUniqueId(), chainKey, selectedTier);
++                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Unlocked "
++                                + plugin.getMobManager().getChainDisplayName(chainKey)
++                                + " Tier " + selectedTier + "! (" + xpCost + " EXP spent)");
++                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.2f);
++                    } else {
++                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough EXP to unlock Tier " + selectedTier
++                                + "! Need " + xpCost + " EXP, you have "
++                                + plugin.getGameManager().getExp(player.getUniqueId()) + ".");
++                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
++                        plugin.getMobManager().openMobTierGUI(player, chainKey);
++                        return;
++                    }
++                }
++
++                int qty = (event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) ? 5 : 1;
++                int totalCost = (int) profile.getPrice() * qty;
++
++                if (plugin.getGameManager().removeGold(player.getUniqueId(), totalCost)) {
++                    plugin.getGameManager().setMobTier(player.getUniqueId(), chainKey, selectedTier);
++                    for (int i = 0; i < qty; i++) {
++                        plugin.getMobManager().addToQueue(player.getUniqueId(), chainKey);
++                    }
++                    player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
++                    player.sendMessage(org.bukkit.ChatColor.GREEN + "Queued " + qty + "x "
++                            + plugin.getMobManager().getChainDisplayName(chainKey)
++                            + " Tier " + selectedTier + " for " + totalCost + " Gold.");
++                } else {
++                    player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + totalCost + " Gold.");
++                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
++                }
++                plugin.getMobManager().openMobTierGUI(player, chainKey);
++                return;
++            }
++
++            if (slot == 22) { // Back button
++                player.closeInventory();
++                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
++                    plugin.getMobManager().openMobSpawnerGUI(player);
++                }, 1L);
++            }
+         } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ")) {
+             event.setCancelled(true);
+             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+@@ -607,7 +606,7 @@ public class MobListener implements Listener {
+                 String nameKey = type.name().toLowerCase() + "_1";
+                 int cost = plugin.getConfig().getInt("towers." + nameKey + ".cost", type.getCost());
+                 if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
+-                    plugin.getTowerManager().placeTower(plotId, type);
++                    plugin.getTowerManager().placeTower(plotId, type, player.getUniqueId());
+                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName() + " on plot " + plotId + "!");
+                     player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
+                     player.closeInventory();
+@@ -632,6 +631,25 @@ public class MobListener implements Listener {
+ 
+             int slot = event.getRawSlot();
+             switch (slot) {
++                case 15 -> { // Return Ghast to Tower
++                    if (tower.getType() == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST) {
++                        org.bukkit.entity.HappyGhast ghast = tower.getSpawnedGhast();
++                        if (ghast != null && ghast.isValid()) {
++                            new java.util.ArrayList<>(ghast.getPassengers()).forEach(p -> ghast.removePassenger(p));
++                            double returnHeight = tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() + 1.0 : 5.0;
++                            org.bukkit.Location returnLoc = tower.getCenterLocation().clone().add(0, returnHeight, 0);
++                            ghast.teleport(returnLoc);
++                            ghast.setAI(false);
++                            ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
++                            tower.setAutopilot(true);
++                            player.sendMessage(org.bukkit.ChatColor.GREEN + "Happy Ghast returned to its post!");
++                            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.5f);
++                        } else {
++                            player.sendMessage(org.bukkit.ChatColor.RED + "Happy Ghast not found!");
++                        }
++                        plugin.getTowerManager().openManageTowerGUI(player, plotId);
++                    }
++                }
+                 case 22 -> { // Upgrade Tower
+                     int cost = tower.getUpgradeCost();
+                     if (cost == -1) {
+@@ -1170,7 +1188,14 @@ public class MobListener implements Listener {
+                         event.getPlayer().sendMessage(org.bukkit.ChatColor.RED + "You cannot ride the opponent's Ghast!");
+                         return;
+                     }
+-                    
++
++                    // Only the tower owner can mount the Happy Ghast
++                    java.util.UUID ownerId = tower.getOwnerId();
++                    if (ownerId != null && !ownerId.equals(event.getPlayer().getUniqueId())) {
++                        event.getPlayer().sendMessage(org.bukkit.ChatColor.RED + "Only the player who placed this tower can ride the Happy Ghast!");
++                        return;
++                    }
++
+                     ghast.addPassenger(event.getPlayer());
+                     ghast.setAI(true);
+                     event.getPlayer().sendMessage(org.bukkit.ChatColor.GREEN + "You are now riding the Happy Ghast! Look to steer. Left-click to shoot!");
+@@ -1284,6 +1309,14 @@ public class MobListener implements Listener {
+         if (event.getDismounted() instanceof org.bukkit.entity.HappyGhast ghast) {
+             ghast.setAI(false);
+             ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
++            // Teleport back to the same spot 2 ticks later to counteract any drift from dismount physics
++            org.bukkit.Location freezeLoc = ghast.getLocation().clone();
++            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
++                if (ghast.isValid()) {
++                    ghast.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
++                    ghast.teleport(freezeLoc);
++                }
++            }, 2L);
+         }
+     }
+ 
+diff --git a/src/main/java/com/pauljang/towerDefense/towers/Tower.java b/src/main/java/com/pauljang/towerDefense/towers/Tower.java
+index 0329f81..f9bf258 100644
+--- a/src/main/java/com/pauljang/towerDefense/towers/Tower.java
++++ b/src/main/java/com/pauljang/towerDefense/towers/Tower.java
+@@ -18,6 +18,7 @@ public class Tower {
+     private org.bukkit.entity.LivingEntity spawnedGolem = null;
+     private org.bukkit.entity.HappyGhast spawnedGhast = null;
+     private boolean autopilot = true;
++    private java.util.UUID ownerId = null;
+ 
+     public Tower(String plotId, Location centerLocation, TowerType type) {
+         this.plotId = plotId;
+@@ -108,4 +109,7 @@ public class Tower {
+ 
+     public boolean isAutopilot() { return autopilot; }
+     public void setAutopilot(boolean autopilot) { this.autopilot = autopilot; }
++
++    public java.util.UUID getOwnerId() { return ownerId; }
++    public void setOwnerId(java.util.UUID ownerId) { this.ownerId = ownerId; }
+ }
+diff --git a/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java b/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java
+index d536786..4d3927b 100644
+--- a/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java
++++ b/src/main/java/com/pauljang/towerDefense/towers/TowerManager.java
+@@ -204,20 +204,41 @@ public class TowerManager {
+             });
+             tower.setSpawnedGhast(ghast);
+ 
+-            // Equip harness — try Paper 1.21.5 direct API first, fall back to Material enum
++            // Equip harness so the Happy Ghast can be ridden.
++            // Approach 1: setHarnessed(boolean) direct API (Paper 1.21.5+)
++            boolean harnessApplied = false;
+             try {
+                 java.lang.reflect.Method m = ghast.getClass().getMethod("setHarnessed", boolean.class);
+                 m.invoke(ghast, true);
+-            } catch (NoSuchMethodException ignored) {
++                harnessApplied = true;
++                plugin.getLogger().info("[HappyGhast] Harness applied via setHarnessed()");
++            } catch (NoSuchMethodException e) {
++                plugin.getLogger().info("[HappyGhast] setHarnessed() not found, trying item equip");
++            } catch (java.lang.reflect.InvocationTargetException e) {
++                plugin.getLogger().warning("[HappyGhast] setHarnessed() threw: " + e.getCause());
++            } catch (Exception e) {
++                plugin.getLogger().warning("[HappyGhast] setHarnessed() reflection error: " + e);
++            }
++
++            // Approach 2: equip harness item in BODY slot (Happy Ghast wears it like a saddle)
++            if (!harnessApplied) {
+                 try {
+                     org.bukkit.Material mat = org.bukkit.Material.valueOf("HARNESS");
+                     org.bukkit.inventory.EntityEquipment eq = ghast.getEquipment();
+                     if (eq != null) {
+-                        eq.setHelmet(new org.bukkit.inventory.ItemStack(mat));
+-                        eq.setHelmetDropChance(0.0f);
++                        eq.setItem(org.bukkit.inventory.EquipmentSlot.BODY, new org.bukkit.inventory.ItemStack(mat));
++                        eq.setDropChance(org.bukkit.inventory.EquipmentSlot.BODY, 0.0f);
++                        harnessApplied = true;
++                        plugin.getLogger().info("[HappyGhast] Harness applied via BODY slot");
+                     }
+-                } catch (IllegalArgumentException ignored2) {}
+-            } catch (Exception ignored) {}
++                } catch (Exception e) {
++                    plugin.getLogger().warning("[HappyGhast] BODY slot equip failed: " + e);
++                }
++            }
++
++            if (!harnessApplied) {
++                plugin.getLogger().warning("[HappyGhast] All harness approaches failed — ghast will not be rideable. Check logs above for details.");
++            }
+         }
+     }
+ 

@@ -204,20 +204,41 @@ public class TowerManager {
             });
             tower.setSpawnedGhast(ghast);
 
-            // Equip harness — try Paper 1.21.5 direct API first, fall back to Material enum
+            // Equip harness so the Happy Ghast can be ridden.
+            // Approach 1: setHarnessed(boolean) direct API (Paper 1.21.5+)
+            boolean harnessApplied = false;
             try {
                 java.lang.reflect.Method m = ghast.getClass().getMethod("setHarnessed", boolean.class);
                 m.invoke(ghast, true);
-            } catch (NoSuchMethodException ignored) {
+                harnessApplied = true;
+                plugin.getLogger().info("[HappyGhast] Harness applied via setHarnessed()");
+            } catch (NoSuchMethodException e) {
+                plugin.getLogger().info("[HappyGhast] setHarnessed() not found, trying item equip");
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                plugin.getLogger().warning("[HappyGhast] setHarnessed() threw: " + e.getCause());
+            } catch (Exception e) {
+                plugin.getLogger().warning("[HappyGhast] setHarnessed() reflection error: " + e);
+            }
+
+            // Approach 2: equip harness item in BODY slot (Happy Ghast wears it like a saddle)
+            if (!harnessApplied) {
                 try {
                     org.bukkit.Material mat = org.bukkit.Material.valueOf("HARNESS");
                     org.bukkit.inventory.EntityEquipment eq = ghast.getEquipment();
                     if (eq != null) {
-                        eq.setHelmet(new org.bukkit.inventory.ItemStack(mat));
-                        eq.setHelmetDropChance(0.0f);
+                        eq.setItem(org.bukkit.inventory.EquipmentSlot.BODY, new org.bukkit.inventory.ItemStack(mat));
+                        eq.setDropChance(org.bukkit.inventory.EquipmentSlot.BODY, 0.0f);
+                        harnessApplied = true;
+                        plugin.getLogger().info("[HappyGhast] Harness applied via BODY slot");
                     }
-                } catch (IllegalArgumentException ignored2) {}
-            } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    plugin.getLogger().warning("[HappyGhast] BODY slot equip failed: " + e);
+                }
+            }
+
+            if (!harnessApplied) {
+                plugin.getLogger().warning("[HappyGhast] All harness approaches failed — ghast will not be rideable. Check logs above for details.");
+            }
         }
     }
 
