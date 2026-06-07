@@ -836,13 +836,35 @@ public class MobManager {
             gui.setItem(MOB_SLOTS[i], createChainGUIItem(player, chain, queuedCount));
         }
 
-        // Compute total queue cost for display
+        // Compute total queue cost, total XP payout, and a per-mob breakdown for the Send Wave lore
         int totalCost = 0;
+        int totalXpPayout = 0;
+        List<String> queuedMobLines = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : queue.entrySet()) {
-            if (entry.getValue() <= 0) continue;
+            int count = entry.getValue();
+            if (count <= 0) continue;
             int tier = plugin.getGameManager().getMobTier(player.getUniqueId(), entry.getKey());
             MobStateProfile profile = upgradeRegistry.getProfile(entry.getKey(), tier);
-            if (profile != null) totalCost += (int) profile.getPrice() * entry.getValue();
+            if (profile == null) continue;
+            totalCost += (int) profile.getPrice() * count;
+            totalXpPayout += profile.getExpReward() * count;
+            queuedMobLines.add(ChatColor.DARK_GRAY + "- " + ChatColor.YELLOW + "x" + count + " "
+                    + ChatColor.WHITE + getChainDisplayName(entry.getKey())
+                    + ChatColor.GRAY + " (Lvl " + tier + ")");
+        }
+
+        // Build the Send Wave lore: description, cost, the queued-mob breakdown, and total XP payout
+        List<String> sendWaveLore = new ArrayList<>();
+        sendWaveLore.add(ChatColor.GRAY + "Spawn all queued mobs on the opponent's track.");
+        sendWaveLore.add(ChatColor.GOLD + "Total Cost: " + ChatColor.YELLOW + totalCost + " Gold");
+        sendWaveLore.add("");
+        if (queuedMobLines.isEmpty()) {
+            sendWaveLore.add(ChatColor.GRAY + "Queued Mobs: " + ChatColor.DARK_GRAY + "(none)");
+        } else {
+            sendWaveLore.add(ChatColor.GRAY + "Queued Mobs:");
+            sendWaveLore.addAll(queuedMobLines);
+            sendWaveLore.add("");
+            sendWaveLore.add(ChatColor.GREEN + "Total Payout: " + ChatColor.DARK_GREEN + "+" + totalXpPayout + " XP");
         }
 
         gui.setItem(38, createGUIItem(Material.RED_WOOL,
@@ -850,8 +872,7 @@ public class MobManager {
                 ChatColor.GRAY + "Dequeue all mobs and refund Gold."));
         gui.setItem(40, createGUIItem(Material.LIME_WOOL,
                 ChatColor.GREEN + "Send Wave",
-                ChatColor.GRAY + "Spawn all queued mobs on the opponent's track.",
-                ChatColor.GOLD + "Total Cost: " + ChatColor.YELLOW + totalCost + " Gold"));
+                sendWaveLore.toArray(new String[0])));
         gui.setItem(42, createGUIItem(Material.NETHER_STAR,
                 ChatColor.GOLD + "Player Upgrades",
                 ChatColor.GRAY + "Open weapons & upgrades screen."));

@@ -240,6 +240,22 @@ public class MobListener implements Listener {
     }
 
     @EventHandler
+    public void onWardenEffect(org.bukkit.event.entity.EntityPotionEffectEvent event) {
+        // Wardens periodically inflict Darkness on nearby players, which is disruptive in a Tower
+        // Defense setting. Cancel the screen-darkening effect when it is applied to a player by a
+        // Warden, without touching the Warden's own entity data.
+        if (event.getEntity() instanceof org.bukkit.entity.Player) {
+            org.bukkit.potion.PotionEffectType modified = event.getModifiedType();
+            if (modified != null
+                    && (modified.equals(org.bukkit.potion.PotionEffectType.DARKNESS)
+                        || modified.equals(org.bukkit.potion.PotionEffectType.BLINDNESS))
+                    && event.getCause() == org.bukkit.event.entity.EntityPotionEffectEvent.Cause.WARDEN) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler
     public void onMobDeath(org.bukkit.event.entity.EntityDeathEvent event) {
         Entity entity = event.getEntity();
         NamespacedKey key = new NamespacedKey(plugin, "td_mob");
@@ -527,6 +543,21 @@ public class MobListener implements Listener {
                 com.pauljang.towerDefense.entities.MobStateProfile profile =
                         plugin.getMobManager().getUpgradeRegistry().getProfile(chainKey, selectedTier);
                 if (profile == null) return;
+
+                // Enforce linear progression: a tier can only be unlocked one step above the player's
+                // current highest unlocked tier (e.g. you cannot buy Lvl 3 before unlocking Lvl 2).
+                int currentLevel = 1; // Tier 1 is always unlocked
+                for (int t = 2; t <= 5; t++) {
+                    if (plugin.getGameManager().isTierUnlocked(player.getUniqueId(), chainKey, t)) {
+                        currentLevel = t;
+                    }
+                }
+                if (selectedTier > currentLevel + 1) {
+                    player.sendMessage(org.bukkit.ChatColor.RED + "You must unlock Level "
+                            + (currentLevel + 1) + " first!");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                    return;
+                }
 
                 // If tier is not yet unlocked, spend EXP to unlock it first
                 if (!plugin.getGameManager().isTierUnlocked(player.getUniqueId(), chainKey, selectedTier)) {
