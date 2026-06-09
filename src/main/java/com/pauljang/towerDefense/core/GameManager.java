@@ -29,6 +29,9 @@ public class GameManager {
     private long matchStartTime = 0L;
 
     private int maxCastleHealth = 100;
+    // Number of players required to fill a match queue and start a game. Configurable via
+    // game.players-per-match (default 8 = up to 4v4). Use /td forcestart to begin with fewer.
+    private int matchSize = 8;
     private final java.util.Map<String, Integer> arenaHealth = new java.util.HashMap<>();
     private final java.util.Map<String, java.util.Map<String, Long>> activeSpells = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.Location, org.bukkit.Material> originalFloorBlocks = new java.util.HashMap<>();
@@ -49,6 +52,22 @@ public class GameManager {
     private final java.util.List<java.util.UUID> matchQueue = new java.util.ArrayList<>();
     private org.bukkit.scheduler.BukkitTask lobbyQueueTask = null;
     private int lobbyQueueSecondsLeft = 0;
+
+    // Pending action-bar gains, flushed once per second to avoid chat flooding from many kills.
+    private final Map<UUID, Integer> pendingGold = new HashMap<>();
+    private final Map<UUID, Integer> pendingExp = new HashMap<>();
+
+    // Dynamic spell pricing: track the last cast time and current cost multiplier per spell per player.
+    // Each successive cast of a spell doubles its cost; the cost resets after 10s without casting it.
+    private final Map<UUID, Map<String, Long>> lastSpellCast = new HashMap<>();
+    private final Map<UUID, Map<String, Integer>> spellCostMultiplier = new HashMap<>();
+    // Last time the player cast ANY spell, used to enforce a global 0.5s anti-spam cooldown.
+    private final Map<UUID, Long> lastAnySpellCast = new HashMap<>();
+
+    // Cooldown windows (ms): global anti-spam between any spells, and the long Freeze-specific cooldown.
+    private static final long GLOBAL_SPELL_COOLDOWN_MS = 500L;
+    private static final long SPELL_PRICE_RESET_MS = 10000L;
+    private static final long FREEZE_COOLDOWN_MS = 30000L;
 
     /**
      * Returns the current tier for a given upgrade chain for the player.
@@ -86,6 +105,7 @@ public class GameManager {
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
         this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 100);
+        this.matchSize = Math.max(2, plugin.getConfig().getInt("game.players-per-match", 8));
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
         
@@ -100,6 +120,23 @@ public class GameManager {
                 updateScoreboard(player);
                 // Keep the inventory completely clear of arrows
                 player.getInventory().remove(Material.ARROW);
+
+                // Flush any accumulated gold/exp gains as a single combined action bar message
+                Integer pGold = pendingGold.remove(player.getUniqueId());
+                Integer pExp = pendingExp.remove(player.getUniqueId());
+                if (pGold != null || pExp != null) {
+                    StringBuilder sb = new StringBuilder();
+                    if (pGold != null && pGold != 0) {
+                        sb.append(ChatColor.GOLD).append("+").append(pGold).append(" Gold");
+                    }
+                    if (pExp != null && pExp != 0) {
+                        if (sb.length() > 0) sb.append(ChatColor.GRAY).append(" | ");
+                        sb.append(ChatColor.GREEN).append("+").append(pExp).append(" XP");
+                    }
+                    if (sb.length() > 0) {
+                        player.sendActionBar(sb.toString());
+                    }
+                }
             }
             updateTabNames();
         }, 0L, 20L);
@@ -200,11 +237,11 @@ public class GameManager {
         }
 
         // Populate matchQueue from the players physically in game_world if not already queued
-        if (matchQueue.size() < 2) {
+        if (matchQueue.size() < matchSize) {
             matchQueue.clear();
             if (gameWorld != null) {
                 for (Player p : gameWorld.getPlayers()) {
-                    if (matchQueue.size() < 2) {
+                    if (matchQueue.size() < matchSize) {
                         matchQueue.add(p.getUniqueId());
                     }
                 }
@@ -214,13 +251,13 @@ public class GameManager {
         // Teleport queued players to their arena starts, assign arenas, and initialize stats
         org.bukkit.Location spawnLoc = gameWorld != null ? gameWorld.getSpawnLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
 
-        int count = 1;
+        int count = 0;
         for (java.util.UUID uuid : matchQueue) {
             Player player = Bukkit.getPlayer(uuid);
             if (player == null) continue;
 
-            // Assign arenas: first queued player gets Arena 1, second gets Arena 2
-            String assignedArena = count == 1 ? "1" : "2";
+            // Alternate team assignments to support up to 4v4: even -> Blue (Arena 1), odd -> Red (Arena 2)
+            String assignedArena = (count % 2 == 0) ? "1" : "2";
             setPlayerArena(player.getUniqueId(), assignedArena);
             count++;
 
@@ -261,6 +298,8 @@ public class GameManager {
                 player.setAllowFlight(true);
                 player.playSound(player.getLocation(), Sound.EVENT_RAID_HORN, 1.0f, 1.0f);
                 teleportToArenaStart(player, getPlayerArena(uuid));
+                // Strip the matchmaking compass now the match is live; leaves the game-world compass.
+                ensureCompass(player);
             }
         }
     }
@@ -331,6 +370,15 @@ public class GameManager {
         swordLevels.clear();
         bowLevels.clear();
         playerArenas.clear();
+        // Clear mob progression so unlocked tiers don't carry over into the next match;
+        // everyone returns to Tier 1 (getMobTier defaults to 1, higher tiers default to locked).
+        playerMobTiers.clear();
+        playerUnlockedTiers.clear();
+        pendingGold.clear();
+        pendingExp.clear();
+        lastSpellCast.clear();
+        spellCostMultiplier.clear();
+        lastAnySpellCast.clear();
 
         // Teleport back to spawn and reset queue
         org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
@@ -358,14 +406,21 @@ public class GameManager {
     }
 
     public void handlePlayerDisconnect(Player player) {
+        // Capture match membership before removing — a disconnecting spectator must not trigger a forfeit.
+        boolean wasInMatch = matchQueue.contains(player.getUniqueId());
         matchQueue.remove(player.getUniqueId());
 
         // Cancel lobby queue countdown if a queued player leaves
-        if (lobbyQueueTask != null && matchQueue.size() < 2) {
+        if (lobbyQueueTask != null && matchQueue.size() < matchSize) {
             cancelLobbyQueueCountdown(player.getName() + " has disconnected.");
         }
 
         if (currentState != GameState.ACTIVE && currentState != GameState.STARTING) {
+            return;
+        }
+
+        // Only an actual match participant disconnecting should forfeit the game.
+        if (!wasInMatch) {
             return;
         }
 
@@ -406,8 +461,39 @@ public class GameManager {
         }, 100L); // 5 seconds delay to see the victory screen
     }
 
+    /**
+     * Forfeits the match for the given player by zeroing their arena's castle health, which ends the
+     * game and awards the win to the opposing team. Returns the lobby shortly after.
+     */
+    public void forfeit(Player player) {
+        if (currentState != GameState.ACTIVE && currentState != GameState.STARTING) {
+            player.sendMessage(ChatColor.RED + "There is no active game to forfeit.");
+            return;
+        }
+
+        String arena = getPlayerArena(player.getUniqueId());
+        if ((!"1".equals(arena) && !"2".equals(arena)) || !matchQueue.contains(player.getUniqueId())) {
+            player.sendMessage(ChatColor.RED + "You are not currently in an active game.");
+            return;
+        }
+
+        Bukkit.broadcastMessage(ChatColor.RED + "[Tower Defense] " + player.getName() + " has forfeited the match!");
+
+        // Zero this arena's health to trigger the end-game victory/forfeit handling.
+        arenaHealth.put(arena, 0);
+        setGameState(GameState.ENDED);
+
+        // Return to lobby state after a short delay so the victory screen is visible.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> setGameState(GameState.LOBBY), 100L);
+    }
+
     public java.util.List<java.util.UUID> getMatchQueue() {
         return matchQueue;
+    }
+
+    /** Number of players required to fill a match. Configurable via game.players-per-match (min 2). */
+    public int getMatchSize() {
+        return matchSize;
     }
 
     public void toggleQueue(Player player) {
@@ -419,21 +505,21 @@ public class GameManager {
         java.util.UUID uuid = player.getUniqueId();
         if (matchQueue.contains(uuid)) {
             matchQueue.remove(uuid);
-            player.sendMessage(ChatColor.YELLOW + "You have left the match queue (" + matchQueue.size() + "/2).");
+            player.sendMessage(ChatColor.YELLOW + "You have left the match queue (" + matchQueue.size() + "/" + matchSize + ").");
             giveLobbyItems(player);
             if (lobbyQueueTask != null) {
                 cancelLobbyQueueCountdown("A player has left the queue.");
             }
         } else {
-            if (matchQueue.size() >= 2) {
+            if (matchQueue.size() >= matchSize) {
                 player.sendMessage(ChatColor.RED + "The match queue is already full!");
                 return;
             }
             matchQueue.add(uuid);
-            player.sendMessage(ChatColor.GREEN + "You have joined the match queue (" + matchQueue.size() + "/2)!");
+            player.sendMessage(ChatColor.GREEN + "You have joined the match queue (" + matchQueue.size() + "/" + matchSize + ")!");
             giveLobbyItems(player);
             // Check if queue is full to start the 30-second lobby queue countdown
-            if (matchQueue.size() == 2) {
+            if (matchQueue.size() >= matchSize) {
                 startLobbyQueueCountdown();
             }
         }
@@ -449,6 +535,14 @@ public class GameManager {
             player.removePotionEffect(effect.getType());
         }
         
+        player.getInventory().setItem(4, createCompass(player)); // Put it in the center slot
+    }
+
+    /**
+     * Builds the navigation compass appropriate for the player's current world: a "Return to Lobby"
+     * compass in the game world, otherwise the lobby "Game Selector" compass.
+     */
+    public org.bukkit.inventory.ItemStack createCompass(Player player) {
         org.bukkit.inventory.ItemStack compass = new org.bukkit.inventory.ItemStack(org.bukkit.Material.COMPASS);
         org.bukkit.inventory.meta.ItemMeta meta = compass.getItemMeta();
         if (meta != null) {
@@ -462,12 +556,44 @@ public class GameManager {
             } else {
                 meta.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Game Selector");
                 java.util.List<String> lore = new java.util.ArrayList<>();
-                lore.add(ChatColor.GRAY + "Right-click to view open games.");
+                lore.add(ChatColor.GRAY + "Click to view open games.");
                 meta.setLore(lore);
             }
             compass.setItemMeta(meta);
         }
-        player.getInventory().setItem(4, compass); // Put it in the center slot
+        return compass;
+    }
+
+    /**
+     * Guarantees the player is holding the navigation compass appropriate for their current world,
+     * without disturbing the rest of their inventory. Used on join and on world change (even mid-match,
+     * where {@link #giveLobbyItems} — which wipes the inventory — must not be called).
+     *
+     * Any compass that does not match the world-appropriate one is stripped. In particular this
+     * removes the lobby "Game Selector" matchmaking compass once the player enters the game world /
+     * a match has started, so it can't linger and re-open the matchmaking GUI during play.
+     */
+    public void ensureCompass(Player player) {
+        org.bukkit.inventory.ItemStack desired = createCompass(player);
+        String desiredName = (desired.getItemMeta() != null && desired.getItemMeta().hasDisplayName())
+                ? desired.getItemMeta().getDisplayName() : null;
+
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        boolean hasDesired = false;
+        for (int i = 0; i < inv.getSize(); i++) {
+            org.bukkit.inventory.ItemStack it = inv.getItem(i);
+            if (it == null || it.getType() != org.bukkit.Material.COMPASS) continue;
+            String name = (it.hasItemMeta() && it.getItemMeta().hasDisplayName())
+                    ? it.getItemMeta().getDisplayName() : null;
+            if (desiredName != null && desiredName.equals(name)) {
+                hasDesired = true; // keep the world-appropriate compass
+            } else {
+                inv.setItem(i, null); // strip the wrong-world compass (e.g. the matchmaking compass)
+            }
+        }
+        if (!hasDesired) {
+            inv.setItem(4, desired);
+        }
     }
 
     public void openGamesGUI(Player player) {
@@ -495,7 +621,7 @@ public class GameManager {
             
             int waitingCount = matchQueue.size();
             
-            lore.add(ChatColor.GRAY + "Players queued: " + ChatColor.YELLOW + waitingCount + "/2");
+            lore.add(ChatColor.GRAY + "Players queued: " + ChatColor.YELLOW + waitingCount + "/" + matchSize);
             gameMeta.setLore(lore);
             gameItem.setItemMeta(gameMeta);
         }
@@ -507,7 +633,7 @@ public class GameManager {
     public void checkGameStartConditions() {
         if (currentState != GameState.LOBBY) return;
         org.bukkit.World gameWorld = org.bukkit.Bukkit.getWorld("game_world");
-        if (gameWorld != null && gameWorld.getPlayers().size() >= 2) {
+        if (gameWorld != null && gameWorld.getPlayers().size() >= matchSize) {
             setGameState(GameState.STARTING);
         }
     }
@@ -515,7 +641,7 @@ public class GameManager {
     public void checkGameStopConditions() {
         if (currentState == GameState.STARTING) {
             org.bukkit.World gameWorld = org.bukkit.Bukkit.getWorld("game_world");
-            if (gameWorld == null || gameWorld.getPlayers().size() < 2) {
+            if (gameWorld == null || gameWorld.getPlayers().size() < matchSize) {
                 setGameState(GameState.LOBBY);
                 Bukkit.broadcastMessage(ChatColor.RED + "[Tower Defense] Start countdown cancelled. Waiting for players...");
             }
@@ -767,6 +893,46 @@ public class GameManager {
         return end != null && System.currentTimeMillis() < end;
     }
 
+    /**
+     * Computes the cost multiplier that would apply to the player's next cast of this spell, without
+     * mutating any state. Each successive cast doubles the multiplier; 10 seconds of inactivity on that
+     * specific spell resets it back to 1. Used both for display (openUpgradesGUI) and to price a cast.
+     */
+    public int getNextSpellMultiplier(UUID uuid, String spellType) {
+        String spell = spellType.toUpperCase();
+        long now = System.currentTimeMillis();
+        Long last = lastSpellCast.getOrDefault(uuid, Collections.emptyMap()).get(spell);
+        int storedMult = spellCostMultiplier.getOrDefault(uuid, Collections.emptyMap()).getOrDefault(spell, 1);
+        if (last == null || now - last > SPELL_PRICE_RESET_MS) {
+            return 1;
+        }
+        // Within the reset window, every additional cast doubles the cost.
+        return storedMult * 2;
+    }
+
+    /** Records that the player just cast this spell at the given multiplier, for dynamic pricing. */
+    public void recordSpellCast(UUID uuid, String spellType, int multiplier) {
+        String spell = spellType.toUpperCase();
+        long now = System.currentTimeMillis();
+        lastSpellCast.computeIfAbsent(uuid, k -> new HashMap<>()).put(spell, now);
+        spellCostMultiplier.computeIfAbsent(uuid, k -> new HashMap<>()).put(spell, multiplier);
+        lastAnySpellCast.put(uuid, now);
+    }
+
+    /** True if the player is still within the global anti-spam cooldown after any spell cast. */
+    public boolean isGlobalSpellOnCooldown(UUID uuid) {
+        Long last = lastAnySpellCast.get(uuid);
+        return last != null && (System.currentTimeMillis() - last) < GLOBAL_SPELL_COOLDOWN_MS;
+    }
+
+    /** Remaining Freeze-specific cooldown in milliseconds (0 if ready). */
+    public long getFreezeCooldownRemaining(UUID uuid) {
+        Long last = lastSpellCast.getOrDefault(uuid, Collections.emptyMap()).get("FREEZE");
+        if (last == null) return 0L;
+        long remaining = FREEZE_COOLDOWN_MS - (System.currentTimeMillis() - last);
+        return Math.max(0L, remaining);
+    }
+
     public void castSpell(String arena, String spellType, int durationSeconds) {
         String spell = spellType.toUpperCase();
         long endTime = System.currentTimeMillis() + (durationSeconds * 1000L);
@@ -870,6 +1036,7 @@ public class GameManager {
     public void disableRandomTower(String arena, int durationSeconds) {
         java.util.List<com.pauljang.towerDefense.towers.Tower> arenaTowers = new java.util.ArrayList<>();
         for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
+            if (tower.isDisabled()) continue; // Don't re-target an already-disabled tower
             String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
             if (arena.equals(towerArena)) {
                 arenaTowers.add(tower);
@@ -993,6 +1160,8 @@ public class GameManager {
         bowLevels.put(uuid, 1);
         setPlayerArena(uuid, arena);
         player.getInventory().clear();
+        // Strip the lobby matchmaking compass so it can't linger into the match.
+        player.getInventory().remove(org.bukkit.Material.COMPASS);
         player.setHealth(player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue());
         player.setFoodLevel(20);
         player.setFireTicks(0);
@@ -1026,9 +1195,10 @@ public class GameManager {
         playerGold.put(uuid, current + amount);
         
         if (!silent) {
+            // Accumulate for the combined per-second action bar instead of spamming chat.
+            pendingGold.merge(uuid, amount, Integer::sum);
             Player player = Bukkit.getPlayer(uuid);
             if (player != null && player.isOnline()) {
-                player.sendMessage(ChatColor.GOLD + "+$" + amount + " Gold!");
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.2f);
             }
         }
@@ -1056,10 +1226,11 @@ public class GameManager {
     public void addExp(java.util.UUID uuid, int amount) {
         int current = getExp(uuid);
         playerExp.put(uuid, current + amount);
-        
+
+        // Accumulate for the combined per-second action bar instead of spamming chat.
+        pendingExp.merge(uuid, amount, Integer::sum);
         Player player = Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.GREEN + "+" + amount + " TD EXP!");
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.4f, 1.5f);
         }
     }
@@ -1243,9 +1414,11 @@ public class GameManager {
         
         replaceItemInInventory(player, swordMat, "SWORD");
         replaceItemInInventory(player, bowMat, "BOW");
-        
+
         // Clear any arrows that might have been in the inventory
         player.getInventory().remove(Material.ARROW);
+        // Strip the lobby matchmaking compass; the world-appropriate compass is granted via ensureCompass.
+        player.getInventory().remove(Material.COMPASS);
 
         // Give Mob Spawner Menu Item in slot 7 (index 7)
         org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
@@ -1412,30 +1585,35 @@ public class GameManager {
         gui.setItem(11, createCustomGUIItem(bowMat, bowName, bowLore));
 
         // 4. Defensive Spells (Slot 12, 13, 14)
-        int overchargeCost = plugin.getConfig().getInt("spells.overcharge.cost", 250);
+        int overchargeCost = plugin.getConfig().getInt("spells.overcharge.cost", 250) * getNextSpellMultiplier(uuid, "OVERCHARGE");
         int overchargeDur = plugin.getConfig().getInt("spells.overcharge.duration", 10);
         java.util.List<String> overchargeLore = new java.util.ArrayList<>();
-        overchargeLore.add(ChatColor.GRAY + "Increases tower attack speeds on your track by 50%.");
+        overchargeLore.add(ChatColor.GRAY + "Increases tower attack speeds on your track by 15%.");
         overchargeLore.add(ChatColor.GRAY + "Duration: " + overchargeDur + " seconds");
         overchargeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + overchargeCost + " Gold");
         overchargeLore.add("");
         overchargeLore.add(ChatColor.YELLOW + "Click to cast on your track!");
         gui.setItem(12, createCustomGUIItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "" + ChatColor.BOLD + "Spell: Overcharge", overchargeLore));
 
-        int freezeCost = plugin.getConfig().getInt("spells.freeze.cost", 200);
+        int freezeCost = plugin.getConfig().getInt("spells.freeze.cost", 200) * getNextSpellMultiplier(uuid, "FREEZE");
         int freezeDur = plugin.getConfig().getInt("spells.freeze.duration", 10);
-        double freezeSlow = plugin.getConfig().getDouble("spells.freeze.slow-multiplier", 0.4);
+        double freezeSlow = plugin.getConfig().getDouble("spells.freeze.slow-multiplier", 0.7);
         int freezePct = (int) Math.round((1.0 - freezeSlow) * 100.0);
         java.util.List<String> freezeLore = new java.util.ArrayList<>();
         freezeLore.add(ChatColor.GRAY + "Slows down mobs traversing your track by " + freezePct + "%.");
         freezeLore.add(ChatColor.GRAY + "(Does not affect slow-immune mobs)");
         freezeLore.add(ChatColor.GRAY + "Duration: " + freezeDur + " seconds");
         freezeLore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + freezeCost + " Gold");
+        freezeLore.add(ChatColor.RED + "Cooldown: 30 seconds");
+        long freezeRemaining = getFreezeCooldownRemaining(uuid);
+        if (freezeRemaining > 0) {
+            freezeLore.add(ChatColor.RED + "On cooldown: " + ((freezeRemaining / 1000) + 1) + "s remaining");
+        }
         freezeLore.add("");
         freezeLore.add(ChatColor.YELLOW + "Click to cast on your track!");
         gui.setItem(13, createCustomGUIItem(Material.SNOW_BLOCK, ChatColor.AQUA + "" + ChatColor.BOLD + "Spell: Freeze", freezeLore));
 
-        int stormCost = plugin.getConfig().getInt("spells.damage-storm.cost", 300);
+        int stormCost = plugin.getConfig().getInt("spells.damage-storm.cost", 300) * getNextSpellMultiplier(uuid, "DAMAGE_STORM");
         int stormDur = plugin.getConfig().getInt("spells.damage-storm.duration", 10);
         double stormDps = plugin.getConfig().getDouble("spells.damage-storm.damage-per-second", 2.0);
         java.util.List<String> stormLore = new java.util.ArrayList<>();
@@ -1447,7 +1625,7 @@ public class GameManager {
         gui.setItem(14, createCustomGUIItem(Material.MAGMA_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Spell: Damage Storm", stormLore));
  
         // 5. Offensive Spells / Sabotages (Slot 21, 22, 23)
-        int hasteCost = plugin.getConfig().getInt("spells.haste-rush.cost", 200);
+        int hasteCost = plugin.getConfig().getInt("spells.haste-rush.cost", 200) * getNextSpellMultiplier(uuid, "HASTE_RUSH");
         int hasteDur = plugin.getConfig().getInt("spells.haste-rush.duration", 6);
         double hasteMult = plugin.getConfig().getDouble("spells.haste-rush.speed-multiplier", 1.6);
         int hastePct = (int) Math.round((hasteMult - 1.0) * 100.0);
@@ -1460,7 +1638,7 @@ public class GameManager {
         hasteLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
         gui.setItem(21, createCustomGUIItem(Material.GOLD_BLOCK, ChatColor.GOLD + "" + ChatColor.BOLD + "Sabotage: Haste Rush", hasteLore));
  
-        int empCost = plugin.getConfig().getInt("spells.tower-emp.cost", 250);
+        int empCost = plugin.getConfig().getInt("spells.tower-emp.cost", 250) * getNextSpellMultiplier(uuid, "TOWER_EMP");
         int empDur = plugin.getConfig().getInt("spells.tower-emp.duration", 6);
         java.util.List<String> empLore = new java.util.ArrayList<>();
         empLore.add(ChatColor.GRAY + "Disables a random tower on the opponent's");
@@ -1471,7 +1649,7 @@ public class GameManager {
         empLore.add(ChatColor.RED + "Click to cast on OPPONENT'S track!");
         gui.setItem(22, createCustomGUIItem(Material.REDSTONE_BLOCK, ChatColor.RED + "" + ChatColor.BOLD + "Sabotage: Tower EMP", empLore));
  
-        int shieldCost = plugin.getConfig().getInt("spells.slow-shield.cost", 150);
+        int shieldCost = plugin.getConfig().getInt("spells.slow-shield.cost", 150) * getNextSpellMultiplier(uuid, "SLOW_SHIELD");
         int shieldDur = plugin.getConfig().getInt("spells.slow-shield.duration", 5);
         java.util.List<String> shieldLore = new java.util.ArrayList<>();
         shieldLore.add(ChatColor.GRAY + "Grants slow immunity to any mobs spawned");

@@ -19,6 +19,7 @@ public class Tower {
     private org.bukkit.entity.HappyGhast spawnedGhast = null;
     private boolean autopilot = true;
     private java.util.UUID ownerId = null;
+    private boolean empDisplayed = false;
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
         this.plotId = plotId;
@@ -112,4 +113,7 @@ public class Tower {
 
     public java.util.UUID getOwnerId() { return ownerId; }
     public void setOwnerId(java.util.UUID ownerId) { this.ownerId = ownerId; }
+
+    public boolean isEmpDisplayed() { return empDisplayed; }
+    public void setEmpDisplayed(boolean empDisplayed) { this.empDisplayed = empDisplayed; }
 }

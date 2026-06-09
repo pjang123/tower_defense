@@ -1,81 +1,81 @@
 Upgrade Chain,Tier,Entity Type,Price,Damage,HP,Speed,EXP Reward,Immunities,Mount,Equipment,Special Mechanics
-Zombie,1,ZOMBIE,15,1.0,40,2.0,7,None,None,None,None
-Zombie,2,ZOMBIE,18,1.0,56,2.0,9,None,None,LEATHER_HELMET,None
-Zombie,3,ZOMBIE,22,1.0,78,2.0,10,None,None,CHAINMAIL_HELMET,None
-Zombie,4,ZOMBIE,26,1.5,110,2.0,13,None,None,IRON_HELMET,None
-Zombie,5,ZOMBIE,31,2.0,154,1.6,30,None,None,DIAMOND_HELMET,None
-Spider,1,SPIDER,25,1.0,80,2.0,30,None,None,None,None
-Spider,2,SPIDER,30,1.0,112,2.0,32,None,None,None,None
-Spider,3,CAVE_SPIDER,36,1.5,157,1.6,36,None,None,None,None
-Spider,4,CAVE_SPIDER,43,1.0,222,1.6,38,None,None,None,Invisible to non-Mage/Ice towers
-Spider,5,CAVE_SPIDER,52,1.5,307,1.6,44,None,None,None,Fully Invisible
-Skeleton,1,SKELETON,60,1.0,350,1.6,60,None,None,None,None
-Skeleton,2,SKELETON,144,1.0,490,1.2,66,None,ZOMBIE_HORSE,None,None
-Skeleton,3,SKELETON,173,1.0,686,1.2,72,None,SKELETON_HORSE,None,None
-Skeleton,4,WITHER_SKELETON,207,2.0,960,1.2,80,"MAGE, ZEUS",ZOMBIE_HORSE,None,None
-Skeleton,5,WITHER_SKELETON,249,2.5,1345,0.9,80,"MAGE, ZEUS",SKELETON_HORSE,None,None
-Creeper,1,CREEPER,300,1.0,450,1.2,45,None,None,None,None
-Creeper,2,CREEPER,360,1.0,630,1.2,49,None,None,None,Regenerates Health
-Creeper,3,CREEPER,432,1.0,882,1.2,54,None,PIG,None,Regenerates Health
-Creeper,4,CREEPER,518,1.8,1235,0.9,60,None,COW,None,Regenerates Health
-Creeper,5,CREEPER,622,2.5,1729,0.9,66,None,None,None,"Spawns in Charged state, Regenerates Health"
-Silverfish,1,SILVERFISH,80,1.0,180,1.6,18,"ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Silverfish,2,SILVERFISH,96,1.0,252,1.6,19,"ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Silverfish,3,SILVERFISH,115,1.0,353,1.6,19,"ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Silverfish,4,ENDERMITE,138,2.5,411,1.2,21,"ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Silverfish,5,ENDERMITE,166,3.0,575,1.2,22,"ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Blaze,1,BLAZE,500,1.0,410,1.2,105,"MAGE, ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Blaze,2,BLAZE,600,1.0,574,1.2,111,"MAGE, ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Blaze,3,BLAZE,720,1.0,804,1.2,115,"MAGE, ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Blaze,4,BLAZE,864,1.5,1125,0.9,121,"MAGE, ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Blaze,5,BLAZE,1037,2.0,1575,0.9,127,"MAGE, ARTILLERY, POISON, SORCERER, QUAKE",None,None,Flying
-Zombie Pigman,1,ZOMBIFIED_PIGLIN,50,1.0,150,1.6,44,"MAGE, ZEUS",None,None,None
-Zombie Pigman,2,ZOMBIFIED_PIGLIN,120,1.0,210,1.6,48,"MAGE, ZEUS",None,GOLDEN_SWORD,None
-Zombie Pigman,3,ZOMBIFIED_PIGLIN,144,1.0,297,1.6,50,"MAGE, ZEUS",None,STONE_SWORD,None
-Zombie Pigman,4,ZOMBIFIED_PIGLIN,173,1.0,412,1.2,50,"MAGE, ZEUS",None,IRON_SWORD,None
-Zombie Pigman,5,ZOMBIFIED_PIGLIN,207,1.5,576,1.2,54,"MAGE, ZEUS",None,DIAMOND_SWORD,None
-Witch,1,WITCH,150,1.0,300,1.6,37,None,None,None,Heals other mobs
-Witch,2,WITCH,165,1.0,420,1.2,39,None,None,None,Heals other mobs
-Witch,3,WITCH,182,1.0,588,1.2,42,None,None,None,Heals other mobs
-Witch,4,WITCH,200,1.5,823,1.2,43,None,None,None,Heals other mobs
-Witch,5,WITCH,220,2.0,1152,0.9,45,None,None,None,Heals other mobs
-Slime,1,SLIME,1500,1.0,800,1.2,150,None,None,None,Splits 1x on death
-Slime,2,SLIME,1000,1.5,880,1.2,157,None,None,None,Splits 2x on death
-Slime,3,SLIME,2160,2.0,968,1.2,165,None,None,None,Splits 3x on death
-Slime,4,MAGMA_CUBE,2592,2.5,1065,0.9,174,MAGE,None,None,Splits 4x on death
-Slime,5,MAGMA_CUBE,3110,3.0,1171,0.9,183,MAGE,None,None,Splits 5x on death
-Giant,1,GIANT,5000,10.0,3000,0.6,300,QUAKE,None,None,"Summons zombies, Regenerates"
-Giant,2,GIANT,5750,20.0,4200,0.6,306,QUAKE,None,LEATHER_HELMET,"Summons zombies, Regenerates"
-Giant,3,GIANT,6613,30.0,5888,0.6,312,QUAKE,None,CHAINMAIL_HELMET,"Summons zombies, Regenerates"
-Giant,4,GIANT,7604,40.0,8232,0.6,318,QUAKE,None,IRON_HELMET,"Summons zombies, Regenerates"
-Giant,5,GIANT,8745,50.0,11525,0.6,324,QUAKE,None,DIAMOND_HELMET,"Summons zombies, Regenerates"
-Warden,1,WARDEN,4000,5.0,2500,0.9,250,None,None,None,High health tank
-Warden,2,WARDEN,4600,10.0,3500,0.6,260,None,None,None,Increased damage resistance
-Warden,3,WARDEN,5290,15.0,4900,0.6,270,None,None,None,Sonic boom attack potential
-Warden,4,WARDEN,6083,20.0,6860,0.6,280,None,None,None,Heavy tank
-Warden,5,WARDEN,6995,25.0,9600,0.6,290,None,None,None,Unstoppable force
-Ravager,1,RAVAGER,2000,3.0,1200,0.9,180,None,None,None,Heavy beast
-Ravager,2,RAVAGER,2400,4.0,1680,0.9,190,None,None,None,Armored plates
-Ravager,3,RAVAGER,2880,5.0,2352,0.9,200,None,None,None,Roar stun resistance
-Ravager,4,RAVAGER,3456,6.0,3292,0.6,210,None,None,None,Siege beast
-Ravager,5,RAVAGER,4147,7.0,4610,0.6,220,None,None,None,Elite siege beast
-Hoglin,1,HOGLIN,600,2.0,500,1.2,80,None,None,None,Brutal charge
-Hoglin,2,HOGLIN,720,3.0,700,1.2,85,None,None,None,Knockback resistance
-Hoglin,3,HOGLIN,864,4.0,980,1.2,90,None,None,None,Fierce tusks
-Hoglin,4,HOGLIN,1036,5.0,1372,0.9,95,None,None,None,Enraged
-Hoglin,5,ZOGLIN,1243,6.0,1920,0.9,100,MAGE,None,None,Fire resistant
-Enderman,1,ENDERMAN,800,2.0,600,1.2,100,CHORUS,None,None,Teleport Dodge
-Enderman,2,ENDERMAN,960,2.5,840,1.2,110,CHORUS,None,None,Teleport Dodge
-Enderman,3,ENDERMAN,1152,3.0,1176,0.9,120,CHORUS,None,None,Teleport Dodge
-Enderman,4,ENDERMAN,1382,3.5,1646,0.9,130,CHORUS,None,None,High Dodge Chance
-Enderman,5,ENDERMAN,1658,4.0,2300,0.9,140,CHORUS,None,None,High Dodge Chance
-Endermite,1,ENDERMITE,100,1.0,150,1.6,20,CHORUS,None,None,Swarm
-Endermite,2,ENDERMITE,120,1.5,210,1.6,22,CHORUS,None,None,Swarm
-Endermite,3,ENDERMITE,144,2.0,294,1.6,24,CHORUS,None,None,Swarm
-Endermite,4,ENDERMITE,172,2.5,411,1.2,26,CHORUS,None,None,Swarm
-Endermite,5,ENDERMITE,206,3.0,575,1.2,28,CHORUS,None,None,Swarm Leader
-Breeze,1,BREEZE,750,1.5,550,1.2,90,None,None,None,"Hovering, Fast"
-Breeze,2,BREEZE,900,2.0,770,1.2,95,None,None,None,"Hovering, Fast"
-Breeze,3,BREEZE,1080,2.5,1078,0.9,100,None,None,None,Deflects Projectiles
-Breeze,4,BREEZE,1296,3.0,1509,0.9,105,None,None,None,High Deflection
-Breeze,5,BREEZE,1555,3.5,2112,0.9,110,None,None,None,Storm Conjurer
+Zombie,1,ZOMBIE,22,1.0,80,2.0,7,None,None,None,None
+Zombie,2,ZOMBIE,27,1.0,112,2.0,9,None,None,LEATHER_HELMET,None
+Zombie,3,ZOMBIE,33,1.0,156,2.0,10,None,None,CHAINMAIL_HELMET,None
+Zombie,4,ZOMBIE,39,1.5,220,2.0,13,None,None,IRON_HELMET,None
+Zombie,5,ZOMBIE,46,2.0,308,1.6,30,None,None,DIAMOND_HELMET,None
+Spider,1,SPIDER,37,1.0,160,2.0,30,None,None,None,None
+Spider,2,SPIDER,45,1.0,224,2.0,32,None,None,None,None
+Spider,3,CAVE_SPIDER,54,1.5,314,1.6,36,None,None,None,None
+Spider,4,CAVE_SPIDER,64,1.0,444,1.6,38,None,None,None,Invisible
+Spider,5,CAVE_SPIDER,78,1.5,614,1.6,44,None,None,None,Invisible
+Skeleton,1,SKELETON,90,1.0,700,1.6,60,None,None,None,None
+Skeleton,2,SKELETON,216,1.0,980,1.2,66,None,ZOMBIE_HORSE,None,None
+Skeleton,3,SKELETON,259,1.0,1372,1.2,72,None,SKELETON_HORSE,None,None
+Skeleton,4,WITHER_SKELETON,310,2.0,1920,1.2,80,"FIRE",ZOMBIE_HORSE,None,None
+Skeleton,5,WITHER_SKELETON,373,2.5,2690,0.9,80,"FIRE",SKELETON_HORSE,None,None
+Creeper,1,CREEPER,450,1.0,900,1.2,45,None,None,None,None
+Creeper,2,CREEPER,540,1.0,1260,1.2,49,None,None,None,Regenerates Health
+Creeper,3,CREEPER,648,1.0,1764,1.2,54,None,PIG,None,Regenerates Health
+Creeper,4,CREEPER,777,1.8,2470,0.9,60,None,COW,None,Regenerates Health
+Creeper,5,CREEPER,933,2.5,3458,0.9,66,None,None,None,"Spawns in Charged state, Regenerates Health"
+Silverfish,1,SILVERFISH,120,1.0,360,1.6,18,"ARCHER, POISON, ICE",None,None,None
+Silverfish,2,SILVERFISH,144,1.0,504,1.6,19,"ARCHER, POISON, ICE",None,None,None
+Silverfish,3,SILVERFISH,172,1.0,706,1.6,19,"ARCHER, POISON, ICE",None,None,None
+Silverfish,4,ENDERMITE,207,2.5,822,1.2,21,"ARCHER, POISON, ICE",None,None,None
+Silverfish,5,ENDERMITE,249,3.0,1150,1.2,22,"ARCHER, POISON, ICE",None,None,None
+Blaze,1,BLAZE,750,1.0,820,1.2,105,"FIRE, ARCHER, POISON, ICE",None,None,Flying
+Blaze,2,BLAZE,900,1.0,1148,1.2,111,"FIRE, ARCHER, POISON, ICE",None,None,Flying
+Blaze,3,BLAZE,1080,1.0,1608,1.2,115,"FIRE, ARCHER, POISON, ICE",None,None,Flying
+Blaze,4,BLAZE,1296,1.5,2250,0.9,121,"FIRE, ARCHER, POISON, ICE",None,None,Flying
+Blaze,5,BLAZE,1555,2.0,3150,0.9,127,"FIRE, ARCHER, POISON, ICE",None,None,Flying
+Zombie Pigman,1,ZOMBIFIED_PIGLIN,75,1.0,300,1.6,44,"FIRE",None,None,None
+Zombie Pigman,2,ZOMBIFIED_PIGLIN,180,1.0,420,1.6,48,"FIRE",None,GOLDEN_SWORD,None
+Zombie Pigman,3,ZOMBIFIED_PIGLIN,216,1.0,594,1.6,50,"FIRE",None,STONE_SWORD,None
+Zombie Pigman,4,ZOMBIFIED_PIGLIN,259,1.0,824,1.2,50,"FIRE",None,IRON_SWORD,None
+Zombie Pigman,5,ZOMBIFIED_PIGLIN,310,1.5,1152,1.2,54,"FIRE",None,DIAMOND_SWORD,None
+Witch,1,WITCH,225,1.0,600,1.6,37,None,None,None,Heals other mobs
+Witch,2,WITCH,247,1.0,840,1.2,39,None,None,None,Heals other mobs
+Witch,3,WITCH,273,1.0,1176,1.2,42,None,None,None,Heals other mobs
+Witch,4,WITCH,300,1.5,1646,1.2,43,None,None,None,Heals other mobs
+Witch,5,WITCH,330,2.0,2304,0.9,45,None,None,None,Heals other mobs
+Slime,1,SLIME,2250,1.0,1600,1.2,150,None,None,None,Splits 1x on death
+Slime,2,SLIME,1500,1.5,1760,1.2,157,None,None,None,Splits 2x on death
+Slime,3,SLIME,3240,2.0,1936,1.2,165,None,None,None,Splits 3x on death
+Slime,4,MAGMA_CUBE,3888,2.5,2130,0.9,174,"FIRE",None,None,Splits 4x on death
+Slime,5,MAGMA_CUBE,4665,3.0,2342,0.9,183,"FIRE",None,None,Splits 5x on death
+Giant,1,GIANT,7500,10.0,6000,0.6,300,"ICE",None,None,"Summons zombies, Regenerates"
+Giant,2,GIANT,8625,20.0,8400,0.6,306,"ICE",None,LEATHER_HELMET,"Summons zombies, Regenerates"
+Giant,3,GIANT,9919,30.0,11776,0.6,312,"ICE",None,CHAINMAIL_HELMET,"Summons zombies, Regenerates"
+Giant,4,GIANT,11406,40.0,16464,0.6,318,"ICE",None,IRON_HELMET,"Summons zombies, Regenerates"
+Giant,5,GIANT,13117,50.0,23050,0.6,324,"ICE",None,DIAMOND_HELMET,"Summons zombies, Regenerates"
+Warden,1,WARDEN,6000,5.0,10000,0.9,250,"ICE, POISON",None,None,High health tank
+Warden,2,WARDEN,6900,10.0,14000,0.6,260,"ICE, POISON",None,None,Increased damage resistance
+Warden,3,WARDEN,7935,15.0,20000,0.6,270,"ICE, POISON",None,None,Sonic boom attack potential
+Warden,4,WARDEN,9124,20.0,28000,0.6,280,"ICE, POISON",None,None,Heavy tank
+Warden,5,WARDEN,10492,25.0,40000,0.6,290,"ICE, POISON",None,None,Unstoppable force
+Ravager,1,RAVAGER,3000,3.0,2400,0.9,180,None,None,None,Heavy beast
+Ravager,2,RAVAGER,3600,4.0,3360,0.9,190,None,None,None,Armored plates
+Ravager,3,RAVAGER,4320,5.0,4704,0.9,200,None,None,None,Roar stun resistance
+Ravager,4,RAVAGER,5184,6.0,6584,0.6,210,None,None,None,Siege beast
+Ravager,5,RAVAGER,6220,7.0,9220,0.6,220,None,None,None,Elite siege beast
+Hoglin,1,HOGLIN,900,2.0,1000,1.2,80,None,None,None,Brutal charge
+Hoglin,2,HOGLIN,1080,3.0,1400,1.2,85,None,None,None,Knockback resistance
+Hoglin,3,HOGLIN,1296,4.0,1960,1.2,90,None,None,None,Fierce tusks
+Hoglin,4,HOGLIN,1554,5.0,2744,0.9,95,None,None,None,Enraged
+Hoglin,5,ZOGLIN,1864,6.0,3840,0.9,100,"FIRE",None,None,Fire resistant
+Enderman,1,ENDERMAN,1200,2.0,1200,1.2,100,"CHORUS",None,None,Teleport Dodge
+Enderman,2,ENDERMAN,1440,2.5,1680,1.2,110,"CHORUS",None,None,Teleport Dodge
+Enderman,3,ENDERMAN,1728,3.0,2352,0.9,120,"CHORUS",None,None,Teleport Dodge
+Enderman,4,ENDERMAN,2073,3.5,3292,0.9,130,"CHORUS",None,None,High Dodge Chance
+Enderman,5,ENDERMAN,2487,4.0,4600,0.9,140,"CHORUS",None,None,High Dodge Chance
+Endermite,1,ENDERMITE,150,1.0,300,1.6,20,"CHORUS",None,None,Swarm
+Endermite,2,ENDERMITE,180,1.5,420,1.6,22,"CHORUS",None,None,Swarm
+Endermite,3,ENDERMITE,216,2.0,588,1.6,24,"CHORUS",None,None,Swarm
+Endermite,4,ENDERMITE,258,2.5,822,1.2,26,"CHORUS",None,None,Swarm
+Endermite,5,ENDERMITE,309,3.0,1150,1.2,28,"CHORUS",None,None,Swarm Leader
+Breeze,1,BREEZE,1125,1.5,1100,1.2,90,None,None,None,"Flying, Hovering, Fast"
+Breeze,2,BREEZE,1350,2.0,1540,1.2,95,None,None,None,"Flying, Hovering, Fast"
+Breeze,3,BREEZE,1620,2.5,2156,0.9,100,None,None,None,"Flying, Deflects Projectiles"
+Breeze,4,BREEZE,1944,3.0,3018,0.9,105,None,None,None,"Flying, High Deflection"
+Breeze,5,BREEZE,2332,3.5,4224,0.9,110,None,None,None,"Flying, Storm Conjurer"

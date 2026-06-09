@@ -61,7 +61,7 @@ public class MobUpgradeRegistry {
                 EntityType entityType = EntityType.valueOf(parts[2].trim().toUpperCase());
                 double price = Double.parseDouble(parts[3].trim());
                 double damage = Double.parseDouble(parts[4].trim());
-                double hp = Double.parseDouble(parts[5].trim());
+                double hp = roundToNiceValue(Double.parseDouble(parts[5].trim()));
                 double speed = Double.parseDouble(parts[6].trim());
                 int expReward = Integer.parseInt(parts[7].trim());
 
@@ -97,6 +97,26 @@ public class MobUpgradeRegistry {
         } catch (IOException | IllegalArgumentException e) {
             plugin.getLogger().severe("Failed to load mob upgrades CSV: " + e.getMessage());
         }
+    }
+
+    /**
+     * Snaps a raw HP value to a clean, readable number. Lower-tier mobs round to the nearest 5/10,
+     * while heavy tanks round to the nearest 50/100, so health bars read as tidy round figures
+     * instead of arbitrary decimals as tiers scale up.
+     */
+    static double roundToNiceValue(double hp) {
+        double step;
+        if (hp < 100) {
+            step = 5;
+        } else if (hp < 500) {
+            step = 10;
+        } else if (hp < 2000) {
+            step = 50;
+        } else {
+            step = 100;
+        }
+        double snapped = Math.round(hp / step) * step;
+        return Math.max(step, snapped); // never round a positive HP down to 0
     }
 
     public MobStateProfile getProfile(String upgradeChain, int tier) {

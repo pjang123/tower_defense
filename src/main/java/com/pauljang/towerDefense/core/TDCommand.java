@@ -30,7 +30,7 @@ public class TDCommand implements CommandExecutor {
 
         // If they just type /td with no arguments
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]|challenge [player]|accept>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|spawnmob|gui|upgrades|giveitems|setarena [player] [arena]|challenge [player]|accept|lobby|forfeit|forcestart>");
             return true;
         }
 
@@ -43,6 +43,9 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td list " + ChatColor.WHITE + "- Shows this help menu");
                 player.sendMessage(ChatColor.YELLOW + "/td challenge [player] " + ChatColor.WHITE + "- Duel another player in 1v1 TD");
                 player.sendMessage(ChatColor.YELLOW + "/td accept " + ChatColor.WHITE + "- Accept a pending duel challenge");
+                player.sendMessage(ChatColor.YELLOW + "/td lobby " + ChatColor.WHITE + "- Return to the lobby and leave the queue");
+                player.sendMessage(ChatColor.YELLOW + "/td forfeit " + ChatColor.WHITE + "- Forfeit the active game");
+                player.sendMessage(ChatColor.YELLOW + "/td forcestart " + ChatColor.WHITE + "- Start the countdown with 2+ queued players");
                 player.sendMessage(ChatColor.YELLOW + "/td start " + ChatColor.WHITE + "- Force start the game");
                 player.sendMessage(ChatColor.YELLOW + "/td stop " + ChatColor.WHITE + "- Force stop the game");
                 player.sendMessage(ChatColor.YELLOW + "/td status " + ChatColor.WHITE + "- Show current game state");
@@ -346,6 +349,44 @@ public class TDCommand implements CommandExecutor {
 
             case "accept":
                 gameManager.acceptChallenge(player);
+                break;
+
+            case "lobby":
+                GameState lobbyState = gameManager.getCurrentState();
+                boolean isPlaying = (lobbyState == GameState.ACTIVE || lobbyState == GameState.STARTING)
+                        && gameManager.getMatchQueue().contains(player.getUniqueId());
+                if (isPlaying) {
+                    player.sendMessage(ChatColor.RED + "You are in an active game! Use " + ChatColor.YELLOW + "/td forfeit" + ChatColor.RED + " to leave.");
+                } else {
+                    gameManager.getMatchQueue().remove(player.getUniqueId());
+                    org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
+                    if (lobbyWorld != null) {
+                        player.teleport(lobbyWorld.getSpawnLocation());
+                    }
+                    gameManager.giveLobbyItems(player);
+                    player.sendMessage(ChatColor.GREEN + "Returned to the lobby.");
+                }
+                break;
+
+            case "forfeit":
+                if (gameManager.getCurrentState() == GameState.ACTIVE || gameManager.getCurrentState() == GameState.STARTING) {
+                    gameManager.forfeit(player);
+                } else {
+                    player.sendMessage(ChatColor.RED + "There is no active game to forfeit.");
+                }
+                break;
+
+            case "forcestart":
+                if (gameManager.getCurrentState() == GameState.ACTIVE || gameManager.getCurrentState() == GameState.STARTING) {
+                    player.sendMessage(ChatColor.RED + "A game is already in progress!");
+                    break;
+                }
+                if (gameManager.getMatchQueue().size() >= 2) {
+                    gameManager.startLobbyQueueCountdown();
+                    player.sendMessage(ChatColor.GREEN + "Force-starting the match countdown!");
+                } else {
+                    player.sendMessage(ChatColor.RED + "Need at least 2 players in the queue to force start.");
+                }
                 break;
 
             default:

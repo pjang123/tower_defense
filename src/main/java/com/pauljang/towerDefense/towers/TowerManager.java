@@ -132,6 +132,16 @@ public class TowerManager {
         isolateTowerBlocks(center, tower.getStructureSize());
         clearNearbyDroppedItemsLater(center);
 
+        // Owner-name prefix applied to spawned Golems/Ghasts (e.g. "Steve's Iron Golem").
+        String ownerPrefix = "";
+        if (tower.getOwnerId() != null) {
+            String ownerName = org.bukkit.Bukkit.getOfflinePlayer(tower.getOwnerId()).getName();
+            if (ownerName != null) {
+                ownerPrefix = org.bukkit.ChatColor.GOLD + ownerName + "'s ";
+            }
+        }
+        final String ownerNamePrefix = ownerPrefix;
+
         // Handle Golem and Happy Ghast entity spawns
         if (type == TowerType.GOLEM) {
             if (tower.getSpawnedGolem() != null && tower.getSpawnedGolem().isValid()) {
@@ -156,7 +166,7 @@ public class TowerManager {
                         golem.setGravity(true);
                         golem.setCollidable(false);
                         golem.setPersistent(true);
-                        golem.setCustomName(org.bukkit.ChatColor.GOLD + "Copper Golem");
+                        golem.setCustomName(ownerNamePrefix + org.bukkit.ChatColor.GOLD + "Copper Golem");
                         golem.setCustomNameVisible(true);
                     }
                 } catch (Exception ignored) {
@@ -166,7 +176,7 @@ public class TowerManager {
                         g.setGravity(true);
                         g.setCollidable(false);
                         g.setPersistent(true);
-                        g.setCustomName(org.bukkit.ChatColor.GOLD + "Copper Golem");
+                        g.setCustomName(ownerNamePrefix + org.bukkit.ChatColor.GOLD + "Copper Golem");
                         setEntityScale(g, 0.6);
                         g.setCustomNameVisible(true);
                     });
@@ -178,7 +188,7 @@ public class TowerManager {
                     g.setGravity(true);
                     g.setCollidable(false);
                     g.setPersistent(true);
-                    g.setCustomName(org.bukkit.ChatColor.GRAY + "Iron Golem");
+                    g.setCustomName(ownerNamePrefix + org.bukkit.ChatColor.GRAY + "Iron Golem");
                     setEntityScale(g, 1.0);
                     g.setCustomNameVisible(true);
                 });
@@ -198,7 +208,7 @@ public class TowerManager {
                 gh.setGravity(false);
                 gh.setCollidable(false);
                 gh.setPersistent(true);
-                gh.setCustomName(org.bukkit.ChatColor.LIGHT_PURPLE + "Happy Ghast [Lvl " + level + "]");
+                gh.setCustomName(ownerNamePrefix + org.bukkit.ChatColor.LIGHT_PURPLE + "Happy Ghast [Lvl " + level + "]");
                 gh.setCustomNameVisible(true);
                 setEntityScale(gh, 0.5);
             });
@@ -245,6 +255,20 @@ public class TowerManager {
 
             if (!harnessApplied) {
                 plugin.getLogger().warning("[HappyGhast] All harness approaches failed — ghast will not be rideable. Check logs above for details.");
+            }
+        }
+
+        // Push out any player who ended up inside the tower's bounding box (e.g. standing on the plot
+        // while the structure was raised), teleporting them safely to the top of the tower.
+        int boundsY = tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 3;
+        int boundsX = tower.getStructureSize() != null ? tower.getStructureSize().getBlockX() : 1;
+        int boundsZ = tower.getStructureSize() != null ? tower.getStructureSize().getBlockZ() : 1;
+        Location boxCenter = center.clone().add(0, boundsY / 2.0, 0);
+        for (org.bukkit.entity.Entity nearby : center.getWorld().getNearbyEntities(
+                boxCenter, boundsX / 2.0 + 0.5, boundsY / 2.0 + 1.0, boundsZ / 2.0 + 0.5)) {
+            if (nearby instanceof Player trapped) {
+                trapped.teleport(center.clone().add(0, boundsY + 1, 0));
+                trapped.sendMessage(ChatColor.YELLOW + "You were moved to the top of the tower.");
             }
         }
     }
@@ -320,6 +344,11 @@ public class TowerManager {
         if (tower.getStructureSize() != null) {
             holoHeight = tower.getStructureSize().getBlockY() + 1.2;
         }
+        // The Poison Tower's structure lacks a tall bounding box, so its hologram floats too high.
+        // Pin it slightly lower so it sits just above the tower instead.
+        if (tower.getType() == TowerType.POISON) {
+            holoHeight = (tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 3) + 0.3;
+        }
 
         long cooldown = tower.getCooldown();
         boolean isBoosted = isRedstoneBoosted(tower);
@@ -331,8 +360,18 @@ public class TowerManager {
             speedStr += ChatColor.RED + " ⚡";
         }
 
+        // Prepend the owner's name to the tower title, e.g. "Steve's Archer Tower".
+        String ownerPrefix = "";
+        if (tower.getOwnerId() != null) {
+            String ownerName = org.bukkit.Bukkit.getOfflinePlayer(tower.getOwnerId()).getName();
+            if (ownerName != null) {
+                ownerPrefix = ChatColor.GOLD + ownerName + "'s ";
+            }
+        }
+
         java.util.List<String> lines = new java.util.ArrayList<>();
-        lines.add(tower.getType().getColor().toString() + ChatColor.BOLD.toString() + tower.getType().name().toLowerCase() + "_" + tower.getLevel());
+        lines.add(ownerPrefix + tower.getType().getColor().toString() + ChatColor.BOLD.toString()
+                + tower.getType().getDisplayName() + " " + tower.getRomanLevel());
         
         if (tower.getType() == TowerType.REDSTONE) {
             lines.add(ChatColor.RED + "✦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
@@ -448,11 +487,27 @@ public class TowerManager {
 
                 for (Tower tower : placedTowers.values()) {
                     if (tower.isDisabled()) {
-                        if (tick % 10 == 0) {
+                        tower.setEmpDisplayed(true);
+                        // Make the disabled state obvious: relabel the top hologram line and emit heavy
+                        // smoke + redstone particles around the tower.
+                        java.util.List<ArmorStand> empStands = tower.getHolograms();
+                        if (!empStands.isEmpty() && empStands.get(0) != null && empStands.get(0).isValid()) {
+                            empStands.get(0).setCustomName(ChatColor.RED + "" + ChatColor.BOLD + "[DISABLED EMP]");
+                            empStands.get(0).setCustomNameVisible(true);
+                        }
+                        if (tick % 5 == 0) {
                             Location center = tower.getCenterLocation();
-                            center.getWorld().spawnParticle(org.bukkit.Particle.SMOKE, center.clone().add(0, 2, 0), 2, 0.2, 0.2, 0.2, 0.0);
+                            center.getWorld().spawnParticle(org.bukkit.Particle.LARGE_SMOKE, center.clone().add(0, 2, 0), 12, 0.5, 0.7, 0.5, 0.02);
+                            center.getWorld().spawnParticle(org.bukkit.Particle.DUST, center.clone().add(0, 2.5, 0), 10, 0.5, 0.7, 0.5,
+                                    new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.5f));
                         }
                         continue;
+                    }
+
+                    // Tower just came back online after an EMP — restore its normal hologram.
+                    if (tower.isEmpDisplayed()) {
+                        tower.setEmpDisplayed(false);
+                        updateHologram(tower);
                     }
 
                     // Redstone passive towers don't fire active attacks, they only boost nearby towers
@@ -502,97 +557,27 @@ public class TowerManager {
                         }
                     }
 
-                    // Golem pathing movement tick
+                    // Golem pathing movement tick: chase the nearest mob on the track within range,
+                    // otherwise return to the tower center.
                     if (tower.getType() == TowerType.GOLEM && tower.getSpawnedGolem() != null && tower.getSpawnedGolem().isValid()) {
                         org.bukkit.entity.LivingEntity golem = tower.getSpawnedGolem();
-                        org.bukkit.NamespacedKey wpKey = new org.bukkit.NamespacedKey(plugin, "golem_wp_index");
-                        org.bukkit.NamespacedKey dirKey = new org.bukkit.NamespacedKey(plugin, "golem_wp_dir");
-                        
-                        int wpIndex = 0;
-                        int dirVal = 1;
-                        if (golem.getPersistentDataContainer().has(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER)) {
-                            wpIndex = golem.getPersistentDataContainer().get(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER);
-                        }
-                        if (golem.getPersistentDataContainer().has(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER)) {
-                            dirVal = golem.getPersistentDataContainer().get(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER);
-                        }
-                        
-                        String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
-                        java.util.List<Location> wps = plugin.getWaypointConfigManager().getWaypoints(towerArena);
-                        if (!wps.isEmpty()) {
-                            Location centerLoc = tower.getCenterLocation();
-                            double range = tower.getRange();
-                            
-                            // Find closest waypoint on the path to the tower center
-                            int closestIndex = 0;
-                            double closestDistSq = Double.MAX_VALUE;
-                            for (int i = 0; i < wps.size(); i++) {
-                                Location wp = wps.get(i);
-                                if (wp.getWorld().equals(centerLoc.getWorld())) {
-                                    double distSq = wp.distanceSquared(centerLoc);
-                                    if (distSq < closestDistSq) {
-                                        closestDistSq = distSq;
-                                        closestIndex = i;
-                                    }
+                        if (golem instanceof org.bukkit.entity.Mob golemMob && tick % 5 == 0) {
+                            String golemArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+                            Mob nearestTrackMob = null;
+                            double nearestDistSq = Double.MAX_VALUE;
+                            for (Mob candidate : getMobsInRadius(tower.getCenterLocation(), tower.getRange(), golemArena)) {
+                                double dSq = candidate.getLocation().distanceSquared(golem.getLocation());
+                                if (dSq < nearestDistSq) {
+                                    nearestDistSq = dSq;
+                                    nearestTrackMob = candidate;
                                 }
                             }
-                            
-                            int minIndex = closestIndex;
-                            int maxIndex = closestIndex;
-                            
-                            // Expand left (downwards in indices) while within range
-                            while (minIndex > 0) {
-                                Location wp = wps.get(minIndex - 1);
-                                if (wp.getWorld().equals(centerLoc.getWorld()) && wp.distanceSquared(centerLoc) <= range * range) {
-                                    minIndex--;
-                                } else {
-                                    break;
-                                }
-                            }
-                            
-                            // Expand right (upwards in indices) while within range
-                            while (maxIndex < wps.size() - 1) {
-                                Location wp = wps.get(maxIndex + 1);
-                                if (wp.getWorld().equals(centerLoc.getWorld()) && wp.distanceSquared(centerLoc) <= range * range) {
-                                    maxIndex++;
-                                } else {
-                                    break;
-                                }
-                            }
-                            
-                            // Adjust wpIndex if it falls outside of [minIndex, maxIndex]
-                            if (wpIndex < minIndex || wpIndex > maxIndex) {
-                                wpIndex = closestIndex;
-                                dirVal = 1;
-                                golem.getPersistentDataContainer().set(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER, wpIndex);
-                                golem.getPersistentDataContainer().set(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER, dirVal);
-                            }
-                            
-                            Location targetWp = wps.get(wpIndex);
-                            
-                            if (golem instanceof org.bukkit.entity.Mob mob) {
-                                if (tick % 5 == 0) {
-                                    mob.getPathfinder().moveTo(targetWp, 1.25);
-                                }
-                            }
-                            
-                            if (golem.getLocation().distanceSquared(targetWp) < 2.25) {
-                                if (minIndex == maxIndex) {
-                                    wpIndex = minIndex;
-                                } else {
-                                    wpIndex += dirVal;
-                                    if (wpIndex > maxIndex) {
-                                        dirVal = -1;
-                                        wpIndex = maxIndex - 1;
-                                        if (wpIndex < minIndex) wpIndex = minIndex;
-                                    } else if (wpIndex < minIndex) {
-                                        dirVal = 1;
-                                        wpIndex = minIndex + 1;
-                                        if (wpIndex > maxIndex) wpIndex = maxIndex;
-                                    }
-                                }
-                                golem.getPersistentDataContainer().set(wpKey, org.bukkit.persistence.PersistentDataType.INTEGER, wpIndex);
-                                golem.getPersistentDataContainer().set(dirKey, org.bukkit.persistence.PersistentDataType.INTEGER, dirVal);
+                            if (nearestTrackMob != null) {
+                                golemMob.getPathfinder().moveTo(nearestTrackMob.getLocation(), 1.25);
+                                golemMob.setTarget(nearestTrackMob);
+                            } else {
+                                golemMob.getPathfinder().moveTo(tower.getCenterLocation(), 1.0);
+                                golemMob.setTarget(null);
                             }
                         }
                     }
@@ -600,7 +585,7 @@ public class TowerManager {
                     long cooldown = tower.getCooldown();
                     String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
                     if (plugin.getGameManager().isSpellActive(towerArena, "OVERCHARGE")) {
-                        cooldown = Math.max(1, cooldown / 2);
+                        cooldown = Math.max(1L, (long) (cooldown * 0.85)); // 15% attack-speed boost
                     }
 
                     // Redstone passive cooldown reduction boost
@@ -631,6 +616,20 @@ public class TowerManager {
 
     private Mob findTarget(Tower tower) {
         Location towerLoc = tower.getCenterLocation();
+
+        // Happy Ghasts can leave their base (ridden or roaming on autopilot). When the ghast has
+        // drifted away horizontally from its tower, sweep for targets around the ghast's live
+        // location instead of the static tower block so its detection radius tracks with it.
+        if (tower.getType() == TowerType.HAPPY_GHAST
+                && tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
+            Location ghastLoc = tower.getSpawnedGhast().getLocation();
+            double dx = ghastLoc.getX() - towerLoc.getX();
+            double dz = ghastLoc.getZ() - towerLoc.getZ();
+            if (dx * dx + dz * dz > 9.0) { // >3 blocks horizontal: ghast is off-station
+                towerLoc = ghastLoc;
+            }
+        }
+
         double rangeSquared = Math.pow(tower.getRange(), 2);
         String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
 
@@ -748,6 +747,11 @@ public class TowerManager {
 
         switch (tower.getType()) {
             case ARCHER -> {
+                // Breeze deflects single-target Archer projectiles.
+                if (target.getType() == org.bukkit.entity.EntityType.BREEZE) {
+                    start.getWorld().playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1f);
+                    return;
+                }
                 target.damage(tower.getDamage());
                 drawParticleLine(start, target.getEyeLocation(), org.bukkit.Particle.CRIT);
                 start.getWorld().playSound(start, Sound.ENTITY_ARROW_SHOOT, 0.8f, 1.2f);
@@ -777,8 +781,12 @@ public class TowerManager {
                 start.getWorld().playSound(start, Sound.ENTITY_PLAYER_SPLASH, 0.8f, 1.2f);
             }
             case CHORUS -> {
+                // Chorus-immune mobs (e.g. Enderman) skip the rollback teleportation entirely.
+                if (isMobImmuneToTower(target, "CHORUS")) {
+                    return;
+                }
                 target.damage(tower.getDamage());
-                
+
                 com.pauljang.towerDefense.entities.TDMob tdMob = null;
                 for (com.pauljang.towerDefense.entities.TDMob active : plugin.getMobManager().getActiveMobs()) {
                     if (active.getEntity().equals(target)) {
@@ -880,10 +888,23 @@ public class TowerManager {
                         if (heightOffset > 0.0) {
                             teleportLoc.add(0, heightOffset, 0);
                         }
-                        
+
+                        // Face the waypoint the mob is now heading toward so it doesn't spin on arrival.
+                        com.pauljang.towerDefense.data.TDWaypoint nextWp = graph.get(newWpId);
+                        if (nextWp != null) {
+                            org.bukkit.util.Vector lookDir = nextWp.getLocation().toVector().subtract(teleportLoc.toVector());
+                            if (lookDir.lengthSquared() > 0.0001) {
+                                teleportLoc.setDirection(lookDir);
+                            }
+                        }
+
+                        // Teleport instantly, then clear residual velocity and stale pathing so the mob
+                        // doesn't keep drifting forward from its pre-teleport momentum.
                         target.teleport(teleportLoc);
+                        target.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                        target.getPathfinder().stopPathfinding();
                         target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, teleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
-                        
+
                         double speed = 1.0;
                         org.bukkit.attribute.AttributeInstance speedAttr = target.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
                         if (speedAttr != null) {
@@ -914,8 +935,8 @@ public class TowerManager {
 
                 org.bukkit.NamespacedKey poisonDmgKey = new org.bukkit.NamespacedKey(plugin, "td_poison_damage");
                 for (Mob mob : targets) {
-                    if (mob.getType() == org.bukkit.entity.EntityType.SPIDER) {
-                        continue; // Spider immune to poison tower
+                    if (isMobImmuneToTower(mob, "POISON")) {
+                        continue; // Poison-immune mobs take no damage and show no 🤢 indicator
                     }
                     mob.getPersistentDataContainer().set(poisonDmgKey, org.bukkit.persistence.PersistentDataType.DOUBLE, damage);
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonDur, poisonLvl - 1));
@@ -930,15 +951,16 @@ public class TowerManager {
                 org.bukkit.NamespacedKey slowImmuneKey = new org.bukkit.NamespacedKey(plugin, "td_slow_immune");
 
                 for (Mob mob : targets) {
-                    if (mob.getPersistentDataContainer().has(slowImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)) {
-                        continue; // Skip slow-immune mobs
+                    if (mob.getPersistentDataContainer().has(slowImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)
+                            || isMobImmuneToTower(mob, "ICE") || isMobImmuneToTower(mob, "SLOW")) {
+                        continue; // Skip slow/ice-immune mobs (e.g. Warden) — no damage, freeze, or slowness
                     }
                     mob.damage(damage);
-                    
+
                     // Freeze for slowDur ticks (50ms per tick)
                     long freezeEndTime = System.currentTimeMillis() + (slowDur * 50L);
                     mob.getPersistentDataContainer().set(freezeKey, org.bukkit.persistence.PersistentDataType.LONG, freezeEndTime);
-                    
+
                     // Apply slowness II to visually slow/halt animations and trigger the snowflake indicator
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowDur, 2));
                     drawParticleLine(start, mob.getEyeLocation(), org.bukkit.Particle.SNOWFLAKE);
@@ -948,9 +970,9 @@ public class TowerManager {
             case GOLEM -> {
                 double damage = tower.getDamage();
                 if (tower.getLevel() == 1) {
-                    damage = plugin.getConfig().getDouble("towers.golem_1.damage", 20.0);
+                    damage = plugin.getConfig().getDouble("towers.golem_1.damage", 150.0); // Copper Golem
                 } else {
-                    damage = plugin.getConfig().getDouble("towers.golem_2.damage", 40.0);
+                    damage = plugin.getConfig().getDouble("towers.golem_2.damage", 300.0); // Iron Golem
                 }
                 
                 target.damage(damage);
@@ -1049,6 +1071,18 @@ public class TowerManager {
             }
         }
         return result;
+    }
+
+    /**
+     * Returns true if the mob's {@code td_immunities} persistent-data string lists the given tower
+     * keyword (case-insensitive), e.g. "POISON", "CHORUS", "ICE", "SLOW".
+     */
+    private boolean isMobImmuneToTower(Mob mob, String towerKeyword) {
+        String immunities = mob.getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, "td_immunities"),
+                org.bukkit.persistence.PersistentDataType.STRING);
+        if (immunities == null || immunities.isEmpty()) return false;
+        return immunities.toUpperCase().contains(towerKeyword.toUpperCase());
     }
 
     private boolean isRedstoneBoosted(Tower targetTower) {

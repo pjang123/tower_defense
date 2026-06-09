@@ -80,6 +80,16 @@ public class MobListener implements Listener {
 
         NamespacedKey key = new NamespacedKey(plugin, "td_mob");
         if (mob.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
+            // Enderman teleport dodge: 30% chance to negate any incoming damage with a teleport effect.
+            if (mob.getType() == org.bukkit.entity.EntityType.ENDERMAN) {
+                if (Math.random() < 0.3) {
+                    event.setCancelled(true);
+                    mob.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, mob.getLocation(), 20);
+                    mob.getWorld().playSound(mob.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                    return;
+                }
+            }
+
             // Check for fire-related damage if the mob has fire immunity
             NamespacedKey fireImmuneKey = new NamespacedKey(plugin, "td_fire_immune");
             EntityDamageEvent.DamageCause cause = event.getCause();
@@ -263,6 +273,11 @@ public class MobListener implements Listener {
             event.getDrops().clear();
             event.setDroppedExp(0);
 
+            // Remove any mount (e.g. a Skeleton dying on a Skeleton Horse) so it doesn't linger.
+            if (entity.getVehicle() != null) {
+                entity.getVehicle().remove();
+            }
+
             // Get the arena this mob was walking on
             String mobArena = entity.getPersistentDataContainer().get(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING);
             if (mobArena == null) mobArena = "1";
@@ -381,6 +396,8 @@ public class MobListener implements Listener {
             player.setGameMode(org.bukkit.GameMode.ADVENTURE);
             player.setAllowFlight(true);
         }
+        // Guarantee a navigation compass regardless of game state (giveStarterWeapons does not grant one)
+        plugin.getGameManager().ensureCompass(player);
         plugin.getGameManager().updateTabNames();
     }
 
@@ -478,19 +495,20 @@ public class MobListener implements Listener {
                     // Open tier selection sub-GUI
                     plugin.getMobManager().openMobTierGUI(player, chainName);
                 } else if (event.isRightClick()) {
-                    java.util.Map<String, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
-                    int count = queue.getOrDefault(chainName, 0);
+                    int count = plugin.getMobManager().getQueueTotal(player.getUniqueId(), chainName);
                     int toRemove = (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)
                             ? Math.min(10, count) : Math.min(1, count);
                     if (toRemove > 0) {
+                        // Remove highest-tier-first and refund each at its actual queued tier price.
+                        int refund = 0;
                         for (int i = 0; i < toRemove; i++) {
-                            plugin.getMobManager().removeFromQueue(player.getUniqueId(), chainName);
+                            int removedTier = plugin.getMobManager().removeOneFromQueue(player.getUniqueId(), chainName);
+                            if (removedTier <= 0) break;
+                            com.pauljang.towerDefense.entities.MobStateProfile profile =
+                                    plugin.getMobManager().getUpgradeRegistry().getProfile(chainName, removedTier);
+                            if (profile != null) refund += (int) profile.getPrice();
                         }
-                        int currentTier = plugin.getGameManager().getMobTier(player.getUniqueId(), chainName);
-                        com.pauljang.towerDefense.entities.MobStateProfile profile =
-                                plugin.getMobManager().getUpgradeRegistry().getProfile(chainName, currentTier);
-                        if (profile != null) {
-                            int refund = (int) profile.getPrice() * toRemove;
+                        if (refund > 0) {
                             plugin.getGameManager().addGold(player.getUniqueId(), refund, true);
                         }
                         player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
@@ -501,14 +519,16 @@ public class MobListener implements Listener {
             }
 
             if (slot == 38) { // Clear Queue and refund
-                java.util.Map<String, Integer> queue = plugin.getMobManager().getQueue(player.getUniqueId());
+                java.util.Map<String, java.util.Map<Integer, Integer>> queue =
+                        plugin.getMobManager().getQueueByTier(player.getUniqueId());
                 int totalRefund = 0;
-                for (java.util.Map.Entry<String, Integer> entry : queue.entrySet()) {
-                    if (entry.getValue() <= 0) continue;
-                    int tier = plugin.getGameManager().getMobTier(player.getUniqueId(), entry.getKey());
-                    com.pauljang.towerDefense.entities.MobStateProfile profile =
-                            plugin.getMobManager().getUpgradeRegistry().getProfile(entry.getKey(), tier);
-                    if (profile != null) totalRefund += (int) profile.getPrice() * entry.getValue();
+                for (java.util.Map.Entry<String, java.util.Map<Integer, Integer>> chainEntry : queue.entrySet()) {
+                    for (java.util.Map.Entry<Integer, Integer> tierEntry : chainEntry.getValue().entrySet()) {
+                        if (tierEntry.getValue() <= 0) continue;
+                        com.pauljang.towerDefense.entities.MobStateProfile profile =
+                                plugin.getMobManager().getUpgradeRegistry().getProfile(chainEntry.getKey(), tierEntry.getKey());
+                        if (profile != null) totalRefund += (int) profile.getPrice() * tierEntry.getValue();
+                    }
                 }
                 plugin.getMobManager().clearQueue(player.getUniqueId());
                 if (totalRefund > 0) plugin.getGameManager().addGold(player.getUniqueId(), totalRefund);
@@ -580,12 +600,16 @@ public class MobListener implements Listener {
                 }
 
                 int qty = (event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) ? 5 : 1;
+
+                // Each queued mob keeps the exact tier selected; queueing a higher tier no longer
+                // overrides previously queued lower-tier mobs of the same chain.
                 int totalCost = (int) profile.getPrice() * qty;
 
                 if (plugin.getGameManager().removeGold(player.getUniqueId(), totalCost)) {
+                    // Track the most recently selected tier for the chain's GUI display/highlight.
                     plugin.getGameManager().setMobTier(player.getUniqueId(), chainKey, selectedTier);
                     for (int i = 0; i < qty; i++) {
-                        plugin.getMobManager().addToQueue(player.getUniqueId(), chainKey);
+                        plugin.getMobManager().addToQueue(player.getUniqueId(), chainKey, selectedTier);
                     }
                     player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Queued " + qty + "x "
@@ -754,6 +778,14 @@ public class MobListener implements Listener {
             java.util.UUID uuid = player.getUniqueId();
             com.pauljang.towerDefense.core.GameManager gm = plugin.getGameManager();
 
+            // Global 0.5s anti-spam cooldown across all spell/sabotage slots.
+            boolean isSpellSlot = (slot == 12 || slot == 13 || slot == 14 || slot == 21 || slot == 22 || slot == 23);
+            if (isSpellSlot && gm.isGlobalSpellOnCooldown(uuid)) {
+                player.sendMessage(org.bukkit.ChatColor.RED + "Slow down! Wait a moment before casting another spell.");
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                return;
+            }
+
             switch (slot) {
                 case 4 -> { // Passive Gold Generator Upgrade
                     int lvl = gm.getGoldGenLevel(uuid);
@@ -796,11 +828,13 @@ public class MobListener implements Listener {
                     }
                 }
                 case 12 -> { // Overcharge Spell
-                    int cost = plugin.getConfig().getInt("spells.overcharge.cost", 250);
+                    int mult = gm.getNextSpellMultiplier(uuid, "OVERCHARGE");
+                    int cost = plugin.getConfig().getInt("spells.overcharge.cost", 250) * mult;
                     int duration = plugin.getConfig().getInt("spells.overcharge.duration", 10);
                     String arena = gm.getPlayerArena(uuid);
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
+                        gm.recordSpellCast(uuid, "OVERCHARGE", mult);
                         gm.castSpell(arena, "OVERCHARGE", duration);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Overcharge on your track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
@@ -810,11 +844,20 @@ public class MobListener implements Listener {
                     }
                 }
                 case 13 -> { // Freeze Spell
-                    int cost = plugin.getConfig().getInt("spells.freeze.cost", 200);
+                    long freezeCd = gm.getFreezeCooldownRemaining(uuid);
+                    if (freezeCd > 0) {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Freeze is on cooldown for "
+                                + ((freezeCd / 1000) + 1) + "s!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                        return;
+                    }
+                    int mult = gm.getNextSpellMultiplier(uuid, "FREEZE");
+                    int cost = plugin.getConfig().getInt("spells.freeze.cost", 200) * mult;
                     int duration = plugin.getConfig().getInt("spells.freeze.duration", 10);
                     String arena = gm.getPlayerArena(uuid);
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
+                        gm.recordSpellCast(uuid, "FREEZE", mult);
                         gm.castSpell(arena, "FREEZE", duration);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Freeze on your track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
@@ -824,11 +867,13 @@ public class MobListener implements Listener {
                     }
                 }
                 case 14 -> { // Damage Storm Spell
-                    int cost = plugin.getConfig().getInt("spells.damage-storm.cost", 300);
+                    int mult = gm.getNextSpellMultiplier(uuid, "DAMAGE_STORM");
+                    int cost = plugin.getConfig().getInt("spells.damage-storm.cost", 300) * mult;
                     int duration = plugin.getConfig().getInt("spells.damage-storm.duration", 10);
                     String arena = gm.getPlayerArena(uuid);
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
+                        gm.recordSpellCast(uuid, "DAMAGE_STORM", mult);
                         gm.castSpell(arena, "DAMAGE_STORM", duration);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Spell: Damage Storm on your track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
@@ -838,12 +883,14 @@ public class MobListener implements Listener {
                     }
                 }
                 case 21 -> { // Haste Rush Sabotage (Cast on Opponent)
-                    int cost = plugin.getConfig().getInt("spells.haste-rush.cost", 200);
+                    int mult = gm.getNextSpellMultiplier(uuid, "HASTE_RUSH");
+                    int cost = plugin.getConfig().getInt("spells.haste-rush.cost", 200) * mult;
                     int duration = plugin.getConfig().getInt("spells.haste-rush.duration", 6);
                     String playerArena = gm.getPlayerArena(uuid);
                     String targetArena = playerArena.equals("1") ? "2" : "1";
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
+                        gm.recordSpellCast(uuid, "HASTE_RUSH", mult);
                         gm.castSpell(targetArena, "HASTE_RUSH", duration);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Sabotage: Haste Rush on your opponent's track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
@@ -853,12 +900,14 @@ public class MobListener implements Listener {
                     }
                 }
                 case 22 -> { // Tower EMP Sabotage (Cast on Opponent)
-                    int cost = plugin.getConfig().getInt("spells.tower-emp.cost", 250);
+                    int mult = gm.getNextSpellMultiplier(uuid, "TOWER_EMP");
+                    int cost = plugin.getConfig().getInt("spells.tower-emp.cost", 250) * mult;
                     int duration = plugin.getConfig().getInt("spells.tower-emp.duration", 6);
                     String playerArena = gm.getPlayerArena(uuid);
                     String targetArena = playerArena.equals("1") ? "2" : "1";
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
+                        gm.recordSpellCast(uuid, "TOWER_EMP", mult);
                         gm.castSpell(targetArena, "TOWER_EMP", duration);
                         gm.disableRandomTower(targetArena, duration);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Sabotage: Tower EMP on your opponent's track for " + duration + " seconds!");
@@ -869,12 +918,14 @@ public class MobListener implements Listener {
                     }
                 }
                 case 23 -> { // Slow Shield Sabotage (Cast on Opponent)
-                    int cost = plugin.getConfig().getInt("spells.slow-shield.cost", 150);
+                    int mult = gm.getNextSpellMultiplier(uuid, "SLOW_SHIELD");
+                    int cost = plugin.getConfig().getInt("spells.slow-shield.cost", 150) * mult;
                     int duration = plugin.getConfig().getInt("spells.slow-shield.duration", 10);
                     String playerArena = gm.getPlayerArena(uuid);
                     String targetArena = playerArena.equals("1") ? "2" : "1";
                     if (gm.hasGold(uuid, cost)) {
                         gm.removeGold(uuid, cost);
+                        gm.recordSpellCast(uuid, "SLOW_SHIELD", mult);
                         gm.castSpell(targetArena, "SLOW_SHIELD", duration);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Activated Sabotage: Slow Shield on your opponent's track for " + duration + " seconds!");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
@@ -919,10 +970,11 @@ public class MobListener implements Listener {
             org.bukkit.event.block.Action action = event.getAction();
             String worldName = player.getWorld().getName();
             
-            // Lobby World Behavior: ONLY right-click to open games GUI (no teleport forward)
+            // Lobby World Behavior: either click opens the games/matchmaking GUI (no teleport forward)
             if (worldName.equals("lobby_world")) {
                 event.setCancelled(true);
-                if (action == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || action == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+                if (action == org.bukkit.event.block.Action.RIGHT_CLICK_AIR || action == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK
+                        || action == org.bukkit.event.block.Action.LEFT_CLICK_AIR || action == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) {
                     plugin.getGameManager().openGamesGUI(player);
                 }
                 return;
@@ -1300,6 +1352,8 @@ public class MobListener implements Listener {
         if (fromWorld.equals("game_world")) {
             plugin.getGameManager().checkGameStopConditions();
         }
+        // Switching dimensions/worlds must never leave a player without their interaction compass
+        plugin.getGameManager().ensureCompass(player);
         plugin.getGameManager().updateTabNames();
     }
 

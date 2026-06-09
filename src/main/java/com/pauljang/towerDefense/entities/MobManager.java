@@ -24,10 +24,19 @@ import java.util.UUID;
 
 public class MobManager {
 
+    /**
+     * Global scaling coefficient applied to every mob's movement-speed attribute. Reduced to 0.25
+     * (one quarter of the former 1.0) during the post-playtest rebalance to slow overall pacing.
+     * Applied once at spawn so it flows through to both velocity-driven and pathfinder-driven mobs.
+     */
+    private static final double GLOBAL_SPEED_COEFFICIENT = 0.25;
+
     private final TowerDefense plugin;
     private final MobUpgradeRegistry upgradeRegistry;
     private final List<TDMob> activeMobs = new ArrayList<>();
-    private final Map<UUID, Map<String, Integer>> playerQueues = new HashMap<>();
+    // Per-player queue tracks the exact tier of each queued mob: chain -> (tier -> count).
+    // This preserves mixed-tier waves (e.g. five Lvl 1 Zombies plus one Lvl 5 Zombie).
+    private final Map<UUID, Map<String, Map<Integer, Integer>>> playerQueues = new HashMap<>();
 
     public MobManager(TowerDefense plugin) {
         this.plugin = plugin;
@@ -162,7 +171,15 @@ public class MobManager {
         if (entity instanceof org.bukkit.entity.Piglin piglin) {
             piglin.setBaby(false);
         }
-        
+
+        // Mobs never push each other off the track or clump up.
+        entity.setCollidable(false);
+
+        // Scrub any random vanilla equipment (armor/weapons) so only CSV-defined equipment shows.
+        if (entity.getEquipment() != null) {
+            entity.getEquipment().clear();
+        }
+
         // Mark as a TD Mob so we can handle events (like sunlight burning)
         entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
 
@@ -215,7 +232,7 @@ public class MobManager {
             if (speedAttr != null) {
                 double base = speedAttr.getBaseValue();
                 if (base < 0.05) base = 0.25;
-                speedAttr.setBaseValue(base * speedMultiplier);
+                speedAttr.setBaseValue(base * speedMultiplier * GLOBAL_SPEED_COEFFICIENT);
             }
         }
 
@@ -275,7 +292,11 @@ public class MobManager {
         boolean fireImmune = profile.getEntityType() == EntityType.BLAZE
                 || profile.getEntityType() == EntityType.WITHER_SKELETON
                 || profile.getSpecialMechanics().toLowerCase().contains("fire resistant");
-        boolean slowImmune = isFlying; // flying mobs dodge ground-based slow effects
+        // Flying mobs dodge ground-based slow effects; mobs with an ICE/SLOW immunity (e.g. Warden)
+        // also fully resist Freeze spells and Ice Towers.
+        boolean slowImmune = isFlying
+                || profile.getImmunities().contains("ICE")
+                || profile.getImmunities().contains("SLOW");
 
         // Kill gold reward = 10% of spawn price, minimum 1
         int killGold = Math.max(1, (int) (profile.getPrice() / 10.0));
@@ -324,6 +345,12 @@ public class MobManager {
         if (profile.getEntityType() == EntityType.CREEPER
                 && profile.getSpecialMechanics().contains("Charged")) {
             ((org.bukkit.entity.Creeper) entity).setPowered(true);
+        }
+
+        // Invisibility special mechanic (e.g. higher-tier Spiders)
+        if (profile.getSpecialMechanics().contains("Invisible")) {
+            entity.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                    org.bukkit.potion.PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
         }
 
         // Spawn mount entity and set the mob as its passenger
@@ -434,27 +461,14 @@ public class MobManager {
     }
 
     /**
-     * Returns true if a mob is driven by manual velocity overrides instead of vanilla pathfinding.
-     * Covers brain-AI mobs (which ignore removeAllGoals()), velocity-only mobs (Slime/Magma Cube/
-     * Creeper/Wither Skeleton), any mounted mob, and any flying mob (height-offset &gt; 0).
-     * MAGMA_CUBE and WITHER_SKELETON are included here explicitly — they were previously omitted,
-     * which silently dropped them onto the (AI-disabled, and therefore frozen) vanilla path.
+     * All TD mobs are driven by manual velocity overrides rather than vanilla AI pathfinding, which
+     * keeps every mob moving smoothly along the track regardless of entity type. Any entity carrying
+     * the {@code td_mob} persistent-data key is treated as velocity-driven.
      */
     private boolean isVelocityDriven(org.bukkit.entity.Mob entity, double heightOffset) {
-        org.bukkit.entity.EntityType t = entity.getType();
-        return t == org.bukkit.entity.EntityType.GIANT ||
-               t == org.bukkit.entity.EntityType.SLIME ||
-               t == org.bukkit.entity.EntityType.MAGMA_CUBE ||
-               t == org.bukkit.entity.EntityType.WITHER_SKELETON ||
-               t == org.bukkit.entity.EntityType.CREEPER ||
-               t == org.bukkit.entity.EntityType.WARDEN ||
-               t == org.bukkit.entity.EntityType.ENDERMAN ||
-               t == org.bukkit.entity.EntityType.ZOMBIFIED_PIGLIN ||
-               t == org.bukkit.entity.EntityType.HOGLIN ||
-               t == org.bukkit.entity.EntityType.ZOGLIN ||
-               t == org.bukkit.entity.EntityType.BREEZE ||
-               entity.getVehicle() instanceof org.bukkit.entity.Mob ||
-               heightOffset > 0.0;
+        return entity.getPersistentDataContainer().has(
+                new org.bukkit.NamespacedKey(plugin, "td_mob"),
+                org.bukkit.persistence.PersistentDataType.BYTE);
     }
 
     private void handleMobMovement(TDMob mob, Iterator<TDMob> iterator, long currentTick) {
@@ -519,7 +533,7 @@ public class MobManager {
 
         double slowMult = 1.0;
         if (isFreezeActive && !isSlowImmune) {
-            slowMult = plugin.getConfig().getDouble("spells.freeze.slow-multiplier", 0.4);
+            slowMult = plugin.getConfig().getDouble("spells.freeze.slow-multiplier", 0.7);
         }
 
         double hasteMult = 1.0;
@@ -729,46 +743,59 @@ public class MobManager {
 
     // --- GUI & Queue System ---
 
-    public Map<String, Integer> getQueue(UUID uuid) {
-        return playerQueues.computeIfAbsent(uuid, k -> {
-            Map<String, Integer> map = new LinkedHashMap<>();
-            for (String chain : upgradeRegistry.getAvailableChains()) {
-                map.put(chain, 0);
-            }
-            return map;
-        });
+    /** A single queued mob preserving its exact tier. */
+    private record QueuedSpawn(String chain, int tier) {}
+
+    /** Full queue view for a player: chain -> (tier -> count). Lazily created. */
+    public Map<String, Map<Integer, Integer>> getQueueByTier(UUID uuid) {
+        return playerQueues.computeIfAbsent(uuid, k -> new LinkedHashMap<>());
     }
 
-    public void addToQueue(UUID uuid, String chain) {
-        String key = chain.toLowerCase();
-        Map<String, Integer> queue = getQueue(uuid);
-        queue.put(key, queue.getOrDefault(key, 0) + 1);
+    /** Total queued count for a chain, summed across all tiers. */
+    public int getQueueTotal(UUID uuid, String chain) {
+        Map<Integer, Integer> tiers = getQueueByTier(uuid).get(chain.toLowerCase());
+        if (tiers == null) return 0;
+        int total = 0;
+        for (int c : tiers.values()) total += c;
+        return total;
     }
 
-    public void removeFromQueue(UUID uuid, String chain) {
-        String key = chain.toLowerCase();
-        Map<String, Integer> queue = getQueue(uuid);
-        int current = queue.getOrDefault(key, 0);
-        if (current > 0) {
-            queue.put(key, current - 1);
+    /** Queues one mob of the given chain at the exact tier selected. */
+    public void addToQueue(UUID uuid, String chain, int tier) {
+        Map<Integer, Integer> tiers = getQueueByTier(uuid)
+                .computeIfAbsent(chain.toLowerCase(), k -> new java.util.TreeMap<>());
+        tiers.merge(tier, 1, Integer::sum);
+    }
+
+    /**
+     * Removes one queued mob of the chain (highest tier first) and returns the tier removed,
+     * or -1 if the chain had nothing queued.
+     */
+    public int removeOneFromQueue(UUID uuid, String chain) {
+        Map<Integer, Integer> tiers = getQueueByTier(uuid).get(chain.toLowerCase());
+        if (tiers == null || tiers.isEmpty()) return -1;
+        int topTier = java.util.Collections.max(tiers.keySet());
+        int count = tiers.getOrDefault(topTier, 0);
+        if (count <= 1) {
+            tiers.remove(topTier);
+        } else {
+            tiers.put(topTier, count - 1);
         }
+        return topTier;
     }
 
-    /** Legacy overload kept for any existing callers. */
+    /** Legacy overloads kept for any existing callers; default to tier 1. */
     public void addToQueue(UUID uuid, PresetMobType type) {
-        addToQueue(uuid, type.name().toLowerCase());
+        addToQueue(uuid, type.name().toLowerCase(), 1);
     }
 
     /** Legacy overload kept for any existing callers. */
     public void removeFromQueue(UUID uuid, PresetMobType type) {
-        removeFromQueue(uuid, type.name().toLowerCase());
+        removeOneFromQueue(uuid, type.name().toLowerCase());
     }
 
     public void clearQueue(UUID uuid) {
-        Map<String, Integer> queue = getQueue(uuid);
-        for (String key : queue.keySet()) {
-            queue.put(key, 0);
-        }
+        getQueueByTier(uuid).clear();
     }
 
     public void clearAllQueues() {
@@ -776,13 +803,16 @@ public class MobManager {
     }
 
     public void sendQueue(UUID uuid) {
-        Map<String, Integer> queue = playerQueues.get(uuid);
+        Map<String, Map<Integer, Integer>> queue = playerQueues.get(uuid);
         if (queue == null || queue.isEmpty()) return;
 
-        List<String> spawnList = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : queue.entrySet()) {
-            for (int i = 0; i < entry.getValue(); i++) {
-                spawnList.add(entry.getKey());
+        // Flatten the queue into a spawn list preserving each mob's exact tier.
+        List<QueuedSpawn> spawnList = new ArrayList<>();
+        for (Map.Entry<String, Map<Integer, Integer>> chainEntry : queue.entrySet()) {
+            for (Map.Entry<Integer, Integer> tierEntry : chainEntry.getValue().entrySet()) {
+                for (int i = 0; i < tierEntry.getValue(); i++) {
+                    spawnList.add(new QueuedSpawn(chainEntry.getKey(), tierEntry.getKey()));
+                }
             }
         }
 
@@ -792,7 +822,7 @@ public class MobManager {
         String playerArena = plugin.getGameManager().getPlayerArena(uuid);
         String targetArena = playerArena.equals("1") ? "2" : "1";
 
-        // Spawn mobs spaced 10 ticks (0.5s) apart
+        // Spawn mobs spaced 20 ticks (1.0s) apart to space out the wave
         new BukkitRunnable() {
             int index = 0;
 
@@ -802,12 +832,11 @@ public class MobManager {
                     cancel();
                     return;
                 }
-                String upgradeChain = spawnList.get(index);
-                int tier = plugin.getGameManager().getMobTier(uuid, upgradeChain);
-                spawnMobByChain(targetArena, upgradeChain, tier);
+                QueuedSpawn qs = spawnList.get(index);
+                spawnMobByChain(targetArena, qs.chain(), qs.tier());
                 index++;
             }
-        }.runTaskTimer(plugin, 0L, 10L);
+        }.runTaskTimer(plugin, 0L, 20L);
 
         // Reset the player's queue after spawning
         clearQueue(uuid);
@@ -815,7 +844,7 @@ public class MobManager {
 
     public void openMobSpawnerGUI(Player player) {
         org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 54, ChatColor.DARK_RED + "TD Mob Spawner");
-        Map<String, Integer> queue = getQueue(player.getUniqueId());
+        Map<String, Map<Integer, Integer>> queue = getQueueByTier(player.getUniqueId());
 
         // Border: top row, bottom row, left and right columns
         org.bukkit.inventory.ItemStack border = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
@@ -832,25 +861,27 @@ public class MobManager {
         List<String> chains = getGuiChains();
         for (int i = 0; i < MOB_SLOTS.length && i < chains.size(); i++) {
             String chain = chains.get(i);
-            int queuedCount = queue.getOrDefault(chain, 0);
+            int queuedCount = getQueueTotal(player.getUniqueId(), chain);
             gui.setItem(MOB_SLOTS[i], createChainGUIItem(player, chain, queuedCount));
         }
 
-        // Compute total queue cost, total XP payout, and a per-mob breakdown for the Send Wave lore
+        // Compute total queue cost, total XP payout, and a per-tier breakdown for the Send Wave lore
         int totalCost = 0;
         int totalXpPayout = 0;
         List<String> queuedMobLines = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : queue.entrySet()) {
-            int count = entry.getValue();
-            if (count <= 0) continue;
-            int tier = plugin.getGameManager().getMobTier(player.getUniqueId(), entry.getKey());
-            MobStateProfile profile = upgradeRegistry.getProfile(entry.getKey(), tier);
-            if (profile == null) continue;
-            totalCost += (int) profile.getPrice() * count;
-            totalXpPayout += profile.getExpReward() * count;
-            queuedMobLines.add(ChatColor.DARK_GRAY + "- " + ChatColor.YELLOW + "x" + count + " "
-                    + ChatColor.WHITE + getChainDisplayName(entry.getKey())
-                    + ChatColor.GRAY + " (Lvl " + tier + ")");
+        for (Map.Entry<String, Map<Integer, Integer>> chainEntry : queue.entrySet()) {
+            for (Map.Entry<Integer, Integer> tierEntry : chainEntry.getValue().entrySet()) {
+                int count = tierEntry.getValue();
+                if (count <= 0) continue;
+                int tier = tierEntry.getKey();
+                MobStateProfile profile = upgradeRegistry.getProfile(chainEntry.getKey(), tier);
+                if (profile == null) continue;
+                totalCost += (int) profile.getPrice() * count;
+                totalXpPayout += profile.getExpReward() * count;
+                queuedMobLines.add(ChatColor.DARK_GRAY + "- " + ChatColor.YELLOW + "x" + count + " "
+                        + ChatColor.WHITE + getChainDisplayName(chainEntry.getKey())
+                        + ChatColor.GRAY + " (Lvl " + tier + ")");
+            }
         }
 
         // Build the Send Wave lore: description, cost, the queued-mob breakdown, and total XP payout
@@ -900,8 +931,9 @@ public class MobManager {
             lore.add(ChatColor.GOLD + "EXP Payout: " + ChatColor.LIGHT_PURPLE + profile.getExpReward() + " XP");
             lore.add("");
             lore.add(ChatColor.DARK_GRAY + "HP: " + ChatColor.WHITE + (int) profile.getHp()
-                    + "  Speed: " + ChatColor.WHITE + profile.getSpeed()
                     + "  Dmg: " + ChatColor.WHITE + profile.getDamage());
+            lore.add(ChatColor.DARK_GRAY + "Speed: " + ChatColor.WHITE
+                    + String.format("%.1f", profile.getSpeed()) + " Blocks/sec");
             if (!profile.getImmunities().isEmpty()) {
                 lore.add(ChatColor.AQUA + "Immune: " + String.join(", ", profile.getImmunities()));
             }
@@ -933,13 +965,13 @@ public class MobManager {
         };
     }
 
-    /** XP cost to unlock each tier. Tier 1 is always free. */
+    /** XP cost to unlock each tier. Tier 1 is always free. High tiers are intentionally expensive. */
     public static int getTierUnlockCost(int tier) {
         return switch (tier) {
-            case 2 -> 100;
-            case 3 -> 300;
-            case 4 -> 600;
-            case 5 -> 1200;
+            case 2 -> 400;
+            case 3 -> 1200;
+            case 4 -> 3000;
+            case 5 -> 6500;
             default -> 0;
         };
     }
@@ -966,8 +998,9 @@ public class MobManager {
         for (int t = 1; t <= 5; t++) {
             MobStateProfile profile = allTiers.get(t);
             if (profile == null) continue;
+            MobStateProfile prevProfile = allTiers.get(t - 1);
             boolean unlocked = plugin.getGameManager().isTierUnlocked(player.getUniqueId(), chain, t);
-            gui.setItem(9 + t, createTierItem(profile, t == currentTier, unlocked));
+            gui.setItem(9 + t, createTierItem(profile, prevProfile, t == currentTier, unlocked));
         }
 
         // Back button at slot 22
@@ -978,7 +1011,7 @@ public class MobManager {
         player.openInventory(gui);
     }
 
-    private org.bukkit.inventory.ItemStack createTierItem(MobStateProfile profile, boolean isSelected, boolean isUnlocked) {
+    private org.bukkit.inventory.ItemStack createTierItem(MobStateProfile profile, MobStateProfile prevProfile, boolean isSelected, boolean isUnlocked) {
         int tier = profile.getTier();
         ChatColor color = getTierColor(tier);
         org.bukkit.Material mat = isUnlocked ? getChainMaterial(profile.getUpgradeChain()) : org.bukkit.Material.BARRIER;
@@ -996,23 +1029,38 @@ public class MobManager {
             lore.add("");
         }
         lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + (int) profile.getPrice() + " Gold");
-        lore.add(ChatColor.RED + "HP: " + ChatColor.WHITE + (int) profile.getHp()
-                + "  " + ChatColor.GREEN + "Speed: " + ChatColor.WHITE + profile.getSpeed());
-        lore.add(ChatColor.DARK_RED + "Damage: " + ChatColor.WHITE + profile.getDamage()
-                + "  " + ChatColor.LIGHT_PURPLE + "EXP: " + ChatColor.WHITE + profile.getExpReward());
-        if (!profile.getImmunities().isEmpty()) {
-            lore.add(ChatColor.AQUA + "Immune: " + String.join(", ", profile.getImmunities()));
-        }
-        if (profile.getMountType() != null) {
-            lore.add(ChatColor.YELLOW + "Mount: " + profile.getMountType().name());
-        }
-        if (profile.getEquipment() != null) {
-            lore.add(ChatColor.YELLOW + "Equipment: " + profile.getEquipment().name());
-        }
-        if (!profile.getSpecialMechanics().isEmpty()) {
-            lore.add(ChatColor.LIGHT_PURPLE + profile.getSpecialMechanics());
-        }
         lore.add("");
+
+        // Core stats, each annotated with the upgrade delta over the previous tier.
+        lore.add(ChatColor.RED + "HP: " + ChatColor.WHITE + (int) profile.getHp()
+                + deltaTag(prevProfile == null ? 0 : (int) profile.getHp() - (int) prevProfile.getHp(), ""));
+        lore.add(ChatColor.DARK_RED + "Damage: " + ChatColor.WHITE + profile.getDamage()
+                + deltaTagDouble(prevProfile == null ? 0 : profile.getDamage() - prevProfile.getDamage(), ""));
+        lore.add(ChatColor.GREEN + "Speed: " + ChatColor.WHITE
+                + String.format("%.1f", profile.getSpeed()) + " Blocks/sec"
+                + deltaTagDouble(prevProfile == null ? 0 : profile.getSpeed() - prevProfile.getSpeed(), ""));
+        lore.add(ChatColor.LIGHT_PURPLE + "EXP Payout: " + ChatColor.WHITE + profile.getExpReward()
+                + deltaTag(prevProfile == null ? 0 : profile.getExpReward() - prevProfile.getExpReward(), ""));
+        lore.add("");
+
+        boolean hasTraits = !profile.getImmunities().isEmpty() || profile.getMountType() != null
+                || profile.getEquipment() != null || !profile.getSpecialMechanics().isEmpty();
+        if (hasTraits) {
+            if (!profile.getImmunities().isEmpty()) {
+                lore.add(ChatColor.AQUA + "Immune: " + String.join(", ", profile.getImmunities()));
+            }
+            if (profile.getMountType() != null) {
+                lore.add(ChatColor.YELLOW + "Mount: " + profile.getMountType().name());
+            }
+            if (profile.getEquipment() != null) {
+                lore.add(ChatColor.YELLOW + "Equipment: " + profile.getEquipment().name());
+            }
+            if (!profile.getSpecialMechanics().isEmpty()) {
+                lore.add(ChatColor.LIGHT_PURPLE + profile.getSpecialMechanics());
+            }
+            lore.add("");
+        }
+
         if (isUnlocked) {
             lore.add(ChatColor.GREEN + "Left-Click " + ChatColor.GRAY + "→ queue 1 at this tier");
             lore.add(ChatColor.GREEN + "Shift+Left " + ChatColor.GRAY + "→ queue 5 at this tier");
@@ -1023,6 +1071,22 @@ public class MobManager {
         meta.setLore(lore);
         item.setItemMeta(meta);
         return item;
+    }
+
+    /** Formats an integer stat delta as a green "(+X)" / red "(-X)" suffix, or empty when unchanged. */
+    private String deltaTag(int delta, String unit) {
+        if (delta == 0) return "";
+        String sign = delta > 0 ? "+" : "";
+        ChatColor c = delta > 0 ? ChatColor.GREEN : ChatColor.RED;
+        return " " + c + "(" + sign + delta + unit + ")";
+    }
+
+    /** Formats a decimal stat delta as a green "(+X.X)" / red "(-X.X)" suffix, or empty when unchanged. */
+    private String deltaTagDouble(double delta, String unit) {
+        if (Math.abs(delta) < 0.001) return "";
+        String sign = delta > 0 ? "+" : "";
+        ChatColor c = delta > 0 ? ChatColor.GREEN : ChatColor.RED;
+        return " " + c + "(" + sign + String.format("%.1f", delta) + unit + ")";
     }
 
     private org.bukkit.inventory.ItemStack createGUIItem(Material material, String name, String... lore) {

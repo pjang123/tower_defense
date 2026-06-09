@@ -3,6 +3,10 @@ game:
   starting-gold: 150
   max-castle-health: 100
   challenge-timeout-seconds: 30
+  # Number of players required to fill a match queue and start a game.
+  # Players are alternated between Blue (Arena 1) and Red (Arena 2) teams,
+  # supporting up to 4v4 (8 players). Use /td forcestart to begin with fewer.
+  players-per-match: 8
 
 # Spells configuration (costs in gold, durations in seconds)
 spells:
@@ -12,7 +16,8 @@ spells:
   freeze:
     cost: 200
     duration: 10
-    slow-multiplier: 0.4
+    # 0.7 = mobs move at 70% speed (a 30% slow) while Freeze is active.
+    slow-multiplier: 0.7
   damage-storm:
     cost: 300
     duration: 10
@@ -315,12 +320,12 @@ towers:
   golem_1:
     cost: 400
     range: 10.0
-    damage: 20.0
+    damage: 150.0
     cooldown: 40
   golem_2:
     cost: 500
     range: 12.0
-    damage: 40.0
+    damage: 300.0
     cooldown: 30
 
   # --- Happy Ghast Towers (Ridable aerial fireballs) ---
