@@ -415,30 +415,100 @@ public class MobManager {
     }
 
     /**
-     * Spawns a fully-equipped Tier 1 Zombie (via the official chain spawn path so it gets a proper
-     * {@link TDMob} wrapper) at the Giant's current location, then makes it inherit the Giant's
-     * pathing so it proceeds toward the castle from that exact spot instead of running to the start.
+     * Spawns a fully-equipped Tier 1 Zombie at the Giant's current location and makes it inherit
+     * the Giant's pathing state so it continues along the track from that position.
+     *
+     * ROOT CAUSE: Teleporting after spawn doesn't work - the teleport fails (likely due to world/chunk
+     * validation issues when called from within the ticker).
+     *
+     * SOLUTION: Spawn the zombie directly at the Giant's location by manually creating it instead of
+     * using spawnMobByChain which hardcodes waypoint 0 as the spawn point.
      */
     public void summonZombieAt(TDMob giant, String arena) {
         Mob giantEntity = giant.getEntity();
         if (giantEntity.isDead() || !giantEntity.isValid()) return;
 
-        int before = activeMobs.size();
-        spawnMobByChain(arena, "zombie", 1);
-        if (activeMobs.size() <= before) return; // Spawn failed (e.g. missing start waypoint)
+        // Get the waypoint graph for this arena
+        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph =
+            plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        if (graph.isEmpty()) {
+            plugin.getLogger().warning("Cannot summon zombie: No waypoints for arena " + arena);
+            return;
+        }
 
-        // spawnMobByChain appends the new mob's TDMob to activeMobs; it's the most recent entry.
-        TDMob zombieTDMob = activeMobs.get(activeMobs.size() - 1);
-        Mob zombie = zombieTDMob.getEntity();
+        // Spawn the zombie entity directly at the Giant's location
+        Location spawnLoc = giantEntity.getLocation();
+        if (spawnLoc.getWorld() == null) return;
 
-        // Teleport the zombie to the Giant's exact current location, then deep-link its pathing state
-        // to the Giant's. On the next movement tick the engine measures from the zombie's physical
-        // position (at the Giant) to the Giant's target waypoint, pushing it forward along the same
-        // track line — instead of walking back to the start or toward a stale waypoint node.
-        zombie.teleport(giantEntity.getLocation());
-        zombieTDMob.setCurrentWaypointId(giant.getCurrentWaypointId());
-        // Deep copy the history so the two mobs never share the same list reference.
-        zombieTDMob.setPathHistory(new java.util.ArrayList<>(giant.getPathHistory()));
+        // Ensure chunk is loaded
+        if (!spawnLoc.getChunk().isLoaded()) {
+            spawnLoc.getChunk().load();
+        }
+
+        // Spawn a basic zombie
+        org.bukkit.entity.Zombie zombie = (org.bukkit.entity.Zombie) spawnLoc.getWorld().spawnEntity(
+            spawnLoc, EntityType.ZOMBIE);
+
+        // Apply standard TD mob configuration
+        zombie.setBaby(false);
+        zombie.setCollidable(false);
+        zombie.setRemoveWhenFarAway(false);
+        zombie.setPersistent(true);
+        org.bukkit.Bukkit.getMobGoals().removeAllGoals(zombie);
+
+        if (zombie.getEquipment() != null) {
+            zombie.getEquipment().clear();
+
+
+        // Mark as TD mob
+        zombie.getPersistentDataContainer().set(
+            new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+        zombie.getPersistentDataContainer().set(
+            new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, "zombie");
+        zombie.getPersistentDataContainer().set(
+            new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, 2);
+        zombie.getPersistentDataContainer().set(
+            new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, 7);
+        zombie.getPersistentDataContainer().set(
+            new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
+        zombie.getPersistentDataContainer().set(
+            new NamespacedKey(plugin, "td_castle_damage"), PersistentDataType.INTEGER, 1);
+
+        // Set zombie stats (Tier 1 from CSV: HP=80, Speed=2.0)
+        org.bukkit.attribute.AttributeInstance kbResist = zombie.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (kbResist != null) kbResist.setBaseValue(1.0);
+
+        org.bukkit.attribute.AttributeInstance speedAttr = zombie.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            double base = speedAttr.getBaseValue();
+            if (base < 0.05) base = 0.25;
+            speedAttr.setBaseValue(base * 2.0 * GLOBAL_SPEED_COEFFICIENT);
+        }
+
+        org.bukkit.attribute.AttributeInstance maxHealthAttr = zombie.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealthAttr != null) {
+            maxHealthAttr.setBaseValue(80.0);
+            zombie.setHealth(80.0);
+        }
+
+        // Initialize healthbar
+        updateHealthBar(zombie);
+
+        // Create TDMob wrapper with the Giant's state
+        TDMob zombieTDMob = new TDMob(zombie, graph);
+        zombieTDMob.setArena(arena);
+        zombieTDMob.setTier(1);
+
+        // Copy the Giant's pathing state EXACTLY
+        String giantCurrentWaypoint = giant.getCurrentWaypointId();
+        List<String> giantHistory = giant.getPathHistory();
+        List<String> zombieHistory = new java.util.ArrayList<>(giantHistory);
+
+        zombieTDMob.setPathHistory(zombieHistory);
+        zombieTDMob.setCurrentWaypointId(giantCurrentWaypoint);
+
+        // Add to active mobs - the zombie is already at the correct location
+        activeMobs.add(zombieTDMob);
     }
 
 
