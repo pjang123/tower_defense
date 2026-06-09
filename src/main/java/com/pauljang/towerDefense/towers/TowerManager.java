@@ -648,6 +648,12 @@ public class TowerManager {
             if (mobArena == null) mobArena = "1";
             if (!towerArena.equals(mobArena)) continue;
 
+            // Invisible mobs (e.g. higher-tier Spiders) are untargetable by every tower except Fire.
+            if (tower.getType() != TowerType.FIRE
+                    && mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY)) {
+                continue;
+            }
+
             double distSq = mob.getLocation().distanceSquared(towerLoc);
             if (distSq <= rangeSquared) {
                 if (tower.getType() == TowerType.GOLEM) {
@@ -898,24 +904,17 @@ public class TowerManager {
                             }
                         }
 
-                        // Teleport instantly, then clear residual velocity and stale pathing so the mob
-                        // doesn't keep drifting forward from its pre-teleport momentum.
+                        // Teleport instantly and zero momentum. We must NOT touch target.getPathfinder():
+                        // all mobs are velocity-driven, so stopPathfinding()/moveTo() fight our custom
+                        // movement loop and make the mob spin or freeze. The MobManager loop detects the
+                        // new location + waypoint on the next tick and seamlessly resumes the push forward.
                         target.teleport(teleportLoc);
                         target.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-                        target.getPathfinder().stopPathfinding();
                         target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, teleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
-
-                        double speed = 1.0;
-                        org.bukkit.attribute.AttributeInstance speedAttr = target.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
-                        if (speedAttr != null) {
-                            speed = speedAttr.getValue();
-                        }
-                        target.getPathfinder().moveTo(newTargetLocation, speed);
                     }
                 }
             }
             case POISON -> {
-                int poisonLvl = plugin.getConfig().getInt("towers.poison_" + tower.getLevel() + ".poison-level", tower.getLevel());
                 int poisonDur = plugin.getConfig().getInt("towers.poison_" + tower.getLevel() + ".poison-duration", 60 + (tower.getLevel() - 1) * 20);
                 double damage = tower.getDamage();
                 java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
@@ -934,12 +933,18 @@ public class TowerManager {
                 }
 
                 org.bukkit.NamespacedKey poisonDmgKey = new org.bukkit.NamespacedKey(plugin, "td_poison_damage");
+                org.bukkit.NamespacedKey poisonedUntilKey = new org.bukkit.NamespacedKey(plugin, "td_poisoned_until");
+                long poisonEndTime = System.currentTimeMillis() + (poisonDur * 50L);
                 for (Mob mob : targets) {
                     if (isMobImmuneToTower(mob, "POISON")) {
                         continue; // Poison-immune mobs take no damage and show no 🤢 indicator
                     }
                     mob.getPersistentDataContainer().set(poisonDmgKey, org.bukkit.persistence.PersistentDataType.DOUBLE, damage);
-                    mob.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonDur, poisonLvl - 1));
+                    // Drive poison through a PDC timestamp rather than the vanilla POISON effect: undead
+                    // mobs (Zombies, Skeletons, …) are immune to that effect, which silently dropped both
+                    // the damage-over-time and the 🤢 health-bar symbol. Extend the window if longer.
+                    long existing = mob.getPersistentDataContainer().getOrDefault(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG, 0L);
+                    mob.getPersistentDataContainer().set(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG, Math.max(existing, poisonEndTime));
                 }
                 start.getWorld().playSound(start, Sound.BLOCK_BREWING_STAND_BREW, 0.8f, 1.0f);
             }
@@ -948,12 +953,13 @@ public class TowerManager {
                 double damage = tower.getDamage();
                 java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
                 org.bukkit.NamespacedKey freezeKey = new org.bukkit.NamespacedKey(plugin, "td_frozen_until");
-                org.bukkit.NamespacedKey slowImmuneKey = new org.bukkit.NamespacedKey(plugin, "td_slow_immune");
+                // Ice Tower (Freeze) checks td_freeze_immune; Prismarine (Slow) keeps td_slow_immune.
+                org.bukkit.NamespacedKey freezeImmuneKey = new org.bukkit.NamespacedKey(plugin, "td_freeze_immune");
 
                 for (Mob mob : targets) {
-                    if (mob.getPersistentDataContainer().has(slowImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)
+                    if (mob.getPersistentDataContainer().has(freezeImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)
                             || isMobImmuneToTower(mob, "ICE") || isMobImmuneToTower(mob, "SLOW")) {
-                        continue; // Skip slow/ice-immune mobs (e.g. Warden) — no damage, freeze, or slowness
+                        continue; // Skip freeze/ice-immune mobs (e.g. Warden) — no damage, freeze, or slowness
                     }
                     mob.damage(damage);
 

@@ -278,6 +278,13 @@ public class MobListener implements Listener {
                 entity.getVehicle().remove();
             }
 
+            // Remove any health-bar ArmorStand passenger (used by invisible mobs like high-tier Spiders).
+            for (Entity passenger : entity.getPassengers()) {
+                if (passenger instanceof org.bukkit.entity.ArmorStand) {
+                    passenger.remove();
+                }
+            }
+
             // Get the arena this mob was walking on
             String mobArena = entity.getPersistentDataContainer().get(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING);
             if (mobArena == null) mobArena = "1";
@@ -490,31 +497,9 @@ public class MobListener implements Listener {
             String chainName = plugin.getMobManager().getChainForSlot(slot);
 
             if (chainName != null) {
-                org.bukkit.event.inventory.ClickType clickType = event.getClick();
-                if (event.isLeftClick()) {
-                    // Open tier selection sub-GUI
-                    plugin.getMobManager().openMobTierGUI(player, chainName);
-                } else if (event.isRightClick()) {
-                    int count = plugin.getMobManager().getQueueTotal(player.getUniqueId(), chainName);
-                    int toRemove = (clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)
-                            ? Math.min(10, count) : Math.min(1, count);
-                    if (toRemove > 0) {
-                        // Remove highest-tier-first and refund each at its actual queued tier price.
-                        int refund = 0;
-                        for (int i = 0; i < toRemove; i++) {
-                            int removedTier = plugin.getMobManager().removeOneFromQueue(player.getUniqueId(), chainName);
-                            if (removedTier <= 0) break;
-                            com.pauljang.towerDefense.entities.MobStateProfile profile =
-                                    plugin.getMobManager().getUpgradeRegistry().getProfile(chainName, removedTier);
-                            if (profile != null) refund += (int) profile.getPrice();
-                        }
-                        if (refund > 0) {
-                            plugin.getGameManager().addGold(player.getUniqueId(), refund, true);
-                        }
-                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
-                        plugin.getMobManager().openMobSpawnerGUI(player);
-                    }
-                }
+                // The main menu strictly navigates to the tier sub-GUI; all queueing and dequeueing
+                // (including shift-click bulk actions) happens inside that tier menu.
+                plugin.getMobManager().openMobTierGUI(player, chainName);
                 return;
             }
 
@@ -564,6 +549,37 @@ public class MobListener implements Listener {
                         plugin.getMobManager().getUpgradeRegistry().getProfile(chainKey, selectedTier);
                 if (profile == null) return;
 
+                String displayName = plugin.getMobManager().getChainDisplayName(chainKey);
+
+                // --- Dequeue branches (right-click): Shift+Right removes 5, plain Right removes 1.
+                // No unlock/progression checks needed; just remove what's queued and refund. ---
+                if (event.isRightClick()) {
+                    int toRemove = event.isShiftClick() ? 5 : 1;
+                    int removed = 0;
+                    int refund = 0;
+                    for (int i = 0; i < toRemove; i++) {
+                        if (!plugin.getMobManager().removeFromQueue(player.getUniqueId(), chainKey, selectedTier)) break;
+                        removed++;
+                        refund += (int) profile.getPrice();
+                    }
+                    if (removed > 0) {
+                        plugin.getGameManager().addGold(player.getUniqueId(), refund, true);
+                        player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 0.7f);
+                        player.sendMessage(org.bukkit.ChatColor.YELLOW + "Dequeued " + removed + "x " + displayName
+                                + " Tier " + selectedTier + ". Refunded " + refund + " Gold.");
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "No " + displayName
+                                + " Tier " + selectedTier + " queued to remove.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                    }
+                    plugin.getMobManager().openMobTierGUI(player, chainKey);
+                    return;
+                }
+
+                // --- Queue branches (left-click): Shift+Left queues 5, plain Left queues 1.
+                // Requires the tier to be reachable and unlocked first. ---
+                if (!event.isLeftClick()) return;
+
                 // Enforce linear progression: a tier can only be unlocked one step above the player's
                 // current highest unlocked tier (e.g. you cannot buy Lvl 3 before unlocking Lvl 2).
                 int currentLevel = 1; // Tier 1 is always unlocked
@@ -586,9 +602,11 @@ public class MobListener implements Listener {
                         plugin.getGameManager().removeExp(player.getUniqueId(), xpCost);
                         plugin.getGameManager().unlockTier(player.getUniqueId(), chainKey, selectedTier);
                         player.sendMessage(org.bukkit.ChatColor.GREEN + "Unlocked "
-                                + plugin.getMobManager().getChainDisplayName(chainKey)
-                                + " Tier " + selectedTier + "! (" + xpCost + " EXP spent)");
+                                + displayName + " Tier " + selectedTier + "! (" + xpCost + " EXP spent)");
                         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.2f);
+                        // Unlocking is its own action: refresh and require a second click to queue.
+                        plugin.getMobManager().openMobTierGUI(player, chainKey);
+                        return;
                     } else {
                         player.sendMessage(org.bukkit.ChatColor.RED + "Not enough EXP to unlock Tier " + selectedTier
                                 + "! Need " + xpCost + " EXP, you have "
@@ -599,7 +617,7 @@ public class MobListener implements Listener {
                     }
                 }
 
-                int qty = (event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) ? 5 : 1;
+                int qty = event.isShiftClick() ? 5 : 1;
 
                 // Each queued mob keeps the exact tier selected; queueing a higher tier no longer
                 // overrides previously queued lower-tier mobs of the same chain.
@@ -613,8 +631,7 @@ public class MobListener implements Listener {
                     }
                     player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.5f);
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Queued " + qty + "x "
-                            + plugin.getMobManager().getChainDisplayName(chainKey)
-                            + " Tier " + selectedTier + " for " + totalCost + " Gold.");
+                            + displayName + " Tier " + selectedTier + " for " + totalCost + " Gold.");
                 } else {
                     player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + totalCost + " Gold.");
                     player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);

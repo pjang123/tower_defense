@@ -82,8 +82,8 @@ public class MobManager {
         return upgradeRegistry;
     }
 
-    // Slot → chain index mapping for the main GUI
-    private static final int[] MOB_SLOTS = {10,11,12,13,14,15,16, 19,20,21,22,23,24,25, 28,29};
+    // Slot → chain index mapping for the main GUI: a centered 3x5 grid for the 15 mob chains.
+    private static final int[] MOB_SLOTS = {11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 29, 30, 31, 32, 33};
 
     /**
      * Chains shown in the spawner GUI. The standalone Endermite is hidden — players can no longer
@@ -175,6 +175,15 @@ public class MobManager {
         // Mobs never push each other off the track or clump up.
         entity.setCollidable(false);
 
+        // Force persistence so vanilla's despawn/garbage-collection never wipes a TD mob (Giants in
+        // particular vanish otherwise, since their huge hitbox keeps them far from any player).
+        entity.setRemoveWhenFarAway(false);
+        entity.setPersistent(true);
+
+        // Every TD mob is velocity-driven, so fully strip its vanilla AI goals. This stops Witches
+        // from pausing to drink potions and Wardens from aggroing onto other mobs along the path.
+        org.bukkit.Bukkit.getMobGoals().removeAllGoals(entity);
+
         // Scrub any random vanilla equipment (armor/weapons) so only CSV-defined equipment shows.
         if (entity.getEquipment() != null) {
             entity.getEquipment().clear();
@@ -214,7 +223,10 @@ public class MobManager {
         // Mark slow and fire immunities if requested or SLOW_SHIELD is active on the arena
         boolean isSlowShieldActive = plugin.getGameManager().isSpellActive(arena, "SLOW_SHIELD");
         if (immuneToSlow || isSlowShieldActive) {
+            // Slow (Prismarine) and Freeze (Ice) now use distinct immunity keys; a slow-immune mob
+            // resists both, so tag it with each.
             entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_slow_immune"), PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_freeze_immune"), PersistentDataType.BYTE, (byte) 1);
         }
         if (immuneToFire) {
             entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_fire_immune"), PersistentDataType.BYTE, (byte) 1);
@@ -305,16 +317,21 @@ public class MobManager {
         // presetKey drives height-offset config lookup; use "flying" for flying mobs
         String presetKey = isFlying ? chain : chain.replace(" ", "_");
 
+        // Flying mobs (e.g. Breeze) must hover like Blazes. Don't rely solely on a config.yml preset
+        // key — many flying chains have none — so forcefully pin a 2.0 height-offset for this preset
+        // before spawning. spawnMob() then raises the spawn point and the movement ticker keeps it
+        // airborne via this same config value.
+        if (isFlying) {
+            plugin.getConfig().set("mobs." + presetKey + ".height-offset", 5.0);
+        }
+
         Mob entity = spawnMob(arena, profile.getEntityType(), profile.getSpeed(), profile.getHp(),
                 0.0, slowImmune, fireImmune, killGold, xpReward, presetKey);
         if (entity == null) return;
 
-        // Override gravity for flying mobs (spawnMob already checks height-offset, but we set it here too)
+        // Override gravity for flying mobs so they don't sink toward the ground.
         if (isFlying) {
             entity.setGravity(false);
-            // Move entity up 3 blocks if it spawned at ground level
-            org.bukkit.Location loc = entity.getLocation();
-            entity.teleport(loc.add(0, 3, 0));
         }
 
         // Store tower immunities in PDC so TowerManager can check them
@@ -324,6 +341,11 @@ public class MobManager {
                 new org.bukkit.NamespacedKey(plugin, "td_immunities"),
                 org.bukkit.persistence.PersistentDataType.STRING, immunityStr);
         }
+
+        // Store the castle damage this mob deals when it reaches the end of the track.
+        entity.getPersistentDataContainer().set(
+            new org.bukkit.NamespacedKey(plugin, "td_castle_damage"),
+            org.bukkit.persistence.PersistentDataType.INTEGER, Math.max(1, (int) Math.round(profile.getDamage())));
 
         // Apply equipment (helmet or hand item based on material type)
         if (profile.getEquipment() != null) {
@@ -347,10 +369,25 @@ public class MobManager {
             ((org.bukkit.entity.Creeper) entity).setPowered(true);
         }
 
-        // Invisibility special mechanic (e.g. higher-tier Spiders)
+        // Invisibility special mechanic (e.g. higher-tier Spiders). An invisible entity also hides
+        // its own custom name (the health bar), so attach an invisible marker ArmorStand as a
+        // passenger to carry a visible health bar; updateHealthBar() renders onto the passenger.
         if (profile.getSpecialMechanics().contains("Invisible")) {
             entity.addPotionEffect(new org.bukkit.potion.PotionEffect(
                     org.bukkit.potion.PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
+
+            org.bukkit.Location asLoc = entity.getLocation();
+            if (asLoc.getWorld() != null) {
+                org.bukkit.entity.ArmorStand nameTag = asLoc.getWorld().spawn(asLoc, org.bukkit.entity.ArmorStand.class, as -> {
+                    as.setVisible(false);
+                    as.setMarker(true);
+                    as.setGravity(false);
+                    as.setInvulnerable(true);
+                    as.setPersistent(false);
+                    as.setSmall(true);
+                });
+                entity.addPassenger(nameTag);
+            }
         }
 
         // Spawn mount entity and set the mob as its passenger
@@ -366,6 +403,33 @@ public class MobManager {
                 mount.addPassenger(entity);
             }
         }
+    }
+
+    /**
+     * Spawns a fully-equipped Tier 1 Zombie (via the official chain spawn path so it gets a proper
+     * {@link TDMob} wrapper) at the Giant's current location, then makes it inherit the Giant's
+     * pathing so it proceeds toward the castle from that exact spot instead of running to the start.
+     */
+    public void summonZombieAt(TDMob giant, String arena) {
+        Mob giantEntity = giant.getEntity();
+        if (giantEntity.isDead() || !giantEntity.isValid()) return;
+
+        int before = activeMobs.size();
+        spawnMobByChain(arena, "zombie", 1);
+        if (activeMobs.size() <= before) return; // Spawn failed (e.g. missing start waypoint)
+
+        // spawnMobByChain appends the new mob's TDMob to activeMobs; it's the most recent entry.
+        TDMob zombieTDMob = activeMobs.get(activeMobs.size() - 1);
+        Mob zombie = zombieTDMob.getEntity();
+
+        // Teleport the zombie to the Giant's exact current location, then deep-link its pathing state
+        // to the Giant's. On the next movement tick the engine measures from the zombie's physical
+        // position (at the Giant) to the Giant's target waypoint, pushing it forward along the same
+        // track line — instead of walking back to the start or toward a stale waypoint node.
+        zombie.teleport(giantEntity.getLocation());
+        zombieTDMob.setCurrentWaypointId(giant.getCurrentWaypointId());
+        // Deep copy the history so the two mobs never share the same list reference.
+        zombieTDMob.setPathHistory(new java.util.ArrayList<>(giant.getPathHistory()));
     }
 
 
@@ -398,22 +462,57 @@ public class MobManager {
             bar.append("■");
         }
 
+        // Status icons stack, each carrying its own distinct colour code.
         StringBuilder status = new StringBuilder();
         if (mob.getFireTicks() > 0) {
             status.append(" ").append(org.bukkit.ChatColor.GOLD).append("🔥");
         }
-        if (mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON)) {
-            status.append(" ").append(org.bukkit.ChatColor.GREEN).append("🤢");
+        // Poison is tracked via a PDC timestamp (undead mobs are immune to the vanilla POISON effect),
+        // but still honour a real POISON effect if some other source applied one.
+        boolean poisoned = mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON);
+        if (!poisoned) {
+            org.bukkit.NamespacedKey poisonedUntilKey = new NamespacedKey(plugin, "td_poisoned_until");
+            if (mob.getPersistentDataContainer().has(poisonedUntilKey, PersistentDataType.LONG)) {
+                long poisonUntil = mob.getPersistentDataContainer().get(poisonedUntilKey, PersistentDataType.LONG);
+                if (System.currentTimeMillis() < poisonUntil) poisoned = true;
+            }
         }
+        if (poisoned) {
+            status.append(" ").append(org.bukkit.ChatColor.DARK_GREEN).append("🤢");
+        }
+        // Distinct symbols for Freeze (Ice Tower, PDC key) vs. Slow (Prismarine, SLOWNESS effect).
+        org.bukkit.NamespacedKey frozenKey = new NamespacedKey(plugin, "td_frozen_until");
+        if (mob.getPersistentDataContainer().has(frozenKey, PersistentDataType.LONG)) {
+            long freezeEnd = mob.getPersistentDataContainer().get(frozenKey, PersistentDataType.LONG);
+            if (System.currentTimeMillis() < freezeEnd) {
+                status.append(" ").append(org.bukkit.ChatColor.AQUA).append("❄");
+            }
+        }
+        // Independent check (not else-if) so Slow stacks alongside Fire/Poison/Freeze.
         if (mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS)) {
-            status.append(" ").append(org.bukkit.ChatColor.AQUA).append("❄");
+            status.append(" ").append(org.bukkit.ChatColor.BLUE).append("🐌");
         }
         if (status.length() > 0) {
             bar.append(status);
         }
 
-        mob.setCustomName(bar.toString());
-        mob.setCustomNameVisible(true);
+        // Invisible mobs (e.g. higher-tier Spiders) hide their own name, so an ArmorStand passenger
+        // carries the visible health bar instead.
+        org.bukkit.entity.ArmorStand nameHolder = null;
+        for (org.bukkit.entity.Entity passenger : mob.getPassengers()) {
+            if (passenger instanceof org.bukkit.entity.ArmorStand as) {
+                nameHolder = as;
+                break;
+            }
+        }
+        if (nameHolder != null) {
+            nameHolder.setCustomName(bar.toString());
+            nameHolder.setCustomNameVisible(true);
+            mob.setCustomNameVisible(false);
+        } else {
+            mob.setCustomName(bar.toString());
+            mob.setCustomNameVisible(true);
+        }
     }
 
     private void startMobTicker() {
@@ -453,6 +552,39 @@ public class MobManager {
                         }
                     }
 
+                    // Poison damage-over-time. Driven by a PDC timestamp rather than the vanilla POISON
+                    // effect so it also affects poison-immune undead (Zombies, Skeletons, …).
+                    org.bukkit.NamespacedKey poisonedUntilKey = new org.bukkit.NamespacedKey(plugin, "td_poisoned_until");
+                    if (mob.getEntity().getPersistentDataContainer().has(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
+                        long poisonUntil = mob.getEntity().getPersistentDataContainer().get(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
+                        if (System.currentTimeMillis() < poisonUntil) {
+                            if (tickCounter % 20 == 0) {
+                                double pdmg = mob.getEntity().getPersistentDataContainer().getOrDefault(
+                                        new org.bukkit.NamespacedKey(plugin, "td_poison_damage"),
+                                        org.bukkit.persistence.PersistentDataType.DOUBLE, 1.0);
+                                mob.getEntity().damage(pdmg);
+                                mob.getEntity().getWorld().spawnParticle(org.bukkit.Particle.WITCH,
+                                        mob.getEntity().getLocation().add(0, 0.5, 0), 6, 0.25, 0.4, 0.25, 0.0);
+                            }
+                        } else {
+                            mob.getEntity().getPersistentDataContainer().remove(poisonedUntilKey);
+                        }
+                    }
+
+                    // Giants periodically summon a Tier 1 Zombie at their position (every 5 seconds),
+                    // but only while the Giant is alive and valid so summons stop on death. The spawn
+                    // is deferred a tick so we don't structurally modify activeMobs mid-iteration.
+                    if (mob.getEntity().getType() == EntityType.GIANT && tickCounter % 100 == 0) {
+                        final TDMob giantMob = mob;
+                        final String giantArena = mobArena;
+                        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                            org.bukkit.entity.Mob giantEntity = giantMob.getEntity();
+                            if (!giantEntity.isDead() && giantEntity.isValid()) {
+                                summonZombieAt(giantMob, giantArena);
+                            }
+                        });
+                    }
+
                     handleMobMovement(mob, iterator, tickCounter);
                 }
                 tickCounter++;
@@ -477,6 +609,20 @@ public class MobManager {
             org.bukkit.persistence.PersistentDataType.STRING
         );
         if (mobArena == null) mobArena = "1";
+
+        // Witches will otherwise stop walking to drink potions — a hardcoded vanilla mechanic that
+        // applies a heavy internal slowness while the drink animation plays. Continuously strip any
+        // held potion and wipe the target so they never enter the drinking state.
+        if (mob.getEntity() instanceof org.bukkit.entity.Witch witch) {
+            org.bukkit.inventory.EntityEquipment eq = witch.getEquipment();
+            if (eq != null) {
+                org.bukkit.inventory.ItemStack mainHand = eq.getItemInMainHand();
+                if (mainHand != null && mainHand.getType() == org.bukkit.Material.POTION) {
+                    eq.setItemInMainHand(null);
+                }
+            }
+            witch.setTarget(null);
+        }
 
         // Freeze status check (applied by Ice Towers)
         boolean isFrozen = false;
@@ -549,95 +695,43 @@ public class MobManager {
 
         double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
 
-        // If the mob has reached the final waypoint, run stay-centered & attack/explode logic
+        // End of track: the mob reached the final waypoint (a node with no outgoing connections) —
+        // the castle door. The mob stays alive and continuously sieges the castle on an attack
+        // cooldown rather than despawning or draining health 20x/second.
         if (mob.hasReachedFinalWaypoint()) {
-            // Check if it's a Creeper - explode and deal massive damage!
+            // Creepers are suicide bombers: they detonate once for their (larger) damage and are
+            // consumed, instead of standing at the door.
             if (mob.getEntity().getType() == EntityType.CREEPER) {
-                int castleDamage = plugin.getConfig().getInt("mobs.creeper.castle-damage", 5);
-                plugin.getGameManager().damageCastle(mobArena, castleDamage);
-                
                 Location loc = mob.getEntity().getLocation();
                 loc.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, loc, 1);
                 loc.getWorld().playSound(loc, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+                plugin.getGameManager().damageCastle(mobArena, getCastleDamage(mob.getEntity()));
 
-                // Also remove any mount (e.g. Pig/Cow for T3/T4 Creeper)
                 org.bukkit.entity.Entity creeperVehicle = mob.getEntity().getVehicle();
                 if (creeperVehicle != null) creeperVehicle.remove();
+                for (org.bukkit.entity.Entity passenger : mob.getEntity().getPassengers()) {
+                    if (passenger instanceof org.bukkit.entity.ArmorStand) passenger.remove();
+                }
+                // remove(), not setHealth(0)/damage(), so no death/reward event fires at the door.
                 mob.getEntity().remove();
                 iterator.remove();
                 return;
             }
 
-            Location finalTarget = mob.getFinalOffsetWaypoint();
-            if (finalTarget != null) {
-                Location finalTargetLoc = finalTarget.clone().add(0, heightOffset, 0);
-                // Periodically repath back to their offset spot if pushed away
-                if (currentTick % 10 == 0) {
-                    if (isVelocityDriven(mob.getEntity(), heightOffset)) {
-                        org.bukkit.entity.Mob physicalMoverF = mob.getEntity();
-                        if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vm) physicalMoverF = vm;
-                        Location loc = physicalMoverF.getLocation();
-                        org.bukkit.util.Vector dir = finalTargetLoc.clone().subtract(loc).toVector();
-                        if (dir.lengthSquared() > 0.01) {
-                            if (heightOffset <= 0.0) dir.setY(0);
-                            dir.normalize();
-                            float yaw = (float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ()));
-                            float pitch = heightOffset > 0.0 ? (float) Math.toDegrees(Math.atan2(-dir.getY(), Math.sqrt(dir.getX()*dir.getX() + dir.getZ()*dir.getZ()))) : 0.0f;
-                            physicalMoverF.setRotation(yaw, pitch);
-                            double speed = 0.1;
-                            org.bukkit.attribute.AttributeInstance speedAttr = mob.getEntity().getAttribute(Attribute.MOVEMENT_SPEED);
-                            if (speedAttr != null) {
-                                speed = speedAttr.getValue();
-                            }
-                            if (isFreezeActive && !isSlowImmune) {
-                                speed = speed * slowMult;
-                            }
-                            if (isHasteActive) {
-                                speed = speed * hasteMult;
-                            }
-                            if (heightOffset > 0.0) {
-                                physicalMoverF.setVelocity(dir.multiply(speed));
-                            } else {
-                                physicalMoverF.setVelocity(dir.multiply(speed).setY(physicalMoverF.getVelocity().getY()));
-                            }
-                        }
-                    } else {
-                        double pathfinderSpeed = 1.0;
-                        if (isFreezeActive && !isSlowImmune) {
-                            pathfinderSpeed = pathfinderSpeed * slowMult;
-                        }
-                        if (isHasteActive) {
-                            pathfinderSpeed = pathfinderSpeed * hasteMult;
-                        }
-                        mob.getEntity().getPathfinder().moveTo(finalTargetLoc, pathfinderSpeed);
-                    }
-                }
+            // Stand still at the door — zero momentum on the mob and any vehicle it rides.
+            mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+            if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vehicleMob) {
+                vehicleMob.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
             }
 
-            // Attack logic: damage castle every 40 ticks (2 seconds)
-            if (currentTick - mob.getLastAttackTick() >= 40) {
-                mob.setLastAttackTick(currentTick);
-
-                // Deal 1 damage to the specific arena's castle health
-                plugin.getGameManager().damageCastle(mobArena, 1);
-
-                // Play custom swing animation & strike sound/particles at the mob's position
+            // Attack the castle once every 1.5 seconds with a visual/audio cue.
+            long now = System.currentTimeMillis();
+            if (now - mob.getLastCastleAttackTime() >= 1500L) {
+                mob.setLastCastleAttackTime(now);
+                plugin.getGameManager().damageCastle(mobArena, getCastleDamage(mob.getEntity()));
+                mob.getEntity().getWorld().playSound(mob.getEntity().getLocation(),
+                        org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1.0f, 0.8f);
                 mob.getEntity().swingMainHand();
-                for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    if (mobArena.equals(plugin.getGameManager().getPlayerArena(p.getUniqueId()))) {
-                        p.playSound(
-                            mob.getEntity().getLocation(),
-                            org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR,
-                            1.0f,
-                            1.0f
-                        );
-                    }
-                }
-                mob.getEntity().getWorld().spawnParticle(
-                    org.bukkit.Particle.SWEEP_ATTACK,
-                    mob.getEntity().getEyeLocation().add(mob.getEntity().getLocation().getDirection().multiply(0.8)),
-                    1
-                );
             }
             return;
         }
@@ -723,15 +817,42 @@ public class MobManager {
 
         }
 
-        // Check if they are close enough to the waypoint to target the next one
-        double reachDistance = isVelocityDriven(mob.getEntity(), heightOffset) ? 4.0 : 1.5;
-        if (mob.getEntity().getLocation().distanceSquared(targetLoc) < reachDistance) {
+        // Check if they are close enough to the waypoint to target the next one. Use only the X/Z
+        // plane: flying and tall mobs sit at a different Y than the node, so a 3D distance would
+        // never collapse and they'd get stuck. A generous radius keeps fast mobs from overshooting
+        // the node in a single tick.
+        Location mobLoc = mob.getEntity().getLocation();
+        double reachDistSq = Math.pow(mobLoc.getX() - targetLoc.getX(), 2)
+                + Math.pow(mobLoc.getZ() - targetLoc.getZ(), 2);
+        double reachThreshold = isVelocityDriven(mob.getEntity(), heightOffset) ? 4.0 : 2.25;
+        if (reachDistSq < reachThreshold) {
             mob.advanceToNextWaypoint();
         }
     }
-    
+
+    /**
+     * Castle damage a mob deals when it reaches the end of the track. Creepers use their configured
+     * (larger) explosion damage; otherwise the value stored at spawn from the profile, defaulting to 1.
+     */
+    private int getCastleDamage(Mob entity) {
+        if (entity.getType() == EntityType.CREEPER) {
+            return plugin.getConfig().getInt("mobs.creeper.castle-damage", 5);
+        }
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "td_castle_damage");
+        if (entity.getPersistentDataContainer().has(key, org.bukkit.persistence.PersistentDataType.INTEGER)) {
+            return entity.getPersistentDataContainer().get(key, org.bukkit.persistence.PersistentDataType.INTEGER);
+        }
+        return 1;
+    }
+
     public void cleanup() {
         for (TDMob mob : activeMobs) {
+            // Remove any health-bar ArmorStand passenger (invisible mobs) so none are left floating.
+            for (org.bukkit.entity.Entity passenger : mob.getEntity().getPassengers()) {
+                if (passenger instanceof org.bukkit.entity.ArmorStand) {
+                    passenger.remove();
+                }
+            }
             mob.getEntity().remove();
         }
         activeMobs.clear();
@@ -782,6 +903,23 @@ public class MobManager {
             tiers.put(topTier, count - 1);
         }
         return topTier;
+    }
+
+    /**
+     * Removes one queued mob of the chain at the exact tier given. Returns true if one was removed,
+     * false if none of that tier were queued.
+     */
+    public boolean removeFromQueue(UUID uuid, String chain, int tier) {
+        Map<Integer, Integer> tiers = getQueueByTier(uuid).get(chain.toLowerCase());
+        if (tiers == null) return false;
+        int count = tiers.getOrDefault(tier, 0);
+        if (count <= 0) return false;
+        if (count <= 1) {
+            tiers.remove(tier);
+        } else {
+            tiers.put(tier, count - 1);
+        }
+        return true;
     }
 
     /** Legacy overloads kept for any existing callers; default to tier 1. */
@@ -945,9 +1083,7 @@ public class MobManager {
         if (queuedCount > 0) {
             lore.add(ChatColor.GREEN + "Queued: " + ChatColor.YELLOW + queuedCount);
         }
-        lore.add(ChatColor.GREEN + "Left-Click " + ChatColor.GRAY + "→ choose tier & queue");
-        lore.add(ChatColor.RED + "Right-Click " + ChatColor.GRAY + "→ dequeue 1");
-        lore.add(ChatColor.RED + "Shift+Right " + ChatColor.GRAY + "→ dequeue 10");
+        lore.add(ChatColor.GREEN + "Click " + ChatColor.GRAY + "→ choose tier (queue & dequeue inside)");
 
         meta.setLore(lore);
         item.setItemMeta(meta);
@@ -998,9 +1134,8 @@ public class MobManager {
         for (int t = 1; t <= 5; t++) {
             MobStateProfile profile = allTiers.get(t);
             if (profile == null) continue;
-            MobStateProfile prevProfile = allTiers.get(t - 1);
             boolean unlocked = plugin.getGameManager().isTierUnlocked(player.getUniqueId(), chain, t);
-            gui.setItem(9 + t, createTierItem(profile, prevProfile, t == currentTier, unlocked));
+            gui.setItem(9 + t, createTierItem(profile, t == currentTier, unlocked));
         }
 
         // Back button at slot 22
@@ -1011,7 +1146,7 @@ public class MobManager {
         player.openInventory(gui);
     }
 
-    private org.bukkit.inventory.ItemStack createTierItem(MobStateProfile profile, MobStateProfile prevProfile, boolean isSelected, boolean isUnlocked) {
+    private org.bukkit.inventory.ItemStack createTierItem(MobStateProfile profile, boolean isSelected, boolean isUnlocked) {
         int tier = profile.getTier();
         ChatColor color = getTierColor(tier);
         org.bukkit.Material mat = isUnlocked ? getChainMaterial(profile.getUpgradeChain()) : org.bukkit.Material.BARRIER;
@@ -1024,6 +1159,11 @@ public class MobManager {
         meta.setDisplayName(color + "Tier " + tier + ": " + profile.getEntityType().name() + selectedTag + lockedTag);
 
         List<String> lore = new ArrayList<>();
+        // Prominent description of the tier's special mechanics at the top of the lore.
+        if (!profile.getSpecialMechanics().isEmpty()) {
+            lore.add(ChatColor.YELLOW + "Description: " + ChatColor.GRAY + profile.getSpecialMechanics());
+            lore.add("");
+        }
         if (!isUnlocked) {
             lore.add(ChatColor.RED + "Unlock Cost: " + ChatColor.YELLOW + getTierUnlockCost(tier) + " EXP");
             lore.add("");
@@ -1031,20 +1171,16 @@ public class MobManager {
         lore.add(ChatColor.GOLD + "Cost: " + ChatColor.YELLOW + (int) profile.getPrice() + " Gold");
         lore.add("");
 
-        // Core stats, each annotated with the upgrade delta over the previous tier.
-        lore.add(ChatColor.RED + "HP: " + ChatColor.WHITE + (int) profile.getHp()
-                + deltaTag(prevProfile == null ? 0 : (int) profile.getHp() - (int) prevProfile.getHp(), ""));
-        lore.add(ChatColor.DARK_RED + "Damage: " + ChatColor.WHITE + profile.getDamage()
-                + deltaTagDouble(prevProfile == null ? 0 : profile.getDamage() - prevProfile.getDamage(), ""));
+        // Raw static stats from the profile (no cross-tier comparisons).
+        lore.add(ChatColor.RED + "HP: " + ChatColor.WHITE + (int) profile.getHp());
+        lore.add(ChatColor.DARK_RED + "Damage: " + ChatColor.WHITE + profile.getDamage());
         lore.add(ChatColor.GREEN + "Speed: " + ChatColor.WHITE
-                + String.format("%.1f", profile.getSpeed()) + " Blocks/sec"
-                + deltaTagDouble(prevProfile == null ? 0 : profile.getSpeed() - prevProfile.getSpeed(), ""));
-        lore.add(ChatColor.LIGHT_PURPLE + "EXP Payout: " + ChatColor.WHITE + profile.getExpReward()
-                + deltaTag(prevProfile == null ? 0 : profile.getExpReward() - prevProfile.getExpReward(), ""));
+                + String.format("%.1f", profile.getSpeed()) + " Blocks/sec");
+        lore.add(ChatColor.LIGHT_PURPLE + "EXP Payout: " + ChatColor.WHITE + profile.getExpReward());
         lore.add("");
 
         boolean hasTraits = !profile.getImmunities().isEmpty() || profile.getMountType() != null
-                || profile.getEquipment() != null || !profile.getSpecialMechanics().isEmpty();
+                || profile.getEquipment() != null;
         if (hasTraits) {
             if (!profile.getImmunities().isEmpty()) {
                 lore.add(ChatColor.AQUA + "Immune: " + String.join(", ", profile.getImmunities()));
@@ -1055,15 +1191,14 @@ public class MobManager {
             if (profile.getEquipment() != null) {
                 lore.add(ChatColor.YELLOW + "Equipment: " + profile.getEquipment().name());
             }
-            if (!profile.getSpecialMechanics().isEmpty()) {
-                lore.add(ChatColor.LIGHT_PURPLE + profile.getSpecialMechanics());
-            }
             lore.add("");
         }
 
         if (isUnlocked) {
             lore.add(ChatColor.GREEN + "Left-Click " + ChatColor.GRAY + "→ queue 1 at this tier");
             lore.add(ChatColor.GREEN + "Shift+Left " + ChatColor.GRAY + "→ queue 5 at this tier");
+            lore.add(ChatColor.RED + "Right-Click " + ChatColor.GRAY + "→ dequeue 1 at this tier");
+            lore.add(ChatColor.RED + "Shift+Right " + ChatColor.GRAY + "→ dequeue 5 at this tier");
         } else {
             lore.add(ChatColor.YELLOW + "Left-Click " + ChatColor.GRAY + "→ spend EXP to unlock");
         }
@@ -1071,22 +1206,6 @@ public class MobManager {
         meta.setLore(lore);
         item.setItemMeta(meta);
         return item;
-    }
-
-    /** Formats an integer stat delta as a green "(+X)" / red "(-X)" suffix, or empty when unchanged. */
-    private String deltaTag(int delta, String unit) {
-        if (delta == 0) return "";
-        String sign = delta > 0 ? "+" : "";
-        ChatColor c = delta > 0 ? ChatColor.GREEN : ChatColor.RED;
-        return " " + c + "(" + sign + delta + unit + ")";
-    }
-
-    /** Formats a decimal stat delta as a green "(+X.X)" / red "(-X.X)" suffix, or empty when unchanged. */
-    private String deltaTagDouble(double delta, String unit) {
-        if (Math.abs(delta) < 0.001) return "";
-        String sign = delta > 0 ? "+" : "";
-        ChatColor c = delta > 0 ? ChatColor.GREEN : ChatColor.RED;
-        return " " + c + "(" + sign + String.format("%.1f", delta) + unit + ")";
     }
 
     private org.bukkit.inventory.ItemStack createGUIItem(Material material, String name, String... lore) {

@@ -16,6 +16,7 @@ public class TDMob {
     private final List<String> pathHistory = new ArrayList<>();
     private String lastPathfindWaypointId = null;
     private long lastAttackTick = 0;
+    private long lastCastleAttackTime = 0L;
     private final Location finalOffsetWaypoint;
 
     public TDMob(Mob entity, Map<String, TDWaypoint> waypointGraph) {
@@ -70,6 +71,14 @@ public class TDMob {
         return pathHistory;
     }
 
+    /** Replaces this mob's visited-waypoint history (used when a summoned mob inherits a summoner's path). */
+    public void setPathHistory(List<String> history) {
+        this.pathHistory.clear();
+        if (history != null) {
+            this.pathHistory.addAll(history);
+        }
+    }
+
     public void advanceToNextWaypoint() {
         if (currentWaypointId == null) return;
         TDWaypoint current = waypointGraph.get(currentWaypointId);
@@ -113,6 +122,14 @@ public class TDMob {
 
     public void setLastAttackTick(long lastAttackTick) {
         this.lastAttackTick = lastAttackTick;
+    }
+
+    public long getLastCastleAttackTime() {
+        return lastCastleAttackTime;
+    }
+
+    public void setLastCastleAttackTime(long lastCastleAttackTime) {
+        this.lastCastleAttackTime = lastCastleAttackTime;
     }
 
     public Location getFinalOffsetWaypoint() {

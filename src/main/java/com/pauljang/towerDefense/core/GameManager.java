@@ -121,7 +121,8 @@ public class GameManager {
                 // Keep the inventory completely clear of arrows
                 player.getInventory().remove(Material.ARROW);
 
-                // Flush any accumulated gold/exp gains as a single combined action bar message
+                // Flush any accumulated gold/exp gains as a single combined chat message. Action bars
+                // were unreliable (overridden by other HUD updates), so use standard chat instead.
                 Integer pGold = pendingGold.remove(player.getUniqueId());
                 Integer pExp = pendingExp.remove(player.getUniqueId());
                 if (pGold != null || pExp != null) {
@@ -134,7 +135,7 @@ public class GameManager {
                         sb.append(ChatColor.GREEN).append("+").append(pExp).append(" XP");
                     }
                     if (sb.length() > 0) {
-                        player.sendActionBar(sb.toString());
+                        player.sendMessage(sb.toString());
                     }
                 }
             }
@@ -298,8 +299,8 @@ public class GameManager {
                 player.setAllowFlight(true);
                 player.playSound(player.getLocation(), Sound.EVENT_RAID_HORN, 1.0f, 1.0f);
                 teleportToArenaStart(player, getPlayerArena(uuid));
-                // Strip the matchmaking compass now the match is live; leaves the game-world compass.
-                ensureCompass(player);
+                // Strip the "Return to Lobby" compass entirely now the match is live.
+                player.getInventory().remove(org.bukkit.Material.COMPASS);
             }
         }
     }
@@ -771,7 +772,15 @@ public class GameManager {
         }
 
         if (updated <= 0) {
-            setGameState(GameState.ENDED);
+            // Defer the game-end transition by a tick. damageCastle() runs from inside the mob
+            // movement ticker while it iterates activeMobs; ending immediately would run
+            // handleGameEnd() → cleanup() → activeMobs.clear() mid-iteration, throwing a
+            // ConcurrentModificationException. The guard avoids re-ending if already transitioned.
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (currentState == GameState.ACTIVE) {
+                    setGameState(GameState.ENDED);
+                }
+            });
         }
     }
 
