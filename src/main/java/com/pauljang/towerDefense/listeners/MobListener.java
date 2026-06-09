@@ -266,6 +266,16 @@ public class MobListener implements Listener {
     }
 
     @EventHandler
+    public void onWitchDrink(org.bukkit.event.entity.EntityPotionEffectEvent event) {
+        // Witches natively pause walking to drink potions; cancel the self-applied drink effect so
+        // they never enter the drinking state and keep marching along the track.
+        if (event.getEntity() instanceof org.bukkit.entity.Witch
+                && event.getCause() == org.bukkit.event.entity.EntityPotionEffectEvent.Cause.POTION_DRINK) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onMobDeath(org.bukkit.event.entity.EntityDeathEvent event) {
         Entity entity = event.getEntity();
         NamespacedKey key = new NamespacedKey(plugin, "td_mob");
@@ -1141,6 +1151,14 @@ public class MobListener implements Listener {
     public void onEntityDamageByEntity(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         org.bukkit.entity.Entity victim = event.getEntity();
 
+        // Wardens are velocity-driven track mobs; cancel any damage they deal (notably the sonic
+        // boom) so they never blast allied mobs walking the same path.
+        if (event.getDamager() instanceof org.bukkit.entity.Warden warden
+                && warden.getPersistentDataContainer().has(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+            return;
+        }
+
         // Prevent players from hurting each other (PvP prevention)
         if (victim instanceof org.bukkit.entity.Player) {
             org.bukkit.entity.Entity damager = event.getDamager();
@@ -1169,9 +1187,16 @@ public class MobListener implements Listener {
         }
 
         NamespacedKey tdKey = new NamespacedKey(plugin, "td_mob");
-        
+
         // Only run checks for custom TD Mobs
         if (!victim.getPersistentDataContainer().has(tdKey, PersistentDataType.BYTE)) {
+            return;
+        }
+
+        // A player's arrow always damages TD mobs natively. The wrong-track cancellation below was
+        // also blocking the player's own custom arrows, so they dealt no damage.
+        if (event.getDamager() instanceof org.bukkit.entity.Projectile proj
+                && proj.getShooter() instanceof org.bukkit.entity.Player) {
             return;
         }
 

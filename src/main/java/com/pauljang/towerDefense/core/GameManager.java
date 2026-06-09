@@ -519,8 +519,8 @@ public class GameManager {
             matchQueue.add(uuid);
             player.sendMessage(ChatColor.GREEN + "You have joined the match queue (" + matchQueue.size() + "/" + matchSize + ")!");
             giveLobbyItems(player);
-            // Check if queue is full to start the 30-second lobby queue countdown
-            if (matchQueue.size() >= matchSize) {
+            // Start the lobby countdown once at least 2 players are queued; others may still join.
+            if (matchQueue.size() >= 2 && lobbyQueueTask == null) {
                 startLobbyQueueCountdown();
             }
         }
@@ -1135,8 +1135,8 @@ public class GameManager {
     }
 
     public void startPvPMatch(Player p1, Player p2) {
-        // Reset game state
-        setGameState(GameState.ENDED);
+        // Silent cleanup instead of triggering the ENDED state, which would flash the victory screen.
+        // (The actual cleanup calls live in the "Wipe active objects" block below.)
 
         // Reset players
         resetPlayerForMatch(p1, "1");
@@ -1717,13 +1717,13 @@ public class GameManager {
 
     public void startLobbyQueueCountdown() {
         if (lobbyQueueTask != null) return;
-        
-        lobbyQueueSecondsLeft = 10;
-        
+
+        lobbyQueueSecondsLeft = 45;
+
         for (java.util.UUID uuid : matchQueue) {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
-                p.sendMessage(ChatColor.GREEN + "Match found! Transporting to game in 10 seconds.");
+                p.sendMessage(ChatColor.GREEN + "Match found! Transporting to game in 45 seconds.");
                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
             }
         }
@@ -1752,6 +1752,16 @@ public class GameManager {
                 }
             }
         }, 20L, 20L);
+    }
+
+    /**
+     * Forces the lobby countdown to finish in 3 seconds, transporting everyone queued. Requires at
+     * least 2 players; starts the countdown first if it isn't already running.
+     */
+    public void forceStartMatch() {
+        if (matchQueue.size() < 2) return;
+        if (lobbyQueueTask == null) startLobbyQueueCountdown();
+        lobbyQueueSecondsLeft = 3; // Force transport in 3 seconds
     }
 
     public void cancelLobbyQueueCountdown(String reason) {

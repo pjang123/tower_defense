@@ -231,7 +231,7 @@ public class TowerManager {
             }
 
             // Approach 2: equip a colored harness item in the BODY slot (Happy Ghast wears it like
-            // a saddle). There is no generic Material.HARNESS enum — calling Material.valueOf("HARNESS")
+            // a saddle). There is no generic Material.HARNESS enum â€” calling Material.valueOf("HARNESS")
             // threw IllegalArgumentException and left the ghast unsteerable. We must pick a concrete
             // colored variant; choose it by the ghast's arena (this plugin's team distinction) so the
             // harness also gives a clear visual team color: arena "2" -> RED, otherwise BLUE.
@@ -254,7 +254,7 @@ public class TowerManager {
             }
 
             if (!harnessApplied) {
-                plugin.getLogger().warning("[HappyGhast] All harness approaches failed — ghast will not be rideable. Check logs above for details.");
+                plugin.getLogger().warning("[HappyGhast] All harness approaches failed â€” ghast will not be rideable. Check logs above for details.");
             }
         }
 
@@ -357,7 +357,7 @@ public class TowerManager {
         }
         String speedStr = String.format("%.1fs", cooldown / 20.0);
         if (isBoosted) {
-            speedStr += ChatColor.RED + " ⚡";
+            speedStr += ChatColor.RED + " âš¡";
         }
 
         // Prepend the owner's name to the tower title, e.g. "Steve's Archer Tower".
@@ -374,12 +374,12 @@ public class TowerManager {
                 + tower.getType().getDisplayName() + " " + tower.getRomanLevel());
         
         if (tower.getType() == TowerType.REDSTONE) {
-            lines.add(ChatColor.RED + "✦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
-                      ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% ⚡");
+            lines.add(ChatColor.RED + "âœ¦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
+                      ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% âš¡");
         } else {
-            lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" + 
-                      ChatColor.GRAY + " | " + ChatColor.AQUA + "⚡ " + speedStr + 
-                      ChatColor.GRAY + " | " + ChatColor.GREEN + "✦ " + String.format("%.1f", tower.getRange()) + "m");
+            lines.add(ChatColor.RED + "â¤ " + String.format("%.1f", tower.getDamage()) + " DMG" + 
+                      ChatColor.GRAY + " | " + ChatColor.AQUA + "âš¡ " + speedStr + 
+                      ChatColor.GRAY + " | " + ChatColor.GREEN + "âœ¦ " + String.format("%.1f", tower.getRange()) + "m");
         }
         lines.add(ChatColor.GRAY + "Priority: " + ChatColor.GOLD + tower.getTargetingMode().getDisplayName());
 
@@ -504,7 +504,7 @@ public class TowerManager {
                         continue;
                     }
 
-                    // Tower just came back online after an EMP — restore its normal hologram.
+                    // Tower just came back online after an EMP â€” restore its normal hologram.
                     if (tower.isEmpDisplayed()) {
                         tower.setEmpDisplayed(false);
                         updateHologram(tower);
@@ -547,7 +547,7 @@ public class TowerManager {
                                     org.bukkit.util.Vector pushBack = centerLoc.toVector().subtract(ghastLoc.toVector()).normalize().multiply(0.5);
                                     tower.getSpawnedGhast().setVelocity(pushBack);
                                     if (tick % 20 == 0) {
-                                        rider.sendMessage(org.bukkit.ChatColor.RED + "⚠ You are reaching the edge of the arena boundary! Pushing back.");
+                                        rider.sendMessage(org.bukkit.ChatColor.RED + "âš  You are reaching the edge of the arena boundary! Pushing back.");
                                     }
                                 }
                             }
@@ -804,112 +804,44 @@ public class TowerManager {
                     java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = tdMob.getWaypointGraph();
                     java.util.List<String> history = tdMob.getPathHistory();
                     
-                    if (history.size() >= 1) {
-                        Location mobLoc = target.getLocation();
-                        double remaining = 8.0;
-                        Location newTargetLocation = null;
-                        String newWpId = tdMob.getCurrentWaypointId();
-                        
-                        // We trace backward along the visited path history
-                        int currentWpIdx = history.size() - 1; // index of current target waypoint
-                        int prevWpIdx = history.size() - 2; // index of the waypoint the mob just left
-                        
-                        Location currentStartLoc = mobLoc;
-                        int nextTargetIdxInHistory = currentWpIdx;
-                        
-                        // Step 1: Trace from current location back to the previous waypoint
-                        if (prevWpIdx >= 0) {
-                            com.pauljang.towerDefense.data.TDWaypoint prevWp = graph.get(history.get(prevWpIdx));
-                            if (prevWp != null) {
-                                Location prevLoc = prevWp.getLocation();
-                                double dist = currentStartLoc.distance(prevLoc);
-                                if (dist >= remaining) {
-                                    org.bukkit.util.Vector dir = prevLoc.toVector().subtract(currentStartLoc.toVector()).normalize();
-                                    newTargetLocation = currentStartLoc.clone().add(dir.multiply(remaining));
-                                    newWpId = history.get(currentWpIdx);
-                                    nextTargetIdxInHistory = currentWpIdx;
-                                    remaining = 0;
-                                } else {
-                                    remaining -= dist;
-                                    currentStartLoc = prevLoc;
-                                    newWpId = history.get(prevWpIdx);
-                                    nextTargetIdxInHistory = prevWpIdx;
-                                    prevWpIdx--;
-                                }
-                            }
-                        } else {
-                            // No previous waypoint (still on first segment)
-                            newTargetLocation = graph.get("0").getLocation().clone();
-                            newWpId = "0";
-                            remaining = 0;
-                        }
-                        
-                        // Step 2: Trace back from prevWpIdx to prevWpIdx - 1
-                        while (prevWpIdx >= 0 && remaining > 0) {
-                            com.pauljang.towerDefense.data.TDWaypoint prevWp = graph.get(history.get(prevWpIdx));
-                            if (prevWp == null) break;
-                            
-                            Location prevLoc = prevWp.getLocation();
-                            double dist = currentStartLoc.distance(prevLoc);
-                            
-                            if (dist >= remaining) {
-                                org.bukkit.util.Vector dir = prevLoc.toVector().subtract(currentStartLoc.toVector()).normalize();
-                                newTargetLocation = currentStartLoc.clone().add(dir.multiply(remaining));
-                                newWpId = history.get(nextTargetIdxInHistory);
-                                remaining = 0;
-                                break;
-                            } else {
-                                remaining -= dist;
-                                currentStartLoc = prevLoc;
-                                newWpId = history.get(prevWpIdx);
-                                nextTargetIdxInHistory = prevWpIdx;
-                                prevWpIdx--;
-                            }
-                        }
-                        
-                        if (newTargetLocation == null) {
-                            newTargetLocation = graph.get("0").getLocation().clone();
-                            newWpId = "0";
-                            nextTargetIdxInHistory = 0;
-                        }
-                        
-                        // Clean up history to match the rolled-back target index
-                        while (history.size() > nextTargetIdxInHistory + 1) {
-                            history.remove(history.size() - 1);
-                        }
-                        
-                        tdMob.setCurrentWaypointId(newWpId);
-                        
-                        target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, target.getLocation(), 15, 0.5, 0.5, 0.5, 0.1);
-                        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
-                        
+                    if (!history.isEmpty()) {
+                        // Roll the mob back a fixed number of nodes by walking its visited history.
+                        int stepsBack = 3; // Number of nodes to roll back
+                        int targetIndex = Math.max(0, history.size() - 1 - stepsBack);
+
+                        String newWpId = history.get(targetIndex);
+                        com.pauljang.towerDefense.data.TDWaypoint newWp = graph.get(newWpId);
+                        if (newWp == null) return;
+                        Location teleportLoc = newWp.getLocation().clone();
+
+                        // Preserve hover height for flying mobs (e.g. Breeze, Blaze).
                         String presetKey = target.getPersistentDataContainer().get(
                             new org.bukkit.NamespacedKey(plugin, "td_preset"),
                             org.bukkit.persistence.PersistentDataType.STRING
                         );
                         if (presetKey == null) presetKey = target.getType().name().toLowerCase();
                         double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
-                        
-                        Location teleportLoc = newTargetLocation.clone();
                         if (heightOffset > 0.0) {
                             teleportLoc.add(0, heightOffset, 0);
                         }
 
-                        // Face the waypoint the mob is now heading toward so it doesn't spin on arrival.
-                        com.pauljang.towerDefense.data.TDWaypoint nextWp = graph.get(newWpId);
-                        if (nextWp != null) {
-                            org.bukkit.util.Vector lookDir = nextWp.getLocation().toVector().subtract(teleportLoc.toVector());
-                            if (lookDir.lengthSquared() > 0.0001) {
-                                teleportLoc.setDirection(lookDir);
-                            }
+                        // Trim history back to the rolled-back node and retarget there.
+                        while (history.size() > targetIndex + 1) {
+                            history.remove(history.size() - 1);
                         }
+                        tdMob.setCurrentWaypointId(newWpId);
 
-                        // Teleport instantly and zero momentum. We must NOT touch target.getPathfinder():
-                        // all mobs are velocity-driven, so stopPathfinding()/moveTo() fight our custom
-                        // movement loop and make the mob spin or freeze. The MobManager loop detects the
-                        // new location + waypoint on the next tick and seamlessly resumes the push forward.
-                        target.teleport(teleportLoc);
+                        // Orient back toward the mob's prior position, zero momentum, then jump. We do
+                        // NOT touch target.getPathfinder(): all mobs are velocity-driven, so the
+                        // MobManager loop resumes pushing the mob forward on the next tick.
+                        org.bukkit.util.Vector faceDir = target.getLocation().toVector().subtract(teleportLoc.toVector());
+                        if (faceDir.lengthSquared() > 0.0001) {
+                            teleportLoc.setDirection(faceDir);
+                        }
+                        target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, target.getLocation(), 15, 0.5, 0.5, 0.5, 0.1);
+                        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
                         target.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                        target.teleport(teleportLoc);
                         target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, teleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
                     }
                 }
@@ -937,12 +869,12 @@ public class TowerManager {
                 long poisonEndTime = System.currentTimeMillis() + (poisonDur * 50L);
                 for (Mob mob : targets) {
                     if (isMobImmuneToTower(mob, "POISON")) {
-                        continue; // Poison-immune mobs take no damage and show no 🤢 indicator
+                        continue; // Poison-immune mobs take no damage and show no ðŸ¤¢ indicator
                     }
                     mob.getPersistentDataContainer().set(poisonDmgKey, org.bukkit.persistence.PersistentDataType.DOUBLE, damage);
                     // Drive poison through a PDC timestamp rather than the vanilla POISON effect: undead
-                    // mobs (Zombies, Skeletons, …) are immune to that effect, which silently dropped both
-                    // the damage-over-time and the 🤢 health-bar symbol. Extend the window if longer.
+                    // mobs (Zombies, Skeletons, â€¦) are immune to that effect, which silently dropped both
+                    // the damage-over-time and the ðŸ¤¢ health-bar symbol. Extend the window if longer.
                     long existing = mob.getPersistentDataContainer().getOrDefault(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG, 0L);
                     mob.getPersistentDataContainer().set(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG, Math.max(existing, poisonEndTime));
                 }
@@ -959,7 +891,7 @@ public class TowerManager {
                 for (Mob mob : targets) {
                     if (mob.getPersistentDataContainer().has(freezeImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)
                             || isMobImmuneToTower(mob, "ICE") || isMobImmuneToTower(mob, "SLOW")) {
-                        continue; // Skip freeze/ice-immune mobs (e.g. Warden) — no damage, freeze, or slowness
+                        continue; // Skip freeze/ice-immune mobs (e.g. Warden) â€” no damage, freeze, or slowness
                     }
                     mob.damage(damage);
 

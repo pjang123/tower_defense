@@ -284,6 +284,7 @@ public class MobManager {
         updateHealthBar(entity);
 
         TDMob tdMob = new TDMob(entity, graph);
+        tdMob.setArena(arena);
         activeMobs.add(tdMob);
         return entity;
     }
@@ -346,6 +347,14 @@ public class MobManager {
         entity.getPersistentDataContainer().set(
             new org.bukkit.NamespacedKey(plugin, "td_castle_damage"),
             org.bukkit.persistence.PersistentDataType.INTEGER, Math.max(1, (int) Math.round(profile.getDamage())));
+
+        // Record this mob's tier on its TDMob wrapper (the most recent entry spawnMob appended).
+        if (!activeMobs.isEmpty()) {
+            TDMob spawned = activeMobs.get(activeMobs.size() - 1);
+            if (spawned.getEntity().equals(entity)) {
+                spawned.setTier(tier);
+            }
+        }
 
         // Apply equipment (helmet or hand item based on material type)
         if (profile.getEquipment() != null) {
@@ -480,16 +489,19 @@ public class MobManager {
         if (poisoned) {
             status.append(" ").append(org.bukkit.ChatColor.DARK_GREEN).append("🤢");
         }
-        // Distinct symbols for Freeze (Ice Tower, PDC key) vs. Slow (Prismarine, SLOWNESS effect).
+        // Freeze (Ice Tower, PDC key). The Ice Tower also natively applies SLOWNESS, so the snail is
+        // suppressed while frozen to avoid showing both ❄ and 🐌 for the same effect.
         org.bukkit.NamespacedKey frozenKey = new NamespacedKey(plugin, "td_frozen_until");
+        boolean isFrozen = false;
         if (mob.getPersistentDataContainer().has(frozenKey, PersistentDataType.LONG)) {
             long freezeEnd = mob.getPersistentDataContainer().get(frozenKey, PersistentDataType.LONG);
             if (System.currentTimeMillis() < freezeEnd) {
                 status.append(" ").append(org.bukkit.ChatColor.AQUA).append("❄");
+                isFrozen = true;
             }
         }
-        // Independent check (not else-if) so Slow stacks alongside Fire/Poison/Freeze.
-        if (mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS)) {
+        // Slow (Prismarine, SLOWNESS effect) — only shown when the mob isn't already frozen.
+        if (!isFrozen && mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS)) {
             status.append(" ").append(org.bukkit.ChatColor.BLUE).append("🐌");
         }
         if (status.length() > 0) {
@@ -568,6 +580,23 @@ public class MobManager {
                             }
                         } else {
                             mob.getEntity().getPersistentDataContainer().remove(poisonedUntilKey);
+                        }
+                    }
+
+                    // Witches heal nearby allied mobs every 3 seconds; the heal scales with their tier.
+                    if (mob.getEntity() instanceof org.bukkit.entity.Witch witchHealer && tickCounter % 60 == 0) {
+                        double healAmount = mob.getTier() * 10.0;
+                        witchHealer.getWorld().spawnParticle(org.bukkit.Particle.HEART, witchHealer.getLocation().add(0, 2, 0), 3);
+                        for (TDMob ally : activeMobs) {
+                            org.bukkit.entity.Mob allyEnt = ally.getEntity();
+                            if (allyEnt == null || allyEnt.isDead() || !allyEnt.isValid()) continue;
+                            if (!ally.getArena().equals(mob.getArena())) continue;
+                            if (allyEnt.getLocation().distanceSquared(witchHealer.getLocation()) >= 25.0) continue;
+                            org.bukkit.attribute.AttributeInstance maxHpAttr = allyEnt.getAttribute(Attribute.MAX_HEALTH);
+                            if (maxHpAttr == null) continue;
+                            double maxHp = maxHpAttr.getValue();
+                            allyEnt.setHealth(Math.min(maxHp, allyEnt.getHealth() + healAmount));
+                            allyEnt.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, allyEnt.getLocation().add(0, 1, 0), 5);
                         }
                     }
 
@@ -1159,10 +1188,24 @@ public class MobManager {
         meta.setDisplayName(color + "Tier " + tier + ": " + profile.getEntityType().name() + selectedTag + lockedTag);
 
         List<String> lore = new ArrayList<>();
-        // Prominent description of the tier's special mechanics at the top of the lore.
-        if (!profile.getSpecialMechanics().isEmpty()) {
-            lore.add(ChatColor.YELLOW + "Description: " + ChatColor.GRAY + profile.getSpecialMechanics());
-            lore.add("");
+        // Readable ability explanation mapped from the raw special-mechanics string (no ugly raw text).
+        String mech = profile.getSpecialMechanics();
+        if (mech != null && !mech.isEmpty() && !mech.equals("None")) {
+            List<String> explain = new ArrayList<>();
+            if (mech.contains("Heals other mobs")) explain.add(ChatColor.GRAY + "- Heals nearby allies every 3 seconds (scales with tier)");
+            if (mech.contains("Teleport Dodge")) explain.add(ChatColor.GRAY + "- 30% chance to dodge an attack and teleport");
+            if (mech.contains("Deflects Projectiles") || mech.contains("High Deflection") || mech.contains("High Dodge Chance"))
+                explain.add(ChatColor.GRAY + "- Frequently deflects or dodges projectiles");
+            if (mech.contains("Flying")) explain.add(ChatColor.GRAY + "- Hovers above the track");
+            if (mech.contains("Splits")) explain.add(ChatColor.GRAY + "- Splits into smaller slimes on death");
+            if (mech.contains("Summons zombies")) explain.add(ChatColor.GRAY + "- Spawns zombies periodically");
+            if (mech.contains("Regenerates")) explain.add(ChatColor.GRAY + "- Slowly regenerates its own health");
+            if (mech.contains("Invisible")) explain.add(ChatColor.GRAY + "- Invisible; only Fire Towers can target it");
+            if (!explain.isEmpty()) {
+                lore.add(ChatColor.GOLD + "Ability Explanation:");
+                lore.addAll(explain);
+                lore.add("");
+            }
         }
         if (!isUnlocked) {
             lore.add(ChatColor.RED + "Unlock Cost: " + ChatColor.YELLOW + getTierUnlockCost(tier) + " EXP");

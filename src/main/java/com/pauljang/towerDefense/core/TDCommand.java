@@ -382,8 +382,8 @@ public class TDCommand implements CommandExecutor {
                     break;
                 }
                 if (gameManager.getMatchQueue().size() >= 2) {
-                    gameManager.startLobbyQueueCountdown();
-                    player.sendMessage(ChatColor.GREEN + "Force-starting the match countdown!");
+                    gameManager.forceStartMatch();
+                    player.sendMessage(ChatColor.GREEN + "Force-starting the match! Transporting in 3 seconds.");
                 } else {
                     player.sendMessage(ChatColor.RED + "Need at least 2 players in the queue to force start.");
                 }

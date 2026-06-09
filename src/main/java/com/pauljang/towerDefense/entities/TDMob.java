@@ -17,6 +17,8 @@ public class TDMob {
     private String lastPathfindWaypointId = null;
     private long lastAttackTick = 0;
     private long lastCastleAttackTime = 0L;
+    private int tier = 1;
+    private String arena = "1";
     private final Location finalOffsetWaypoint;
 
     public TDMob(Mob entity, Map<String, TDWaypoint> waypointGraph) {
@@ -130,6 +132,22 @@ public class TDMob {
 
     public void setLastCastleAttackTime(long lastCastleAttackTime) {
         this.lastCastleAttackTime = lastCastleAttackTime;
+    }
+
+    public int getTier() {
+        return tier;
+    }
+
+    public void setTier(int tier) {
+        this.tier = tier;
+    }
+
+    public String getArena() {
+        return arena;
+    }
+
+    public void setArena(String arena) {
+        this.arena = arena;
     }
 
     public Location getFinalOffsetWaypoint() {
