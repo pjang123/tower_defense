@@ -592,6 +592,14 @@ public class MobManager {
         if (!isFrozen && mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS)) {
             status.append(" ").append(org.bukkit.ChatColor.BLUE).append("🐌");
         }
+        // Vulnerable (Dripstone hazard tiles, +15% damage taken)
+        org.bukkit.NamespacedKey vulnKey = new NamespacedKey(plugin, "td_vulnerable_until");
+        if (mob.getPersistentDataContainer().has(vulnKey, PersistentDataType.LONG)) {
+            long vulnUntil = mob.getPersistentDataContainer().get(vulnKey, PersistentDataType.LONG);
+            if (System.currentTimeMillis() < vulnUntil) {
+                status.append(" ").append(org.bukkit.ChatColor.LIGHT_PURPLE).append("💔");
+            }
+        }
         if (status.length() > 0) {
             bar.append(status);
         }

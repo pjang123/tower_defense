@@ -122,6 +122,17 @@ public class MobListener implements Listener {
                 }
             }
 
+            // Dripstone vulnerability: +15% damage taken from all sources while tagged
+            NamespacedKey vulnKey = new NamespacedKey(plugin, "td_vulnerable_until");
+            Long vulnUntil = mob.getPersistentDataContainer().get(vulnKey, PersistentDataType.LONG);
+            if (vulnUntil != null) {
+                if (System.currentTimeMillis() < vulnUntil) {
+                    event.setDamage(event.getDamage() * 1.15);
+                } else {
+                    mob.getPersistentDataContainer().remove(vulnKey);
+                }
+            }
+
             // Slime / Magma Cube Shrinking on lethal damage (3 sizes: largest 4, medium 2, smallest 1)
             double damage = event.getFinalDamage();
             double health = mob.getHealth();
@@ -676,6 +687,11 @@ public class MobListener implements Listener {
                 case 16 -> type = com.pauljang.towerDefense.towers.TowerType.ICE;
                 case 19 -> type = com.pauljang.towerDefense.towers.TowerType.GOLEM;
                 case 20 -> type = com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST;
+                case 21 -> type = com.pauljang.towerDefense.towers.TowerType.DRIPSTONE;
+                case 22 -> type = com.pauljang.towerDefense.towers.TowerType.THUNDER;
+                case 23 -> type = com.pauljang.towerDefense.towers.TowerType.TURRET;
+                case 24 -> type = com.pauljang.towerDefense.towers.TowerType.BOMBARDIER;
+                case 25 -> type = com.pauljang.towerDefense.towers.TowerType.BEEHIVE;
             }
 
             if (type != null) {
@@ -687,7 +703,7 @@ public class MobListener implements Listener {
                     plotSize = Math.max(plotWidth, plotLength);
                 }
 
-                boolean is5x5Tower = (type == com.pauljang.towerDefense.towers.TowerType.GOLEM || 
+                boolean is5x5Tower = (type == com.pauljang.towerDefense.towers.TowerType.GOLEM ||
                                      type == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST);
                 if (is5x5Tower && plotSize < 5) {
                     player.sendMessage(org.bukkit.ChatColor.RED + "You cannot place a 5x5 tower (" + type.getDisplayName() + ") on a 3x3 plot!");
@@ -696,8 +712,15 @@ public class MobListener implements Listener {
                     return;
                 }
 
-                String nameKey = type.name().toLowerCase() + "_1";
-                int cost = plugin.getConfig().getInt("towers." + nameKey + ".cost", type.getCost());
+                // Branching towers: pick an upgrade path first; purchase happens in the picker GUI
+                com.pauljang.towerDefense.towers.TowerConfigManager.TowerDefinition definition =
+                        plugin.getTowerConfigManager().getDefinition(type);
+                if (definition != null && definition.hasPaths()) {
+                    plugin.getTowerManager().openPathPickerGUI(player, plotId, type);
+                    return;
+                }
+
+                int cost = plugin.getTowerConfigManager().getCost(type, 1, type.getCost());
                 if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                     plugin.getTowerManager().placeTower(plotId, type, player.getUniqueId());
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName() + " on plot " + plotId + "!");
@@ -708,6 +731,40 @@ public class MobListener implements Listener {
                     player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                 }
             }
+        } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Choose Path: ")) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+
+            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Choose Path: ").length());
+            com.pauljang.towerDefense.towers.TowerType type =
+                    plugin.getTowerManager().getPendingPathChoice(player.getUniqueId());
+            if (type == null) {
+                player.closeInventory();
+                return;
+            }
+
+            // Slots 11 and 15 map to the paths in towers.yaml order (same as the picker layout)
+            int slot = event.getRawSlot();
+            java.util.List<String> paths = plugin.getTowerManager().getPathNamesInOrder(type);
+            String path = null;
+            if (slot == 11 && paths.size() >= 1) path = paths.get(0);
+            else if (slot == 15 && paths.size() >= 2) path = paths.get(1);
+            if (path == null) return;
+
+            plugin.getTowerManager().clearPendingPathChoice(player.getUniqueId());
+
+            int cost = plugin.getTowerConfigManager().getCost(type, path, 1, type.getCost());
+            if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
+                plugin.getTowerManager().placeTower(plotId, type, player.getUniqueId(), path);
+                player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName()
+                        + org.bukkit.ChatColor.GREEN + " (" + path.replace('_', ' ') + ") on plot " + plotId + "!");
+                player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
+            } else {
+                player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+            }
+            player.closeInventory();
         } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Manage Tower: ")) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
@@ -1429,6 +1486,15 @@ public class MobListener implements Listener {
     public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
         if (event.getInventorySlots().contains(40) || event.getRawSlots().contains(45)) {
             event.setCancelled(true);
+        }
+    }
+
+    // Safety net: Bombardier TNT is spawned with yield 0; if a build still produces a block
+    // list, make sure no terrain is destroyed.
+    @EventHandler
+    public void onEntityExplode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        if (event.getEntity().hasMetadata("td_bombardier")) {
+            event.blockList().clear();
         }
     }
 

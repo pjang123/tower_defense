@@ -9,6 +9,7 @@ import com.pauljang.towerDefense.entities.MobManager;
 import com.pauljang.towerDefense.listeners.MobListener;
 import com.pauljang.towerDefense.listeners.WandListener;
 import com.pauljang.towerDefense.setup.SetupManager;
+import com.pauljang.towerDefense.towers.TowerConfigManager;
 import com.pauljang.towerDefense.towers.TowerManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -19,6 +20,7 @@ public final class TowerDefense extends JavaPlugin {
     private PlotConfigManager plotConfigManager;
     private WaypointConfigManager waypointConfigManager;
     private MobManager mobManager;
+    private TowerConfigManager towerConfigManager;
     private TowerManager towerManager;
 
     @Override
@@ -38,6 +40,7 @@ public final class TowerDefense extends JavaPlugin {
         this.plotConfigManager = new PlotConfigManager(this);
         this.waypointConfigManager = new WaypointConfigManager(this);
         this.mobManager = new MobManager(this);
+        this.towerConfigManager = new TowerConfigManager(this);
         this.towerManager = new TowerManager(this);
 
         // Register commands
@@ -83,6 +86,9 @@ public final class TowerDefense extends JavaPlugin {
     }
     public MobManager getMobManager() {
         return mobManager;
+    }
+    public TowerConfigManager getTowerConfigManager() {
+        return towerConfigManager;
     }
     public TowerManager getTowerManager() {
         return towerManager;

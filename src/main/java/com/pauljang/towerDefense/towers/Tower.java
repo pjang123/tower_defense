@@ -9,6 +9,7 @@ public class Tower {
     private final String plotId;
     private final Location centerLocation;
     private final TowerType type;
+    private String pathId = TowerConfigManager.DEFAULT_PATH;
     private int level = 1;
     private long lastAttackTick = 0;
     private final java.util.List<ArmorStand> holograms = new java.util.ArrayList<>();
@@ -20,6 +21,9 @@ public class Tower {
     private boolean autopilot = true;
     private java.util.UUID ownerId = null;
     private boolean empDisplayed = false;
+    private final java.util.List<org.bukkit.entity.Bee> spawnedBees = new java.util.ArrayList<>();
+    private final java.util.List<ArmorStand> landmines = new java.util.ArrayList<>();
+    private final java.util.List<Location> hazardTiles = new java.util.ArrayList<>();
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
         this.plotId = plotId;
@@ -34,6 +38,23 @@ public class Tower {
     public String getPlotId() { return plotId; }
     public Location getCenterLocation() { return centerLocation; }
     public TowerType getType() { return type; }
+
+    public String getPathId() { return pathId; }
+    public void setPathId(String pathId) {
+        this.pathId = (pathId == null) ? TowerConfigManager.DEFAULT_PATH : pathId;
+    }
+    public boolean hasPath() { return !TowerConfigManager.DEFAULT_PATH.equals(pathId); }
+
+    public String getDisplayPathSuffix() {
+        if (!hasPath()) return "";
+        String[] words = pathId.split("_");
+        StringBuilder sb = new StringBuilder(" (");
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(words[i].charAt(0))).append(words[i].substring(1));
+        }
+        return sb.append(')').toString();
+    }
     
     public int getLevel() { return level; }
     public void incrementLevel() { this.level++; }
@@ -44,7 +65,9 @@ public class Tower {
     public java.util.List<ArmorStand> getHolograms() { return holograms; }
 
     public String getTierName() {
-        return type.name().toLowerCase() + "_" + level;
+        return hasPath()
+                ? type.name().toLowerCase() + "_" + pathId + "_" + level
+                : type.name().toLowerCase() + "_" + level;
     }
 
     public String getRomanLevel() {
@@ -64,40 +87,34 @@ public class Tower {
     public TargetingMode getTargetingMode() { return targetingMode; }
     public void setTargetingMode(TargetingMode targetingMode) { this.targetingMode = targetingMode; }
 
+    private static TowerConfigManager towerConfig() {
+        return org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class).getTowerConfigManager();
+    }
+
     public double getRange() {
-        TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String nameKey = type.name().toLowerCase() + "_" + level;
-        return plugin.getConfig().getDouble("towers." + nameKey + ".range", type.getRange() + (level - 1) * 1.5);
+        return towerConfig().getRange(type, pathId, level, type.getRange() + (level - 1) * 1.5);
     }
 
     public double getDamage() {
-        TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String nameKey = type.name().toLowerCase() + "_" + level;
-        return plugin.getConfig().getDouble("towers." + nameKey + ".damage", type.getDamage() + (level - 1) * 1.5);
+        return towerConfig().getDamage(type, pathId, level, type.getDamage() + (level - 1) * 1.5);
     }
 
     public long getCooldown() {
-        TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String nameKey = type.name().toLowerCase() + "_" + level;
-        return plugin.getConfig().getLong("towers." + nameKey + ".cooldown", Math.max(8L, type.getCooldown() - (level - 1) * 2));
+        return towerConfig().getCooldown(type, pathId, level, Math.max(8L, type.getCooldown() - (level - 1) * 2));
     }
 
     public int getUpgradeCost() {
-        int maxLvl = (type == TowerType.GOLEM) ? 2 : 3;
+        int maxLvl = towerConfig().getMaxLevel(type, pathId);
         if (level >= maxLvl) {
             return -1; // Max level reached
         }
-        TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
-        String nextKey = type.name().toLowerCase() + "_" + (level + 1);
-        return plugin.getConfig().getInt("towers." + nextKey + ".cost", (level + 1) * 150);
+        return towerConfig().getCost(type, pathId, level + 1, (level + 1) * 150);
     }
 
     public int getTotalValue() {
-        TowerDefense plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(TowerDefense.class);
         int total = 0;
         for (int l = 1; l <= level; l++) {
-            String key = type.name().toLowerCase() + "_" + l;
-            total += plugin.getConfig().getInt("towers." + key + ".cost", l == 1 ? type.getCost() : l * 100);
+            total += towerConfig().getCost(type, pathId, l, l == 1 ? type.getCost() : l * 100);
         }
         return total;
     }
@@ -116,4 +133,8 @@ public class Tower {
 
     public boolean isEmpDisplayed() { return empDisplayed; }
     public void setEmpDisplayed(boolean empDisplayed) { this.empDisplayed = empDisplayed; }
+
+    public java.util.List<org.bukkit.entity.Bee> getSpawnedBees() { return spawnedBees; }
+    public java.util.List<ArmorStand> getLandmines() { return landmines; }
+    public java.util.List<Location> getHazardTiles() { return hazardTiles; }
 }

@@ -1,0 +1,415 @@
+# ==========================================
+# Tower Defense: Master Tower Configuration
+# ==========================================
+
+# --- EXISTING TOWERS ---
+
+archer:
+  name: "Archer Tower"
+  structure_file: "archer"
+  base_material: COBBLESTONE
+  levels:
+    1:
+      cost: 100
+      range: 15.0
+      damage: 1.5
+      cooldown: 20
+    2:
+      cost: 150
+      range: 16.5
+      damage: 3.0
+      cooldown: 18
+    3:
+      cost: 300
+      range: 18.0
+      damage: 4.5
+      cooldown: 16
+
+fire:
+  name: "Fire Tower"
+  structure_file: "fire"
+  base_material: POLISHED_BLACKSTONE
+  levels:
+    1:
+      cost: 175
+      range: 8.0
+      damage: 1.0
+      cooldown: 80
+      fire_ticks: 60
+    2:
+      cost: 250
+      range: 10.0
+      damage: 2.0
+      cooldown: 80
+      fire_ticks: 100
+    3:
+      cost: 400
+      range: 12.0
+      damage: 3.5
+      cooldown: 80
+      fire_ticks: 140
+
+prismarine:
+  name: "Prismarine Tower"
+  structure_file: "prismarine"
+  base_material: PRISMARINE
+  levels:
+    1:
+      cost: 125
+      range: 8.0
+      damage: 0.5
+      cooldown: 30
+      slowness_duration: 40
+      slowness_level: 1
+    2:
+      cost: 200
+      range: 10.0
+      damage: 1.0
+      cooldown: 30
+      slowness_duration: 60
+      slowness_level: 2
+    3:
+      cost: 350
+      range: 12.0
+      damage: 1.5
+      cooldown: 30
+      slowness_duration: 80
+      slowness_level: 3
+
+chorus:
+  name: "Chorus Tower"
+  structure_file: "chorus"
+  base_material: PURPUR_BLOCK
+  levels:
+    1:
+      cost: 150
+      range: 8.0
+      damage: 0.0
+      cooldown: 120
+      teleport_back: 8.0
+    2:
+      cost: 250
+      range: 10.0
+      damage: 0.0
+      cooldown: 80
+      teleport_back: 12.0
+    3:
+      cost: 400
+      range: 12.0
+      damage: 0.0
+      cooldown: 40
+      teleport_back: 16.0
+
+redstone:
+  name: "Redstone Tower"
+  structure_file: "redstone"
+  base_material: SMOOTH_STONE
+  levels:
+    1:
+      cost: 200
+      range: 10.0
+      damage: 0.0
+      cooldown: 20
+    2:
+      cost: 300
+      range: 16.0
+      damage: 0.0
+      cooldown: 20
+    3:
+      cost: 500
+      range: 24.0
+      damage: 0.0
+      cooldown: 20
+
+poison:
+  name: "Poison Tower"
+  structure_file: "poison"
+  base_material: MOSS_BLOCK
+  levels:
+    1:
+      cost: 150
+      range: 8.0
+      damage: 0.5
+      cooldown: 80
+      poison_duration: 60
+    2:
+      cost: 250
+      range: 10.0
+      damage: 1.0
+      cooldown: 80
+      poison_duration: 80
+    3:
+      cost: 400
+      range: 12.0
+      damage: 1.5
+      cooldown: 80
+      poison_duration: 100
+
+ice:
+  name: "Ice Tower"
+  structure_file: "ice"
+  base_material: SNOW_BLOCK
+  levels:
+    1:
+      cost: 125
+      range: 8.0
+      damage: 0.5
+      cooldown: 30
+      freeze_duration: 40
+    2:
+      cost: 200
+      range: 10.0
+      damage: 1.0
+      cooldown: 30
+      freeze_duration: 60
+    3:
+      cost: 350
+      range: 12.0
+      damage: 1.5
+      cooldown: 30
+      freeze_duration: 80
+
+golem:
+  name: "Golem Tower"
+  structure_file: "golem"
+  base_material: SMOOTH_STONE
+  levels:
+    1:
+      cost: 400
+      range: 10.0
+      damage: 10.0
+      cooldown: 40
+    2:
+      cost: 600
+      range: 12.0
+      damage: 20.0
+      cooldown: 38
+
+happy_ghast:
+  name: "Happy Ghast Tower"
+  structure_file: "happy" # Overrides the default enum name
+  base_material: SOUL_SAND
+  levels:
+    1:
+      cost: 500
+      range: 15.0
+      damage: 8.0
+      cooldown: 50
+    2:
+      cost: 750
+      range: 17.5
+      damage: 12.0
+      cooldown: 48
+    3:
+      cost: 1000
+      range: 20.0
+      damage: 16.0
+      cooldown: 45
+
+# --- NEW TOWERS ---
+
+dripstone:
+  name: "Dripstone Tower"
+  structure_file: "dripstone"
+  base_material: DRIPSTONE_BLOCK
+  levels:
+    1:
+      cost: 200
+      range: 10.0
+      damage: 6.0
+      cooldown: 60
+    2:
+      cost: 300
+      range: 12.0
+      damage: 9.0
+      cooldown: 55
+    3:
+      cost: 450
+      range: 14.0
+      damage: 12.0
+      cooldown: 50
+    4:
+      cost: 650
+      range: 16.0
+      damage: 15.0
+      cooldown: 45
+
+turret:
+  name: "Turret"
+  structure_file: "turret"
+  base_material: IRON_BLOCK
+  paths:
+    gatling:
+      1:
+        cost: 250
+        range: 12.0
+        damage: 0.2
+        cooldown: 2
+      2:
+        cost: 350
+        range: 13.5
+        damage: 0.3
+        cooldown: 2
+      3:
+        cost: 500
+        range: 15.0
+        damage: 0.4
+        cooldown: 1
+    scatter:
+      1:
+        cost: 250
+        range: 10.0
+        damage: 0.5
+        cooldown: 15
+        arrows: 5
+      2:
+        cost: 350
+        range: 11.5
+        damage: 0.8
+        cooldown: 13
+        arrows: 7
+      3:
+        cost: 500
+        range: 13.0
+        damage: 1.2
+        cooldown: 10
+        arrows: 9
+
+bombardier:
+  name: "Bombardier"
+  structure_file: "bombardier"
+  base_material: BRICKS
+  paths:
+    bigger_bombs:
+      1:
+        cost: 175
+        range: 10.0
+        damage: 2.5
+        cooldown: 50
+        radius: 3.5
+      2:
+        cost: 250
+        range: 12.0
+        damage: 4.0
+        cooldown: 45
+        radius: 4.5
+      3:
+        cost: 400
+        range: 14.0
+        damage: 6.0
+        cooldown: 40
+        radius: 5.5
+    landmines:
+      1:
+        cost: 225
+        range: 12.0
+        damage: 18.0
+        cooldown: 80
+      2:
+        cost: 325
+        range: 14.0
+        damage: 24.0
+        cooldown: 75
+      3:
+        cost: 450
+        range: 16.0
+        damage: 32.0
+        cooldown: 70
+
+thunder:
+  name: "Thunder Tower"
+  structure_file: "thunder"
+  base_material: COPPER_BLOCK
+  levels:
+    1:
+      cost: 200
+      range: 12.0
+      damage: 5.0
+      cooldown: 80
+      chain_count: 0
+    2:
+      cost: 300
+      range: 15.0
+      damage: 8.0
+      cooldown: 80
+      chain_count: 3
+    3:
+      cost: 450
+      range: 18.0
+      damage: 11.0
+      cooldown: 75
+      chain_count: 5
+    4:
+      cost: 600
+      range: 999.0
+      damage: 15.0
+      cooldown: 600
+      is_global: true
+
+beehive:
+  name: "Beehive"
+  structure_file: "beehive"
+  base_material: HONEYCOMB_BLOCK
+  paths:
+    goliath:
+      1:
+        cost: 150
+        range: 5.0
+        damage: 4.0
+        cooldown: 40
+        scale: 2.0
+      2:
+        cost: 200
+        range: 5.5
+        damage: 6.0
+        cooldown: 38
+        scale: 2.25
+      3:
+        cost: 250
+        range: 6.0
+        damage: 8.0
+        cooldown: 35
+        scale: 2.5
+      4:
+        cost: 300
+        range: 6.5
+        damage: 10.0
+        cooldown: 32
+        scale: 2.75
+      5:
+        cost: 350
+        range: 7.0
+        damage: 12.0
+        cooldown: 30
+        scale: 3.0
+    swarm:
+      1:
+        cost: 175
+        range: 7.0
+        damage: 1.0
+        cooldown: 60
+        bee_count: 1
+      2:
+        cost: 225
+        range: 8.0
+        damage: 1.5
+        cooldown: 55
+        bee_count: 3
+      3:
+        cost: 275
+        range: 9.0
+        damage: 2.0
+        cooldown: 50
+        bee_count: 5
+      4:
+        cost: 325
+        range: 10.0
+        damage: 2.5
+        cooldown: 45
+        bee_count: 7
+      5:
+        cost: 400
+        range: 11.0
+        damage: 3.0
+        cooldown: 40
+        bee_count: 9

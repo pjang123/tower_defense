@@ -11,7 +11,12 @@ public enum TowerType {
     POISON("Poison Tower", Material.MUD_BRICKS, Material.MOSS_BLOCK, Material.MANGROVE_FENCE, ChatColor.DARK_GREEN, 8.0, 0.5, 80L, 150),
     ICE("Ice Tower", Material.PACKED_ICE, Material.SNOW_BLOCK, Material.BLUE_ICE, ChatColor.AQUA, 8.0, 0.5, 30L, 125),
     GOLEM("Golem Tower", Material.IRON_BLOCK, Material.SMOOTH_STONE, Material.IRON_BARS, ChatColor.GRAY, 10.0, 20.0, 40L, 400),
-    HAPPY_GHAST("Happy Ghast Tower", Material.GHAST_SPAWN_EGG, Material.SOUL_SAND, Material.NETHERRACK, ChatColor.LIGHT_PURPLE, 15.0, 15.0, 50L, 500);
+    HAPPY_GHAST("Happy Ghast Tower", Material.GHAST_SPAWN_EGG, Material.SOUL_SAND, Material.NETHERRACK, ChatColor.LIGHT_PURPLE, 15.0, 15.0, 50L, 500),
+    DRIPSTONE("Dripstone Tower", Material.POINTED_DRIPSTONE, Material.DRIPSTONE_BLOCK, Material.DRIPSTONE_BLOCK, ChatColor.GOLD, 10.0, 6.0, 60L, 200),
+    THUNDER("Thunder Tower", Material.LIGHTNING_ROD, Material.COPPER_BLOCK, Material.COPPER_BLOCK, ChatColor.YELLOW, 12.0, 5.0, 80L, 200),
+    TURRET("Turret", Material.OBSERVER, Material.IRON_BLOCK, Material.IRON_BARS, ChatColor.WHITE, 12.0, 0.3, 5L, 250),
+    BOMBARDIER("Bombardier", Material.TNT, Material.BRICKS, Material.BRICK_WALL, ChatColor.DARK_RED, 10.0, 2.5, 50L, 175),
+    BEEHIVE("Beehive", Material.BEE_NEST, Material.HONEYCOMB_BLOCK, Material.HONEY_BLOCK, ChatColor.GOLD, 7.0, 4.0, 40L, 150);
 
     private final String displayName;
     private final Material blockMaterial;
