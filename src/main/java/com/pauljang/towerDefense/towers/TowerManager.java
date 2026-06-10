@@ -142,14 +142,35 @@ public class TowerManager {
         isolateTowerBlocks(center, tower.getStructureSize());
         clearNearbyDroppedItemsLater(center);
 
-        // Dripstone T2+: vulnerability hazard tiles on track waypoints within range
-        if (type == TowerType.DRIPSTONE) {
-            tower.getHazardTiles().clear();
-            if (level >= 2) {
-                for (Location wpLoc : getTrackLocationsWithinRange(tower)) {
-                    tower.getHazardTiles().add(wpLoc.clone().add(0, 1, 0));
-                    if (tower.getHazardTiles().size() >= 6) break;
-                }
+        // Dripstone T2+: visible pointed-dripstone hazard spikes on the track that tag passing mobs
+        // as vulnerable (+15% damage taken). Clear any previously-spawned hazard stands first.
+        for (Location loc : tower.getHazardTiles()) {
+            if (loc.getWorld() == null) continue;
+            loc.getWorld().getNearbyEntities(loc, 1.0, 1.0, 1.0).stream()
+                .filter(e -> e instanceof ArmorStand && e.getScoreboardTags().contains("td_hazard"))
+                .forEach(org.bukkit.entity.Entity::remove);
+        }
+        tower.getHazardTiles().clear();
+        tower.getLandmines().removeIf(s -> s == null || !s.isValid());
+
+        if (type == TowerType.DRIPSTONE && level >= 2) {
+            for (Location wpLoc : getTrackLocationsWithinRange(tower)) {
+                // Sink the marker stand so its dripstone helmet renders just above the track.
+                Location hazardLoc = wpLoc.clone().add(0, -1.2, 0);
+                ArmorStand hazardStand = hazardLoc.getWorld().spawn(hazardLoc, ArmorStand.class, as -> {
+                    as.setInvisible(true);
+                    as.setMarker(true);
+                    as.setGravity(false);
+                    as.setInvulnerable(true);
+                    as.setPersistent(false);
+                    as.addScoreboardTag("td_hazard");
+                    if (as.getEquipment() != null) {
+                        as.getEquipment().setHelmet(new ItemStack(Material.POINTED_DRIPSTONE));
+                    }
+                });
+                tower.getHazardTiles().add(hazardStand.getEyeLocation());
+                tower.getLandmines().add(hazardStand); // tracked so it cleans up on destroy
+                if (tower.getHazardTiles().size() >= 6) break;
             }
         }
 
@@ -725,19 +746,35 @@ public class TowerManager {
         if (tick - tower.getLastAttackTick() < getEffectiveCooldown(tower)) return;
 
         java.util.List<Location> track = getTrackLocationsWithinRange(tower);
-        java.util.Collections.shuffle(track);
-        Location mineLoc = null;
-        outer:
-        for (Location candidate : track) {
-            for (ArmorStand mine : tower.getLandmines()) {
-                if (mine.isValid() && mine.getEyeLocation().distanceSquared(candidate) < 2.25) {
-                    continue outer;
+        if (track.isEmpty()) return;
+
+        // Pick a random in-range waypoint, then interpolate a random point toward its next waypoint
+        // so mines scatter along the track segment instead of snapping to waypoint centers.
+        Location wp1 = track.get(new Random().nextInt(track.size()));
+        Location mineLoc = wp1.clone();
+
+        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph =
+                plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        for (com.pauljang.towerDefense.data.TDWaypoint wp : graph.values()) {
+            if (wp.getLocation() != null && wp.getLocation().getWorld() != null
+                    && wp.getLocation().getWorld().equals(wp1.getWorld())
+                    && wp.getLocation().distanceSquared(wp1) < 0.1 && !wp.getNextIds().isEmpty()) {
+                com.pauljang.towerDefense.data.TDWaypoint nextWp = graph.get(wp.getNextIds().get(0));
+                if (nextWp != null && nextWp.getLocation() != null) {
+                    Location wp2 = nextWp.getLocation();
+                    double lerp = Math.random();
+                    mineLoc.add(wp2.toVector().subtract(wp1.toVector()).multiply(lerp));
                 }
+                break;
             }
-            mineLoc = candidate;
-            break;
         }
-        if (mineLoc == null) return;
+
+        // Abort this tick if the chosen spot is too close to an existing mine
+        for (ArmorStand existing : tower.getLandmines()) {
+            if (existing.isValid() && existing.getEyeLocation().distanceSquared(mineLoc) < 2.25) {
+                return;
+            }
+        }
 
         // Sink the invisible stand so its TNT helmet renders on the ground
         Location standLoc = mineLoc.clone().add(0, -1.4, 0);
@@ -765,72 +802,73 @@ public class TowerManager {
         int cap = goliath ? 1 : plugin.getTowerConfigManager().getStat(
                 TowerType.BEEHIVE, tower.getPathId(), tower.getLevel(), "bee_count", 1);
 
+        // Base Level 1 (default path) always fields a single starter bee.
+        if (tower.getLevel() == 1) cap = 1;
+
         double structureHeight = tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 3.0;
         Location hiveTop = tower.getCenterLocation().clone().add(0, structureHeight + 1.0, 0);
 
-        if (tower.getSpawnedBees().size() < cap && tick - tower.getLastAttackTick() >= getEffectiveCooldown(tower)) {
-            String ownerPrefix = "";
-            if (tower.getOwnerId() != null) {
-                String ownerName = org.bukkit.Bukkit.getOfflinePlayer(tower.getOwnerId()).getName();
-                if (ownerName != null) {
-                    ownerPrefix = org.bukkit.ChatColor.GOLD + ownerName + "'s ";
+        // Spawn the entire swarm at once once the previous one has been spent and the hive is ready.
+        if (tower.getSpawnedBees().isEmpty() && tick - tower.getLastAttackTick() >= getEffectiveCooldown(tower)) {
+            for (int i = 0; i < cap; i++) {
+                org.bukkit.entity.Bee bee = hiveTop.getWorld().spawn(hiveTop, org.bukkit.entity.Bee.class, b -> {
+                    b.setInvulnerable(true);
+                    b.setCollidable(false);
+                    b.setPersistent(true);
+                    b.setRemoveWhenFarAway(false);
+                    // td_tower_pet (not td_mob): keeps bees out of mob rewards/health-bar systems
+                    b.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "td_tower_pet"),
+                            org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+                    try {
+                        org.bukkit.Bukkit.getMobGoals().removeAllGoals(b);
+                    } catch (Throwable ignored) {
+                    }
+                });
+                if (goliath) {
+                    setEntityScale(bee, plugin.getTowerConfigManager().getStat(
+                            TowerType.BEEHIVE, tower.getPathId(), tower.getLevel(), "scale", 2.0));
                 }
+                tower.getSpawnedBees().add(bee);
             }
-            final String beeName = ownerPrefix + org.bukkit.ChatColor.YELLOW + (goliath ? "Goliath Bee" : "Swarm Bee");
-            org.bukkit.entity.Bee bee = hiveTop.getWorld().spawn(hiveTop, org.bukkit.entity.Bee.class, b -> {
-                b.setInvulnerable(true);
-                b.setCollidable(false);
-                b.setPersistent(true);
-                b.setRemoveWhenFarAway(false);
-                b.setCustomName(beeName);
-                b.setCustomNameVisible(false);
-                // td_tower_pet (not td_mob): keeps bees out of mob rewards/health-bar systems
-                b.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "td_tower_pet"),
-                        org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
-                try {
-                    org.bukkit.Bukkit.getMobGoals().removeAllGoals(b);
-                } catch (Throwable ignored) {
-                }
-            });
-            if (goliath) {
-                setEntityScale(bee, plugin.getTowerConfigManager().getStat(
-                        TowerType.BEEHIVE, tower.getPathId(), tower.getLevel(), "scale", 2.0));
-            }
-            tower.getSpawnedBees().add(bee);
             tower.setLastAttackTick(tick);
-            hiveTop.getWorld().playSound(hiveTop, Sound.ENTITY_BEE_LOOP_AGGRESSIVE, 0.6f, 1.2f);
         }
 
         if (tick % 2 != 0) return;
         java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), tower.getRange(), arena);
+
+        // The whole swarm focuses a single lead target.
+        Mob primeTarget = targets.isEmpty() ? null : targets.get(0);
+
+        int index = 0;
         java.util.Iterator<org.bukkit.entity.Bee> beeIt = tower.getSpawnedBees().iterator();
         while (beeIt.hasNext()) {
             org.bukkit.entity.Bee bee = beeIt.next();
-            Mob nearest = null;
-            double nearestSq = Double.MAX_VALUE;
-            for (Mob m : targets) {
-                double dSq = m.getLocation().distanceSquared(bee.getLocation());
-                if (dSq < nearestSq) {
-                    nearestSq = dSq;
-                    nearest = m;
-                }
-            }
-            if (nearest == null) {
-                org.bukkit.util.Vector toHive = hiveTop.toVector().subtract(bee.getLocation().toVector());
-                if (toHive.lengthSquared() > 1.0) {
-                    bee.setVelocity(toHive.normalize().multiply(0.2));
+            index++;
+
+            if (primeTarget == null || !primeTarget.isValid()) {
+                // Orbit smoothly around the hive while idle
+                double orbitSpeed = 0.05;
+                double radius = 1.5 + (index * 0.2); // slight offset per bee
+                double angle = (tick * orbitSpeed) + (index * Math.PI / 2);
+                Location orbitLoc = hiveTop.clone().add(Math.cos(angle) * radius, Math.sin(tick * 0.05) * 0.5, Math.sin(angle) * radius);
+
+                org.bukkit.util.Vector toOrbit = orbitLoc.toVector().subtract(bee.getLocation().toVector());
+                if (toOrbit.lengthSquared() > 0.01) {
+                    bee.setVelocity(toOrbit.normalize().multiply(0.3));
                 }
                 continue;
             }
-            if (nearestSq <= 1.44) {
+
+            double distSq = primeTarget.getLocation().distanceSquared(bee.getLocation());
+            if (distSq <= 1.44) {
                 Location pop = bee.getLocation();
                 pop.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, pop, 1);
                 pop.getWorld().playSound(pop, Sound.ENTITY_BEE_DEATH, 1.0f, 0.8f);
-                nearest.damage(tower.getDamage());
+                primeTarget.damage(tower.getDamage());
                 bee.remove();
                 beeIt.remove();
             } else {
-                org.bukkit.util.Vector dir = nearest.getLocation().add(0, 0.5, 0).toVector()
+                org.bukkit.util.Vector dir = primeTarget.getLocation().add(0, 0.5, 0).toVector()
                         .subtract(bee.getLocation().toVector()).normalize();
                 bee.setVelocity(dir.multiply(0.45));
             }
@@ -1489,33 +1527,41 @@ public class TowerManager {
                 // Passive Redstone Tower
             }
             case DRIPSTONE -> {
-                playDripstoneStrike(target.getLocation());
-                target.damage(tower.getDamage());
+                playDripstoneStrike(target.getLocation(), tower.getDamage(), target);
 
-                // T3+ "Cave-In": cascade strikes downstream along the target's path
+                // T3 "Cave-In": a 3-wide, 5-long wave of spikes sweeps back down the path behind
+                // the target, damaging everything in the lane.
                 if (tower.getLevel() >= 3) {
-                    com.pauljang.towerDefense.entities.TDMob tdMob = null;
-                    for (com.pauljang.towerDefense.entities.TDMob active : plugin.getMobManager().getActiveMobs()) {
-                        if (active.getEntity().equals(target)) {
-                            tdMob = active;
-                            break;
-                        }
-                    }
-                    if (tdMob != null && tdMob.getCurrentWaypointId() != null) {
-                        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = tdMob.getWaypointGraph();
-                        double cascadeDamage = tower.getDamage() * 0.5;
-                        String wpId = tdMob.getCurrentWaypointId();
-                        for (int i = 1; i <= 3 && wpId != null; i++) {
-                            com.pauljang.towerDefense.data.TDWaypoint wp = graph.get(wpId);
-                            if (wp == null || wp.getLocation() == null) break;
-                            final Location strikeLoc = wp.getLocation().clone();
-                            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                                playDripstoneStrike(strikeLoc);
-                                for (Mob mob : getMobsInRadius(strikeLoc, 2.5, towerArena)) {
-                                    mob.damage(cascadeDamage);
+                    com.pauljang.towerDefense.entities.TDMob tdMob = plugin.getMobManager().getActiveMobs().stream()
+                            .filter(m -> m.getEntity().equals(target)).findFirst().orElse(null);
+
+                    if (tdMob != null && tdMob.getPathHistory().size() >= 2) {
+                        Location currentLoc = target.getLocation();
+                        String prevWpId = tdMob.getPathHistory().get(tdMob.getPathHistory().size() - 2);
+                        com.pauljang.towerDefense.data.TDWaypoint prevWp = tdMob.getWaypointGraph().get(prevWpId);
+
+                        if (prevWp != null && prevWp.getLocation() != null) {
+                            org.bukkit.util.Vector backDir = prevWp.getLocation().toVector().subtract(currentLoc.toVector()).normalize();
+                            org.bukkit.util.Vector rightDir = new org.bukkit.util.Vector(-backDir.getZ(), 0, backDir.getX()).normalize();
+
+                            double waveDamage = tower.getDamage() * 0.5;
+
+                            // 5 blocks back, 3 blocks wide
+                            for (int length = 1; length <= 5; length++) {
+                                for (int width = -1; width <= 1; width++) {
+                                    Location strikeLoc = currentLoc.clone()
+                                            .add(backDir.clone().multiply(length))
+                                            .add(rightDir.clone().multiply(width));
+
+                                    long delay = length * 3L;
+                                    org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                        playDripstoneStrike(strikeLoc, 0, null);
+                                        for (Mob m : getMobsInRadius(strikeLoc, 1.2, towerArena)) {
+                                            m.damage(waveDamage);
+                                        }
+                                    }, delay);
                                 }
-                            }, 5L * i);
-                            wpId = wp.getNextIds().isEmpty() ? null : wp.getNextIds().get(0);
+                            }
                         }
                     }
                 }
@@ -1606,13 +1652,51 @@ public class TowerManager {
         }
     }
 
-    // Particle column of falling dripstone onto a location
-    private void playDripstoneStrike(Location loc) {
-        org.bukkit.block.data.BlockData dripstoneData = Material.POINTED_DRIPSTONE.createBlockData();
-        for (double y = 4.0; y >= 0; y -= 0.5) {
-            loc.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, loc.clone().add(0, y, 0), 4, 0.15, 0.1, 0.15, dripstoneData);
-        }
-        loc.getWorld().playSound(loc, Sound.BLOCK_POINTED_DRIPSTONE_LAND, 1.0f, 0.9f);
+    // A pointed-dripstone spike falls from above the target and deals damage on impact.
+    // When {@code target} is null the strike is purely visual (used by the cave-in wave, which
+    // applies its own area damage on landing).
+    private void playDripstoneStrike(Location targetLoc, double damage, Mob target) {
+        Location startLoc = targetLoc.clone().add(0, 5.0, 0);
+        if (startLoc.getWorld() == null) return;
+
+        ArmorStand fallingSpike = startLoc.getWorld().spawn(startLoc, ArmorStand.class, as -> {
+            as.setInvisible(true);
+            as.setMarker(true);
+            as.setGravity(false);
+            as.setInvulnerable(true);
+            as.setPersistent(false);
+            if (as.getEquipment() != null) {
+                as.getEquipment().setHelmet(new ItemStack(Material.POINTED_DRIPSTONE));
+            }
+        });
+
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override
+            public void run() {
+                if (ticks > 25 || !fallingSpike.isValid()) {
+                    fallingSpike.remove();
+                    this.cancel();
+                    return;
+                }
+
+                Location current = fallingSpike.getLocation();
+                current.subtract(0, 0.4, 0);
+                fallingSpike.teleport(current);
+
+                if (current.getY() <= targetLoc.getY() + 0.5) {
+                    current.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, current, 15, 0.2, 0.1, 0.2, Material.POINTED_DRIPSTONE.createBlockData());
+                    current.getWorld().playSound(current, Sound.BLOCK_POINTED_DRIPSTONE_LAND, 1.0f, 0.9f);
+
+                    if (target != null && target.isValid() && !target.isDead()) {
+                        target.damage(damage);
+                    }
+                    fallingSpike.remove();
+                    this.cancel();
+                }
+                ticks++;
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
     }
 
     private void setEntityScale(org.bukkit.entity.LivingEntity entity, double value) {
@@ -1788,9 +1872,20 @@ public class TowerManager {
         }
 
         // Slot 22: Upgrade Tower
+        // Branching towers at base Level 1: upgrading opens the path picker (Gatling/Scatter, etc.).
+        // getUpgradeCost() would report -1 here (the default path tops out at Level 1), so this case
+        // must be handled before the normal upgrade/maxed logic.
         int nextLvl = tower.getLevel() + 1;
         int cost = tower.getUpgradeCost();
-        if (cost != -1) {
+        if (isBranchingType(tower.getType()) && tower.getLevel() == 1 && !tower.hasPath()) {
+            gui.setItem(22, createGUIItem(
+                Material.ANVIL,
+                ChatColor.GOLD + "Choose Upgrade Path",
+                ChatColor.GRAY + "This tower branches into two paths at Level 2.",
+                "",
+                ChatColor.GREEN + "Click to pick a path and upgrade!"
+            ));
+        } else if (cost != -1) {
             double nextRange = plugin.getTowerConfigManager().getRange(tower.getType(), tower.getPathId(), nextLvl, tower.getRange() + 1.5);
             double nextDamage = plugin.getTowerConfigManager().getDamage(tower.getType(), tower.getPathId(), nextLvl, tower.getDamage() + 1.5);
             long nextCooldown = plugin.getTowerConfigManager().getCooldown(tower.getType(), tower.getPathId(), nextLvl, Math.max(8L, tower.getCooldown() - 2L));
@@ -2064,49 +2159,59 @@ public class TowerManager {
             ChatColor.GRAY + "T2+: chain lightning. T4: global strike."
         ));
 
-        // --- Turret (branching paths) ---
+        // --- Turret (Base Level 1; branches at Level 2) ---
+        int turretCost = plugin.getTowerConfigManager().getCost(TowerType.TURRET, 1, 200);
+        double turretRange = plugin.getTowerConfigManager().getRange(TowerType.TURRET, 1, 12.0);
+        double turretDamage = plugin.getTowerConfigManager().getDamage(TowerType.TURRET, 1, 2.0);
+        double turretSpeed = plugin.getTowerConfigManager().getCooldown(TowerType.TURRET, 1, 10L) / 20.0;
         gui.setItem(23, createGUIItem(
             Material.OBSERVER,
             ChatColor.WHITE + "" + ChatColor.BOLD + "Turret",
-            ChatColor.GRAY + "Two upgrade paths, 3 levels each:",
-            ChatColor.YELLOW + "Gatling: " + ChatColor.GRAY + pathSummary(TowerType.TURRET, "gatling"),
-            ChatColor.YELLOW + "Scatter: " + ChatColor.GRAY + pathSummary(TowerType.TURRET, "scatter"),
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + turretCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + turretRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + turretDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + turretSpeed + "s",
             "",
-            ChatColor.GREEN + "Click to choose a path."
+            ChatColor.GRAY + "Shoots rapid single arrows.",
+            ChatColor.GREEN + "Upgrades into Gatling or Scatter paths at Level 2."
         ));
 
-        // --- Bombardier (branching paths) ---
+        // --- Bombardier (Base Level 1; branches at Level 2) ---
+        int bombCost = plugin.getTowerConfigManager().getCost(TowerType.BOMBARDIER, 1, 150);
+        double bombRange = plugin.getTowerConfigManager().getRange(TowerType.BOMBARDIER, 1, 10.0);
+        double bombDamage = plugin.getTowerConfigManager().getDamage(TowerType.BOMBARDIER, 1, 4.0);
+        double bombSpeed = plugin.getTowerConfigManager().getCooldown(TowerType.BOMBARDIER, 1, 60L) / 20.0;
         gui.setItem(24, createGUIItem(
             Material.TNT,
             ChatColor.DARK_RED + "" + ChatColor.BOLD + "Bombardier",
-            ChatColor.GRAY + "Two upgrade paths, 3 levels each:",
-            ChatColor.YELLOW + "Bigger Bombs: " + ChatColor.GRAY + pathSummary(TowerType.BOMBARDIER, "bigger_bombs"),
-            ChatColor.YELLOW + "Landmines: " + ChatColor.GRAY + pathSummary(TowerType.BOMBARDIER, "landmines"),
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + bombCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + bombRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + bombDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + bombSpeed + "s",
             "",
-            ChatColor.GREEN + "Click to choose a path."
+            ChatColor.GRAY + "Throws explosive bombs.",
+            ChatColor.GREEN + "Upgrades into Bigger Bombs or Landmines at Level 2."
         ));
 
-        // --- Beehive (branching paths) ---
+        // --- Beehive (Base Level 1; branches at Level 2) ---
+        int beeCost = plugin.getTowerConfigManager().getCost(TowerType.BEEHIVE, 1, 100);
+        double beeRange = plugin.getTowerConfigManager().getRange(TowerType.BEEHIVE, 1, 5.0);
+        double beeDamage = plugin.getTowerConfigManager().getDamage(TowerType.BEEHIVE, 1, 2.0);
+        double beeSpeed = plugin.getTowerConfigManager().getCooldown(TowerType.BEEHIVE, 1, 50L) / 20.0;
         gui.setItem(25, createGUIItem(
             Material.BEE_NEST,
             ChatColor.GOLD + "" + ChatColor.BOLD + "Beehive",
-            ChatColor.GRAY + "Two upgrade paths, 5 levels each:",
-            ChatColor.YELLOW + "Goliath: " + ChatColor.GRAY + pathSummary(TowerType.BEEHIVE, "goliath"),
-            ChatColor.YELLOW + "Swarm: " + ChatColor.GRAY + pathSummary(TowerType.BEEHIVE, "swarm"),
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + beeCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + beeRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + beeDamage + " HP",
+            ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + beeSpeed + "s",
             "",
-            ChatColor.GREEN + "Click to choose a path."
+            ChatColor.GRAY + "Spawns a basic bee to attack mobs.",
+            ChatColor.GREEN + "Upgrades into Goliath or Swarm paths at Level 2."
         ));
 
         player.openInventory(gui);
         player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.8f, 1.0f);
-    }
-
-    // Short "cost / dmg / speed" line for a path's level 1, used in buy GUI lore
-    private String pathSummary(TowerType type, String path) {
-        int cost = plugin.getTowerConfigManager().getCost(type, path, 1, type.getCost());
-        double damage = plugin.getTowerConfigManager().getDamage(type, path, 1, type.getDamage());
-        double speed = plugin.getTowerConfigManager().getCooldown(type, path, 1, type.getCooldown()) / 20.0;
-        return cost + "g, " + String.format("%.1f", damage) + " DMG @ " + String.format("%.2fs", speed);
     }
 
     public TowerType getPendingPathChoice(java.util.UUID playerId) {
@@ -2127,9 +2232,18 @@ public class TowerManager {
         return new java.util.ArrayList<>(def.getPathNames());
     }
 
+    /** Branching towers carry a shared base Level 1 and split into named paths at Level 2. */
+    public static boolean isBranchingType(TowerType type) {
+        return type == TowerType.TURRET || type == TowerType.BOMBARDIER || type == TowerType.BEEHIVE;
+    }
+
     public void openPathPickerGUI(Player player, String plotId, TowerType type) {
         java.util.List<String> paths = getPathNamesInOrder(type);
         if (paths.isEmpty()) return;
+
+        // The picker is the Level 1 -> Level 2 upgrade step: show each path's Level 2 stats/cost.
+        Tower existing = getTower(plotId);
+        int targetLevel = existing != null ? existing.getLevel() + 1 : 2;
 
         pendingPathChoice.put(player.getUniqueId(), type);
         Inventory gui = org.bukkit.Bukkit.createInventory(null, 27, ChatColor.DARK_BLUE + "Choose Path: " + plotId);
@@ -2142,21 +2256,21 @@ public class TowerManager {
         int[] slots = {11, 15};
         for (int i = 0; i < paths.size() && i < slots.length; i++) {
             String path = paths.get(i);
-            int cost = plugin.getTowerConfigManager().getCost(type, path, 1, type.getCost());
-            double pRange = plugin.getTowerConfigManager().getRange(type, path, 1, type.getRange());
-            double pDamage = plugin.getTowerConfigManager().getDamage(type, path, 1, type.getDamage());
-            double pSpeed = plugin.getTowerConfigManager().getCooldown(type, path, 1, type.getCooldown()) / 20.0;
+            int cost = plugin.getTowerConfigManager().getCost(type, path, targetLevel, type.getCost());
+            double pRange = plugin.getTowerConfigManager().getRange(type, path, targetLevel, type.getRange());
+            double pDamage = plugin.getTowerConfigManager().getDamage(type, path, targetLevel, type.getDamage());
+            double pSpeed = plugin.getTowerConfigManager().getCooldown(type, path, targetLevel, type.getCooldown()) / 20.0;
             int maxLevel = plugin.getTowerConfigManager().getMaxLevel(type, path);
 
             java.util.List<String> lore = new java.util.ArrayList<>();
-            lore.add(ChatColor.GRAY + "Cost: " + ChatColor.YELLOW + cost + " Gold");
+            lore.add(ChatColor.GRAY + "Upgrade Cost: " + ChatColor.YELLOW + cost + " Gold");
             lore.add(ChatColor.GRAY + "Range: " + ChatColor.YELLOW + pRange + " blocks");
             lore.add(ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + String.format("%.1f", pDamage) + " HP");
             lore.add(ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + String.format("%.2fs", pSpeed));
             lore.add(ChatColor.GRAY + "Max Level: " + ChatColor.YELLOW + maxLevel);
-            appendPathSpecialStat(lore, type, path);
+            appendPathSpecialStat(lore, type, path, targetLevel);
             lore.add("");
-            lore.add(ChatColor.GREEN + "Click to buy and lock in this path!");
+            lore.add(ChatColor.GREEN + "Click to upgrade and lock in this path!");
 
             String displayPath = formatPathName(path);
             gui.setItem(slots[i], createGUIItem(
@@ -2192,17 +2306,17 @@ public class TowerManager {
         };
     }
 
-    private void appendPathSpecialStat(java.util.List<String> lore, TowerType type, String path) {
+    private void appendPathSpecialStat(java.util.List<String> lore, TowerType type, String path, int level) {
         switch (path) {
             case "scatter" -> lore.add(ChatColor.GRAY + "Shots per Attack: " + ChatColor.YELLOW
-                    + plugin.getTowerConfigManager().getStat(type, path, 1, "arrows", 5));
+                    + plugin.getTowerConfigManager().getStat(type, path, level, "arrows", 5));
             case "bigger_bombs" -> lore.add(ChatColor.GRAY + "Blast Radius: " + ChatColor.YELLOW
-                    + plugin.getTowerConfigManager().getStat(type, path, 1, "radius", 3.5) + " blocks");
+                    + plugin.getTowerConfigManager().getStat(type, path, level, "radius", 3.5) + " blocks");
             case "landmines" -> lore.add(ChatColor.GRAY + "Max Active Mines: " + ChatColor.YELLOW + 3);
             case "goliath" -> lore.add(ChatColor.GRAY + "Bee Scale: " + ChatColor.YELLOW
-                    + plugin.getTowerConfigManager().getStat(type, path, 1, "scale", 2.0) + "x");
+                    + plugin.getTowerConfigManager().getStat(type, path, level, "scale", 2.0) + "x");
             case "swarm" -> lore.add(ChatColor.GRAY + "Max Bees: " + ChatColor.YELLOW
-                    + plugin.getTowerConfigManager().getStat(type, path, 1, "bee_count", 1));
+                    + plugin.getTowerConfigManager().getStat(type, path, level, "bee_count", 1));
         }
     }
 

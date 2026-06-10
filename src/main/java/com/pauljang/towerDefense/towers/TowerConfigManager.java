@@ -82,16 +82,29 @@ public class TowerConfigManager {
             }
         }
 
+        // Towers may declare a shared base via "levels:" (stored under DEFAULT_PATH) and/or
+        // branching "paths:". Branching towers (turret/bombardier/beehive) carry both: the base
+        // is their Level 1, and each named path starts at Level 2. We inject the base Level 1 into
+        // every path so per-path lookups (cost/range/damage) resolve correctly at Level 1 too.
         Map<String, NavigableMap<Integer, TowerLevelStats>> paths = new LinkedHashMap<>();
         ConfigurationSection levels = section.getConfigurationSection("levels");
         ConfigurationSection pathsSection = section.getConfigurationSection("paths");
+
+        NavigableMap<Integer, TowerLevelStats> baseLevels = new TreeMap<>();
         if (levels != null) {
-            paths.put(DEFAULT_PATH, parseLevels(id, DEFAULT_PATH, levels));
-        } else if (pathsSection != null) {
+            baseLevels = parseLevels(id, DEFAULT_PATH, levels);
+            paths.put(DEFAULT_PATH, baseLevels);
+        }
+
+        if (pathsSection != null) {
             for (String pathName : pathsSection.getKeys(false)) {
                 ConfigurationSection pathLevels = pathsSection.getConfigurationSection(pathName);
                 if (pathLevels != null) {
-                    paths.put(pathName, parseLevels(id, pathName, pathLevels));
+                    NavigableMap<Integer, TowerLevelStats> specificPathLevels = parseLevels(id, pathName, pathLevels);
+                    if (!baseLevels.isEmpty() && !specificPathLevels.containsKey(1)) {
+                        specificPathLevels.put(1, baseLevels.get(1));
+                    }
+                    paths.put(pathName, specificPathLevels);
                 }
             }
         }
@@ -260,8 +273,18 @@ public class TowerConfigManager {
         public String getStructureFile() { return structureFile; }
         public Material getBaseMaterial() { return baseMaterial; }
 
-        public boolean hasPaths() { return !paths.containsKey(DEFAULT_PATH); }
-        public Set<String> getPathNames() { return paths.keySet(); }
+        public boolean hasPaths() {
+            for (String key : paths.keySet()) {
+                if (!DEFAULT_PATH.equals(key)) return true;
+            }
+            return false;
+        }
+
+        public Set<String> getPathNames() {
+            java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>(paths.keySet());
+            names.remove(DEFAULT_PATH);
+            return names;
+        }
 
         public NavigableMap<Integer, TowerLevelStats> getLevels(String path) {
             return paths.get(path);

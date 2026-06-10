@@ -704,7 +704,11 @@ public class MobListener implements Listener {
                 }
 
                 boolean is5x5Tower = (type == com.pauljang.towerDefense.towers.TowerType.GOLEM ||
-                                     type == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST);
+                                     type == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST ||
+                                     type == com.pauljang.towerDefense.towers.TowerType.TURRET ||
+                                     type == com.pauljang.towerDefense.towers.TowerType.BOMBARDIER ||
+                                     type == com.pauljang.towerDefense.towers.TowerType.THUNDER ||
+                                     type == com.pauljang.towerDefense.towers.TowerType.BEEHIVE);
                 if (is5x5Tower && plotSize < 5) {
                     player.sendMessage(org.bukkit.ChatColor.RED + "You cannot place a 5x5 tower (" + type.getDisplayName() + ") on a 3x3 plot!");
                     player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
@@ -712,14 +716,8 @@ public class MobListener implements Listener {
                     return;
                 }
 
-                // Branching towers: pick an upgrade path first; purchase happens in the picker GUI
-                com.pauljang.towerDefense.towers.TowerConfigManager.TowerDefinition definition =
-                        plugin.getTowerConfigManager().getDefinition(type);
-                if (definition != null && definition.hasPaths()) {
-                    plugin.getTowerManager().openPathPickerGUI(player, plotId, type);
-                    return;
-                }
-
+                // Branching towers (turret/bombardier/beehive) now buy a shared base Level 1 here;
+                // the upgrade path (Gatling/Scatter, etc.) is chosen later from the Manage GUI.
                 int cost = plugin.getTowerConfigManager().getCost(type, 1, type.getCost());
                 if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                     plugin.getTowerManager().placeTower(plotId, type, player.getUniqueId());
@@ -752,14 +750,26 @@ public class MobListener implements Listener {
             else if (slot == 15 && paths.size() >= 2) path = paths.get(1);
             if (path == null) return;
 
-            plugin.getTowerManager().clearPendingPathChoice(player.getUniqueId());
+            // The picker is the base Level 1 -> Level 2 upgrade onto a chosen path.
+            com.pauljang.towerDefense.towers.Tower tower = plugin.getTowerManager().getTower(plotId);
+            if (tower == null) {
+                plugin.getTowerManager().clearPendingPathChoice(player.getUniqueId());
+                player.closeInventory();
+                return;
+            }
 
-            int cost = plugin.getTowerConfigManager().getCost(type, path, 1, type.getCost());
+            int nextLevel = tower.getLevel() + 1; // base Level 1 -> Level 2
+            int cost = plugin.getTowerConfigManager().getCost(type, path, nextLevel, type.getCost());
             if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
-                plugin.getTowerManager().placeTower(plotId, type, player.getUniqueId(), path);
-                player.sendMessage(org.bukkit.ChatColor.GREEN + "Placed " + type.getDisplayName()
-                        + org.bukkit.ChatColor.GREEN + " (" + path.replace('_', ' ') + ") on plot " + plotId + "!");
-                player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
+                plugin.getTowerManager().clearPendingPathChoice(player.getUniqueId());
+                tower.setPathId(path);
+                tower.incrementLevel();
+                plugin.getTowerManager().buildTowerStructure(tower);
+                plugin.getTowerManager().updateHologram(tower);
+                player.sendMessage(org.bukkit.ChatColor.GREEN + "Upgraded " + type.getDisplayName()
+                        + org.bukkit.ChatColor.GREEN + " onto the " + path.replace('_', ' ')
+                        + " path (Level " + tower.getLevel() + ")!");
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
             } else {
                 player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + cost + " Gold.");
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
@@ -801,6 +811,13 @@ public class MobListener implements Listener {
                     }
                 }
                 case 22 -> { // Upgrade Tower
+                    // Branching towers at base Level 1 pick a path (Gatling/Scatter, etc.) first.
+                    if (com.pauljang.towerDefense.towers.TowerManager.isBranchingType(tower.getType())
+                            && tower.getLevel() == 1 && !tower.hasPath()) {
+                        player.closeInventory();
+                        plugin.getTowerManager().openPathPickerGUI(player, plotId, tower.getType());
+                        return;
+                    }
                     int cost = tower.getUpgradeCost();
                     if (cost == -1) {
                         player.sendMessage(org.bukkit.ChatColor.RED + "Tower is already at the maximum level!");
