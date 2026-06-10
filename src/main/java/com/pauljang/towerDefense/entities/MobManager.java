@@ -703,6 +703,12 @@ public class MobManager {
     }
 
     private void handleMobMovement(TDMob mob, Iterator<TDMob> iterator, long currentTick) {
+        // Skip movement if mob was recently teleported by Chorus Tower
+        if (mob.isTeleported()) {
+            mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+            return;
+        }
+
         String mobArena = mob.getEntity().getPersistentDataContainer().get(
             new org.bukkit.NamespacedKey(plugin, "td_arena"),
             org.bukkit.persistence.PersistentDataType.STRING

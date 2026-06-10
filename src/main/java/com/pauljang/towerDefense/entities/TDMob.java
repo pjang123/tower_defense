@@ -20,6 +20,7 @@ public class TDMob {
     private int tier = 1;
     private String arena = "1";
     private final Location finalOffsetWaypoint;
+    private long teleportedUntil = 0; // Timestamp to pause movement after Chorus teleport
 
     public TDMob(Mob entity, Map<String, TDWaypoint> waypointGraph) {
         this.entity = entity;
@@ -156,5 +157,17 @@ public class TDMob {
 
     public Map<String, TDWaypoint> getWaypointGraph() {
         return waypointGraph;
+    }
+
+    public long getTeleportedUntil() {
+        return teleportedUntil;
+    }
+
+    public void setTeleportedUntil(long teleportedUntil) {
+        this.teleportedUntil = teleportedUntil;
+    }
+
+    public boolean isTeleported() {
+        return System.currentTimeMillis() < teleportedUntil;
     }
 }

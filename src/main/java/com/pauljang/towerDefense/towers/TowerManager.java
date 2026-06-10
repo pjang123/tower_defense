@@ -231,7 +231,7 @@ public class TowerManager {
             }
 
             // Approach 2: equip a colored harness item in the BODY slot (Happy Ghast wears it like
-            // a saddle). There is no generic Material.HARNESS enum â€” calling Material.valueOf("HARNESS")
+            // a saddle). There is no generic Material.HARNESS enum calling Material.valueOf("HARNESS")
             // threw IllegalArgumentException and left the ghast unsteerable. We must pick a concrete
             // colored variant; choose it by the ghast's arena (this plugin's team distinction) so the
             // harness also gives a clear visual team color: arena "2" -> RED, otherwise BLUE.
@@ -377,9 +377,10 @@ public class TowerManager {
             lines.add(ChatColor.RED + "âœ¦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
                       ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% âš¡");
         } else {
-            lines.add(ChatColor.RED + "â¤ " + String.format("%.1f", tower.getDamage()) + " DMG" + 
-                      ChatColor.GRAY + " | " + ChatColor.AQUA + "âš¡ " + speedStr + 
-                      ChatColor.GRAY + " | " + ChatColor.GREEN + "âœ¦ " + String.format("%.1f", tower.getRange()) + "m");
+            // ❤ DMG | ⚡  Speed | ✦ Range
+            lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" +
+                      ChatColor.GRAY + " | " + ChatColor.AQUA + "⚡ " + speedStr +
+                      ChatColor.GRAY + " | " + ChatColor.GREEN + "✦ " + String.format("%.1f", tower.getRange()) + "m");
         }
         lines.add(ChatColor.GRAY + "Priority: " + ChatColor.GOLD + tower.getTargetingMode().getDisplayName());
 
@@ -504,7 +505,7 @@ public class TowerManager {
                         continue;
                     }
 
-                    // Tower just came back online after an EMP â€” restore its normal hologram.
+                    // Tower just came back online after an EMP restore its normal hologram.
                     if (tower.isEmpDisplayed()) {
                         tower.setEmpDisplayed(false);
                         updateHologram(tower);
@@ -618,7 +619,7 @@ public class TowerManager {
         Location towerLoc = tower.getCenterLocation();
 
         // Happy Ghasts can leave their base (ridden or roaming on autopilot). When the ghast has
-        // drifted away horizontally from its tower, sweep for targets around the ghast's live
+        // drifted away horizontally from its tower, sweep for targets around the Ghast's live
         // location instead of the static tower block so its detection radius tracks with it.
         if (tower.getType() == TowerType.HAPPY_GHAST
                 && tower.getSpawnedGhast() != null && tower.getSpawnedGhast().isValid()) {
@@ -801,49 +802,195 @@ public class TowerManager {
                     }
                 }
                 if (tdMob != null) {
-                    java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = tdMob.getWaypointGraph();
+                    // Get the teleport-back distance from config (in blocks, not waypoints)
+                    String tierKey = "towers.chorus_" + tower.getLevel() + ".teleport-back";
+                    double blocksBack = plugin.getConfig().getDouble(tierKey, 10.0);
+
+                    Location currentLoc = target.getLocation();
                     java.util.List<String> history = tdMob.getPathHistory();
-                    
-                    if (!history.isEmpty()) {
-                        // Roll the mob back a fixed number of nodes by walking its visited history.
-                        int stepsBack = 3; // Number of nodes to roll back
-                        int targetIndex = Math.max(0, history.size() - 1 - stepsBack);
+                    java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = tdMob.getWaypointGraph();
 
-                        String newWpId = history.get(targetIndex);
-                        com.pauljang.towerDefense.data.TDWaypoint newWp = graph.get(newWpId);
-                        if (newWp == null) return;
-                        Location teleportLoc = newWp.getLocation().clone();
+                    plugin.getLogger().info("[CHORUS DEBUG] Tier: " + tower.getLevel() + ", BlocksBack: " + blocksBack + ", Current: " + currentLoc + ", History size: " + history.size());
 
-                        // Preserve hover height for flying mobs (e.g. Breeze, Blaze).
-                        String presetKey = target.getPersistentDataContainer().get(
-                            new org.bukkit.NamespacedKey(plugin, "td_preset"),
-                            org.bukkit.persistence.PersistentDataType.STRING
-                        );
-                        if (presetKey == null) presetKey = target.getType().name().toLowerCase();
-                        double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
-                        if (heightOffset > 0.0) {
-                            teleportLoc.add(0, heightOffset, 0);
-                        }
-
-                        // Trim history back to the rolled-back node and retarget there.
-                        while (history.size() > targetIndex + 1) {
-                            history.remove(history.size() - 1);
-                        }
-                        tdMob.setCurrentWaypointId(newWpId);
-
-                        // Orient back toward the mob's prior position, zero momentum, then jump. We do
-                        // NOT touch target.getPathfinder(): all mobs are velocity-driven, so the
-                        // MobManager loop resumes pushing the mob forward on the next tick.
-                        org.bukkit.util.Vector faceDir = target.getLocation().toVector().subtract(teleportLoc.toVector());
-                        if (faceDir.lengthSquared() > 0.0001) {
-                            teleportLoc.setDirection(faceDir);
-                        }
-                        target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, target.getLocation(), 15, 0.5, 0.5, 0.5, 0.1);
-                        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
-                        target.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-                        target.teleport(teleportLoc);
-                        target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, teleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
+                    if (history.isEmpty()) {
+                        plugin.getLogger().warning("[CHORUS DEBUG] History is empty, cannot teleport!");
+                        return;
                     }
+
+                    // Walk backwards along the path to find a position blocksBack distance away.
+                    // Start from the mob's current location and trace back through waypoints.
+                    double distanceRemaining = blocksBack;
+                    Location teleportLoc = currentLoc.clone();
+
+                    // Traverse the path history backwards
+                    for (int i = history.size() - 1; i >= 0 && distanceRemaining > 0; i--) {
+                        String wpId = history.get(i);
+                        com.pauljang.towerDefense.data.TDWaypoint wp = graph.get(wpId);
+                        if (wp == null) continue;
+
+                        Location wpLoc = wp.getLocation();
+                        double distToWp = teleportLoc.distance(wpLoc);
+
+                        if (distToWp >= distanceRemaining) {
+                            // The target point is between current position and this waypoint
+                            org.bukkit.util.Vector direction = wpLoc.toVector().subtract(teleportLoc.toVector()).normalize();
+                            teleportLoc = teleportLoc.add(direction.multiply(-distanceRemaining));
+                            distanceRemaining = 0;
+                            break;
+                        } else {
+                            // Move to this waypoint and continue backwards
+                            teleportLoc = wpLoc.clone();
+                            distanceRemaining -= distToWp;
+                        }
+                    }
+
+                    // Clamp to waypoint 0 if we ran out of path
+                    if (distanceRemaining > 0 && !history.isEmpty()) {
+                        String firstWpId = history.get(0);
+                        com.pauljang.towerDefense.data.TDWaypoint firstWp = graph.get(firstWpId);
+                        if (firstWp != null) {
+                            teleportLoc = firstWp.getLocation().clone();
+                        }
+                    }
+
+                    // Adjust Y coordinate - waypoints are at block level, mobs need to be 1 block higher
+                    teleportLoc.add(0, 1, 0);
+
+                    // Preserve hover height for flying mobs
+                    String presetKey = target.getPersistentDataContainer().get(
+                        new org.bukkit.NamespacedKey(plugin, "td_preset"),
+                        org.bukkit.persistence.PersistentDataType.STRING
+                    );
+                    if (presetKey == null) presetKey = target.getType().name().toLowerCase();
+                    double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
+                    if (heightOffset > 0.0) {
+                        teleportLoc.add(0, heightOffset, 0);
+                    }
+
+                    // CRITICAL: Do NOT change currentWaypointId or pathHistory!
+                    // The mob should keep targeting the same waypoint it was heading toward.
+                    // This way, after teleporting backwards, it must walk forward again to reach it.
+
+                    // Visual and audio effects
+                    target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, currentLoc, 15, 0.5, 0.5, 0.5, 0.1);
+                    target.getWorld().playSound(currentLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+
+                    plugin.getLogger().info("[CHORUS DEBUG] Teleporting from " + currentLoc + " to " + teleportLoc + " (distance: " + currentLoc.distance(teleportLoc) + " blocks)");
+
+                    // Visual and audio effects at current location
+                    target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, currentLoc, 15, 0.5, 0.5, 0.5, 0.1);
+                    target.getWorld().playSound(currentLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+
+                    // Store the final teleport location
+                    final Location finalTeleportLoc = teleportLoc;
+                    final Mob finalTarget = target;
+                    final com.pauljang.towerDefense.entities.TDMob finalTDMob = tdMob;
+
+                    // Pause movement for 10 ticks (0.5 seconds) to let the teleport stick
+                    tdMob.setTeleportedUntil(System.currentTimeMillis() + 500);
+
+                    // Defer teleport to next tick to avoid conflicts with movement system
+                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                        // Stop pathfinder and zero velocity
+                        finalTarget.getPathfinder().stopPathfinding();
+                        finalTarget.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+
+                        // Ensure chunk is loaded
+                        if (!finalTeleportLoc.getChunk().isLoaded()) {
+                            finalTeleportLoc.getChunk().load();
+                        }
+
+                        // Check if entity is still valid
+                        if (!finalTarget.isValid() || finalTarget.isDead()) {
+                            plugin.getLogger().warning("[CHORUS DEBUG] Entity is dead/invalid, cannot teleport");
+                            return;
+                        }
+
+                        // Check if destination is safe (not inside blocks)
+                        org.bukkit.block.Block atFeet = finalTeleportLoc.getBlock();
+                        org.bukkit.block.Block atHead = finalTeleportLoc.clone().add(0, 1, 0).getBlock();
+                        plugin.getLogger().info("[CHORUS DEBUG] Destination blocks - Feet: " + atFeet.getType() + ", Head: " + atHead.getType());
+
+                        // FORCE teleport by removing and re-spawning at new location
+                        // This bypasses all teleport checks and events
+                        org.bukkit.entity.EntityType entityType = finalTarget.getType();
+                        double health = finalTarget.getHealth();
+                        org.bukkit.attribute.AttributeInstance maxHealthAttr = finalTarget.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+                        double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
+
+                        // Get all PDC data
+                        org.bukkit.persistence.PersistentDataContainer pdc = finalTarget.getPersistentDataContainer();
+
+                        // Remove from active mobs temporarily
+                        plugin.getMobManager().getActiveMobs().remove(finalTDMob);
+
+                        // Remove old entity
+                        finalTarget.remove();
+
+                        // Spawn new entity at target location
+                        org.bukkit.entity.Mob newEntity = (org.bukkit.entity.Mob) finalTeleportLoc.getWorld().spawnEntity(
+                            finalTeleportLoc, entityType);
+
+                        // Restore properties
+                        newEntity.setCollidable(false);
+                        newEntity.setRemoveWhenFarAway(false);
+                        newEntity.setPersistent(true);
+                        org.bukkit.Bukkit.getMobGoals().removeAllGoals(newEntity);
+
+                        if (maxHealthAttr != null) {
+                            org.bukkit.attribute.AttributeInstance newMaxHealthAttr = newEntity.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+                            if (newMaxHealthAttr != null) {
+                                newMaxHealthAttr.setBaseValue(maxHealth);
+                                newEntity.setHealth(health);
+                            }
+                        }
+
+                        // Copy all PDC data to new entity
+                        for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
+                            // Copy each data type
+                            if (pdc.has(key, org.bukkit.persistence.PersistentDataType.STRING)) {
+                                newEntity.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.STRING,
+                                    pdc.get(key, org.bukkit.persistence.PersistentDataType.STRING));
+                            } else if (pdc.has(key, org.bukkit.persistence.PersistentDataType.INTEGER)) {
+                                newEntity.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.INTEGER,
+                                    pdc.get(key, org.bukkit.persistence.PersistentDataType.INTEGER));
+                            } else if (pdc.has(key, org.bukkit.persistence.PersistentDataType.BYTE)) {
+                                newEntity.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.BYTE,
+                                    pdc.get(key, org.bukkit.persistence.PersistentDataType.BYTE));
+                            } else if (pdc.has(key, org.bukkit.persistence.PersistentDataType.LONG)) {
+                                newEntity.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.LONG,
+                                    pdc.get(key, org.bukkit.persistence.PersistentDataType.LONG));
+                            } else if (pdc.has(key, org.bukkit.persistence.PersistentDataType.DOUBLE)) {
+                                newEntity.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.DOUBLE,
+                                    pdc.get(key, org.bukkit.persistence.PersistentDataType.DOUBLE));
+                            }
+                        }
+
+                        // Update TDMob to point to new entity
+                        java.lang.reflect.Field entityField;
+                        try {
+                            entityField = finalTDMob.getClass().getDeclaredField("entity");
+                            entityField.setAccessible(true);
+                            entityField.set(finalTDMob, newEntity);
+                        } catch (Exception e) {
+                            plugin.getLogger().severe("[CHORUS DEBUG] Failed to update TDMob entity: " + e.getMessage());
+                        }
+
+                        // Re-add to active mobs
+                        plugin.getMobManager().getActiveMobs().add(finalTDMob);
+
+                        // Update health bar
+                        plugin.getMobManager().updateHealthBar(newEntity);
+
+                        plugin.getLogger().info("[CHORUS DEBUG] Force respawn successful, new location: " + newEntity.getLocation());
+
+                        // Effects at destination
+                        finalTarget.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, finalTeleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
+                        finalTarget.getWorld().playSound(finalTeleportLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.2f);
+
+                        // Zero velocity again after teleport
+                        finalTarget.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                    });
                 }
             }
             case POISON -> {
@@ -891,7 +1038,7 @@ public class TowerManager {
                 for (Mob mob : targets) {
                     if (mob.getPersistentDataContainer().has(freezeImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)
                             || isMobImmuneToTower(mob, "ICE") || isMobImmuneToTower(mob, "SLOW")) {
-                        continue; // Skip freeze/ice-immune mobs (e.g. Warden) â€” no damage, freeze, or slowness
+                        continue; // Skip freeze/ice-immune mobs (e.g. Warden) no damage, freeze, or slowness
                     }
                     mob.damage(damage);
 
@@ -1338,7 +1485,7 @@ public class TowerManager {
             ChatColor.GRAY + "Damage: " + ChatColor.YELLOW + happyDamage + " HP (AoE)",
             ChatColor.GRAY + "Attack Speed: " + ChatColor.YELLOW + happySpeed + "s",
             "",
-            ChatColor.GRAY + "Ridable ghast. Shoots fireballs that deal AoE damage.",
+            ChatColor.GRAY + "Rideable ghast. Shoots fireballs that deal AoE damage.",
             ChatColor.GRAY + "Has 3 tiers. Autopilot mode when unridden."
         ));
 

@@ -239,19 +239,19 @@ towers:
     range: 8.0
     damage: 0.0
     cooldown: 120          # 6 seconds between teleports
-    teleport-back: 1       # Teleport back by 1 waypoint
+    teleport-back: 8.0     # Teleport mob back by 8 blocks along path
   chorus_2:
     cost: 250
     range: 10.0
     damage: 0.0
     cooldown: 80           # 4 seconds between teleports
-    teleport-back: 2       # Teleport back by 2 waypoints
+    teleport-back: 12.0    # Teleport mob back by 12 blocks along path
   chorus_3:
     cost: 400
     range: 12.0
     damage: 0.0
     cooldown: 40           # 2 seconds between teleports
-    teleport-back: 3       # Teleport back by 3 waypoints
+    teleport-back: 16.0    # Teleport mob back by 16 blocks along path
 
   # --- Redstone Towers (Passive booster, speeds up nearby towers) ---
   redstone_1:
