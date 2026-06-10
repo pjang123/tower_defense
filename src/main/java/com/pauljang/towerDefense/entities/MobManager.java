@@ -458,7 +458,7 @@ public class MobManager {
 
         if (zombie.getEquipment() != null) {
             zombie.getEquipment().clear();
-
+        }
 
         // Mark as TD mob
         zombie.getPersistentDataContainer().set(
