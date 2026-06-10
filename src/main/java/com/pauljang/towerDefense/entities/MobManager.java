@@ -409,6 +409,10 @@ public class MobManager {
                 if (mount instanceof Mob mountMob) {
                     org.bukkit.Bukkit.getMobGoals().removeAllGoals(mountMob);
                 }
+                // Mark ALL mounts as TD mobs (prevents burning in sunlight AND protects from player damage)
+                mount.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "td_mob"),
+                    PersistentDataType.BYTE, (byte) 1);
                 mount.addPassenger(entity);
             }
         }

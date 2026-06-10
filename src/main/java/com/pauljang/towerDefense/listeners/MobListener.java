@@ -52,11 +52,11 @@ public class MobListener implements Listener {
     public void onMobBurn(EntityCombustEvent event) {
         Entity entity = event.getEntity();
         NamespacedKey key = new NamespacedKey(plugin, "td_mob");
-        
-        // If the entity has our custom TD Mob tag
+
+        // If the entity has our custom TD Mob tag (includes both mobs and mounts)
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             NamespacedKey fireImmuneKey = new NamespacedKey(plugin, "td_fire_immune");
-            
+
             // If immune to fire, cancel all combustion
             if (entity.getPersistentDataContainer().has(fireImmuneKey, PersistentDataType.BYTE)) {
                 event.setCancelled(true);
@@ -1188,15 +1188,15 @@ public class MobListener implements Listener {
 
         NamespacedKey tdKey = new NamespacedKey(plugin, "td_mob");
 
-        // Only run checks for custom TD Mobs
+        // Only run checks for custom TD Mobs (includes both mobs and mounts)
         if (!victim.getPersistentDataContainer().has(tdKey, PersistentDataType.BYTE)) {
             return;
         }
 
-        // A player's arrow always damages TD mobs natively. The wrong-track cancellation below was
-        // also blocking the player's own custom arrows, so they dealt no damage.
-        if (event.getDamager() instanceof org.bukkit.entity.Projectile proj
-                && proj.getShooter() instanceof org.bukkit.entity.Player) {
+        // ALWAYS block damage to mounts (any entity serving as a vehicle)
+        // Check if victim is carrying a passenger (rider) - if so, it's a mount
+        if (!victim.getPassengers().isEmpty()) {
+            event.setCancelled(true);
             return;
         }
 
@@ -1227,7 +1227,8 @@ public class MobListener implements Listener {
 
             String playerArena = plugin.getGameManager().getPlayerArena(attacker.getUniqueId());
 
-            // Attack is cancelled if player is trying to hit a mob on the opponent's track
+            // Players can ONLY damage mobs on their OWN track (where they placed towers to defend)
+            // Cancel if trying to hit a mob on the OPPONENT's track (where they sent the mobs)
             if (!mobArena.equals(playerArena)) {
                 event.setCancelled(true);
             }

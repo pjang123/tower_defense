@@ -1001,6 +1001,12 @@ public class TowerManager {
                                 vehicleMob.setRemoveWhenFarAway(false);
                                 vehicleMob.setPersistent(true);
                             }
+                            // Mark the mount as a TD mob so it doesn't burn in sunlight (existing listener handles td_mob tag)
+                            if (newVehicle instanceof org.bukkit.entity.AbstractHorse horse) {
+                                horse.getPersistentDataContainer().set(
+                                    new org.bukkit.NamespacedKey(plugin, "td_mob"),
+                                    org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+                            }
                             plugin.getLogger().info("[CHORUS DEBUG] Spawned new vehicle");
                         }
 
