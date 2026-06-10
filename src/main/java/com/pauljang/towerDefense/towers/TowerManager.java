@@ -817,69 +817,118 @@ public class TowerManager {
                         return;
                     }
 
-                    // Walk backwards along the path to find a position blocksBack distance away.
-                    // Start from the mob's current location and trace back through waypoints.
-                    double distanceRemaining = blocksBack;
-                    Location teleportLoc = currentLoc.clone();
+                    // Walk backwards along the path by blocksBack distance.
+                    // pathHistory includes currentWaypointId at the end (the waypoint the mob is targeting),
+                    // so the second-to-last entry is the waypoint the mob actually last passed through.
 
-                    // Traverse the path history backwards
-                    for (int i = history.size() - 1; i >= 0 && distanceRemaining > 0; i--) {
-                        String wpId = history.get(i);
-                        com.pauljang.towerDefense.data.TDWaypoint wp = graph.get(wpId);
-                        if (wp == null) continue;
+                    if (history.size() < 2) {
+                        plugin.getLogger().warning("[CHORUS DEBUG] Not enough history to teleport back!");
+                        return;
+                    }
 
-                        Location wpLoc = wp.getLocation();
-                        double distToWp = teleportLoc.distance(wpLoc);
+                    // Start from the last waypoint the mob actually passed (not the current target)
+                    String lastPassedWpId = history.get(history.size() - 2);
+                    com.pauljang.towerDefense.data.TDWaypoint lastPassedWp = graph.get(lastPassedWpId);
+                    if (lastPassedWp == null) {
+                        plugin.getLogger().warning("[CHORUS DEBUG] Last passed waypoint not found!");
+                        return;
+                    }
 
-                        if (distToWp >= distanceRemaining) {
-                            // The target point is between current position and this waypoint
-                            org.bukkit.util.Vector direction = wpLoc.toVector().subtract(teleportLoc.toVector()).normalize();
-                            teleportLoc = teleportLoc.add(direction.multiply(-distanceRemaining));
-                            distanceRemaining = 0;
-                            break;
-                        } else {
-                            // Move to this waypoint and continue backwards
-                            teleportLoc = wpLoc.clone();
-                            distanceRemaining -= distToWp;
+                    Location lastPassedLoc = lastPassedWp.getLocation();
+
+                    // Distance from current location back to the last passed waypoint
+                    double distToLastPassed = currentLoc.distance(lastPassedLoc);
+                    double remainingDist = blocksBack;
+
+                    Location teleportLoc = null;
+                    String newTargetWpId = null; // The waypoint the mob should target after teleport
+
+                    // Case 1: blocksBack is less than distance to last passed waypoint
+                    // Mob stays on current segment (between lastPassed and current target)
+                    if (remainingDist <= distToLastPassed) {
+                        org.bukkit.util.Vector direction = lastPassedLoc.toVector().subtract(currentLoc.toVector()).normalize();
+                        teleportLoc = currentLoc.clone().add(direction.multiply(remainingDist));
+                        // Mob is still on same segment, keep current target waypoint
+                        newTargetWpId = history.get(history.size() - 1);
+                        plugin.getLogger().info("[CHORUS DEBUG] Interpolating on current segment, target stays: " + newTargetWpId);
+                    } else {
+                        // Case 2: Need to go back past the last waypoint
+                        remainingDist -= distToLastPassed;
+                        Location walkbackLoc = lastPassedLoc.clone();
+
+                        // Walk backwards through earlier waypoints
+                        for (int i = history.size() - 2; i > 0; i--) {
+                            String currentWpId = history.get(i);
+                            String prevWpId = history.get(i - 1);
+
+                            com.pauljang.towerDefense.data.TDWaypoint prevWp = graph.get(prevWpId);
+                            if (prevWp == null) continue;
+
+                            Location prevLoc = prevWp.getLocation();
+                            double segmentDist = walkbackLoc.distance(prevLoc);
+
+                            if (remainingDist <= segmentDist) {
+                                // Found the segment - interpolate
+                                org.bukkit.util.Vector direction = prevLoc.toVector().subtract(walkbackLoc.toVector()).normalize();
+                                teleportLoc = walkbackLoc.clone().add(direction.multiply(remainingDist));
+                                // Mob is now between prevWp and currentWp, so it should target currentWp
+                                newTargetWpId = currentWpId;
+                                plugin.getLogger().info("[CHORUS DEBUG] Found target on segment between " + prevWpId + " and " + currentWpId + ", new target: " + newTargetWpId);
+                                break;
+                            } else {
+                                // Keep going backwards
+                                remainingDist -= segmentDist;
+                                walkbackLoc = prevLoc.clone();
+                            }
+                        }
+
+                        // Fallback: if we ran out of path, go to waypoint 0 and target waypoint 1
+                        if (teleportLoc == null) {
+                            String firstWpId = history.get(0);
+                            com.pauljang.towerDefense.data.TDWaypoint firstWp = graph.get(firstWpId);
+                            if (firstWp != null) {
+                                teleportLoc = firstWp.getLocation().clone();
+                                // If there's a waypoint after 0, target it; otherwise target 0
+                                newTargetWpId = history.size() > 1 ? history.get(1) : firstWpId;
+                                plugin.getLogger().info("[CHORUS DEBUG] Ran out of path, teleporting to waypoint 0, new target: " + newTargetWpId);
+                            }
                         }
                     }
 
-                    // Clamp to waypoint 0 if we ran out of path
-                    if (distanceRemaining > 0 && !history.isEmpty()) {
-                        String firstWpId = history.get(0);
-                        com.pauljang.towerDefense.data.TDWaypoint firstWp = graph.get(firstWpId);
-                        if (firstWp != null) {
-                            teleportLoc = firstWp.getLocation().clone();
-                        }
+                    if (teleportLoc == null || newTargetWpId == null) {
+                        plugin.getLogger().warning("[CHORUS DEBUG] Could not calculate teleport location!");
+                        return;
                     }
 
-                    // Adjust Y coordinate - waypoints are at block level, mobs need to be 1 block higher
-                    teleportLoc.add(0, 1, 0);
+                    // Store the new target waypoint to update after respawn
+                    final String finalNewTargetWpId = newTargetWpId;
 
-                    // Preserve hover height for flying mobs
+                    // Adjust Y coordinate - waypoints are at block level, mobs need to be higher
+                    // Check if this is a flying mob first
                     String presetKey = target.getPersistentDataContainer().get(
                         new org.bukkit.NamespacedKey(plugin, "td_preset"),
                         org.bukkit.persistence.PersistentDataType.STRING
                     );
                     if (presetKey == null) presetKey = target.getType().name().toLowerCase();
                     double heightOffset = plugin.getConfig().getDouble("mobs." + presetKey + ".height-offset", 0.0);
+
                     if (heightOffset > 0.0) {
+                        // Flying mob - use heightOffset only (already includes base height)
                         teleportLoc.add(0, heightOffset, 0);
+                    } else {
+                        // Ground mob - add 1 block to stand on top of waypoint block
+                        teleportLoc.add(0, 1, 0);
                     }
 
                     // CRITICAL: Do NOT change currentWaypointId or pathHistory!
                     // The mob should keep targeting the same waypoint it was heading toward.
                     // This way, after teleporting backwards, it must walk forward again to reach it.
 
-                    // Visual and audio effects
+                    // Visual and audio effects at current location
                     target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, currentLoc, 15, 0.5, 0.5, 0.5, 0.1);
                     target.getWorld().playSound(currentLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
 
                     plugin.getLogger().info("[CHORUS DEBUG] Teleporting from " + currentLoc + " to " + teleportLoc + " (distance: " + currentLoc.distance(teleportLoc) + " blocks)");
-
-                    // Visual and audio effects at current location
-                    target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, currentLoc, 15, 0.5, 0.5, 0.5, 0.1);
-                    target.getWorld().playSound(currentLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
 
                     // Store the final teleport location
                     final Location finalTeleportLoc = teleportLoc;
@@ -921,15 +970,49 @@ public class TowerManager {
                         // Get all PDC data
                         org.bukkit.persistence.PersistentDataContainer pdc = finalTarget.getPersistentDataContainer();
 
-                        // Remove from active mobs temporarily
-                        plugin.getMobManager().getActiveMobs().remove(finalTDMob);
+                        // Check if mob is riding a vehicle (e.g., skeleton on skeleton horse)
+                        org.bukkit.entity.Entity vehicle = finalTarget.getVehicle();
+                        org.bukkit.entity.EntityType vehicleType = null;
+                        if (vehicle != null) {
+                            vehicleType = vehicle.getType();
+                            plugin.getLogger().info("[CHORUS DEBUG] Mob has vehicle: " + vehicleType);
+                        }
 
-                        // Remove old entity
+                        // Check that TDMob is in activeMobs before removing
+                        boolean wasInList = plugin.getMobManager().getActiveMobs().remove(finalTDMob);
+                        if (!wasInList) {
+                            plugin.getLogger().warning("[CHORUS DEBUG] TDMob was not in activeMobs list!");
+                        }
+
+                        // Remove old entity and vehicle (but keep reference for copying data)
+                        if (vehicle != null) {
+                            vehicle.remove();
+                        }
                         finalTarget.remove();
+
+                        // Spawn new vehicle first if there was one
+                        org.bukkit.entity.Entity newVehicle = null;
+                        if (vehicleType != null) {
+                            newVehicle = finalTeleportLoc.getWorld().spawnEntity(finalTeleportLoc, vehicleType);
+                            // Configure vehicle
+                            if (newVehicle instanceof org.bukkit.entity.Mob vehicleMob) {
+                                org.bukkit.Bukkit.getMobGoals().removeAllGoals(vehicleMob);
+                                vehicleMob.setCollidable(false);
+                                vehicleMob.setRemoveWhenFarAway(false);
+                                vehicleMob.setPersistent(true);
+                            }
+                            plugin.getLogger().info("[CHORUS DEBUG] Spawned new vehicle");
+                        }
 
                         // Spawn new entity at target location
                         org.bukkit.entity.Mob newEntity = (org.bukkit.entity.Mob) finalTeleportLoc.getWorld().spawnEntity(
                             finalTeleportLoc, entityType);
+
+                        // Mount the new entity on the new vehicle
+                        if (newVehicle != null) {
+                            newVehicle.addPassenger(newEntity);
+                            plugin.getLogger().info("[CHORUS DEBUG] Mounted entity on vehicle");
+                        }
 
                         // Restore properties
                         newEntity.setCollidable(false);
@@ -937,6 +1020,7 @@ public class TowerManager {
                         newEntity.setPersistent(true);
                         org.bukkit.Bukkit.getMobGoals().removeAllGoals(newEntity);
 
+                        // Copy ALL attributes from old entity to new entity
                         if (maxHealthAttr != null) {
                             org.bukkit.attribute.AttributeInstance newMaxHealthAttr = newEntity.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
                             if (newMaxHealthAttr != null) {
@@ -944,6 +1028,47 @@ public class TowerManager {
                                 newEntity.setHealth(health);
                             }
                         }
+
+                        // Copy movement speed
+                        org.bukkit.attribute.AttributeInstance oldSpeed = finalTarget.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
+                        if (oldSpeed != null) {
+                            org.bukkit.attribute.AttributeInstance newSpeed = newEntity.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
+                            if (newSpeed != null) {
+                                newSpeed.setBaseValue(oldSpeed.getBaseValue());
+                            }
+                        }
+
+                        // Copy knockback resistance
+                        org.bukkit.attribute.AttributeInstance oldKB = finalTarget.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
+                        if (oldKB != null) {
+                            org.bukkit.attribute.AttributeInstance newKB = newEntity.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
+                            if (newKB != null) {
+                                newKB.setBaseValue(oldKB.getBaseValue());
+                            }
+                        }
+
+                        // Copy armor
+                        org.bukkit.attribute.AttributeInstance oldArmor = finalTarget.getAttribute(org.bukkit.attribute.Attribute.ARMOR);
+                        if (oldArmor != null) {
+                            org.bukkit.attribute.AttributeInstance newArmor = newEntity.getAttribute(org.bukkit.attribute.Attribute.ARMOR);
+                            if (newArmor != null) {
+                                newArmor.setBaseValue(oldArmor.getBaseValue());
+                            }
+                        }
+
+                        // Copy equipment
+                        if (finalTarget.getEquipment() != null && newEntity.getEquipment() != null) {
+                            newEntity.getEquipment().setHelmet(finalTarget.getEquipment().getHelmet());
+                            newEntity.getEquipment().setItemInMainHand(finalTarget.getEquipment().getItemInMainHand());
+                        }
+
+                        // Copy baby/adult state for zombies
+                        if (newEntity instanceof org.bukkit.entity.Zombie newZombie && finalTarget instanceof org.bukkit.entity.Zombie oldZombie) {
+                            newZombie.setBaby(oldZombie.isBaby());
+                        }
+
+                        // Copy gravity
+                        newEntity.setGravity(finalTarget.hasGravity());
 
                         // Copy all PDC data to new entity
                         for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
@@ -966,18 +1091,41 @@ public class TowerManager {
                             }
                         }
 
-                        // Update TDMob to point to new entity
+                        // Update TDMob to point to new entity using reflection
                         java.lang.reflect.Field entityField;
                         try {
                             entityField = finalTDMob.getClass().getDeclaredField("entity");
                             entityField.setAccessible(true);
                             entityField.set(finalTDMob, newEntity);
+                            plugin.getLogger().info("[CHORUS DEBUG] Successfully updated TDMob entity reference");
                         } catch (Exception e) {
                             plugin.getLogger().severe("[CHORUS DEBUG] Failed to update TDMob entity: " + e.getMessage());
+                            e.printStackTrace();
+                            // If reflection fails, the mob will be lost - clean up new entity
+                            newEntity.remove();
+                            return;
                         }
 
-                        // Re-add to active mobs
-                        plugin.getMobManager().getActiveMobs().add(finalTDMob);
+                        // Update the mob's waypoint state to match its new position on the path
+                        // Trim history to only include waypoints before the new target
+                        java.util.List<String> newHistory = new java.util.ArrayList<>();
+                        for (String wpId : finalTDMob.getPathHistory()) {
+                            if (wpId.equals(finalNewTargetWpId)) {
+                                break;
+                            }
+                            newHistory.add(wpId);
+                        }
+                        finalTDMob.setPathHistory(newHistory);
+                        finalTDMob.setCurrentWaypointId(finalNewTargetWpId);
+                        plugin.getLogger().info("[CHORUS DEBUG] Updated waypoint state - target: " + finalNewTargetWpId + ", history size: " + newHistory.size());
+
+                        // Re-add to active mobs - CRITICAL for mob to continue existing
+                        if (!plugin.getMobManager().getActiveMobs().contains(finalTDMob)) {
+                            plugin.getMobManager().getActiveMobs().add(finalTDMob);
+                            plugin.getLogger().info("[CHORUS DEBUG] Re-added TDMob to activeMobs list");
+                        } else {
+                            plugin.getLogger().warning("[CHORUS DEBUG] TDMob already in activeMobs list!");
+                        }
 
                         // Update health bar
                         plugin.getMobManager().updateHealthBar(newEntity);
@@ -985,11 +1133,11 @@ public class TowerManager {
                         plugin.getLogger().info("[CHORUS DEBUG] Force respawn successful, new location: " + newEntity.getLocation());
 
                         // Effects at destination
-                        finalTarget.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, finalTeleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
-                        finalTarget.getWorld().playSound(finalTeleportLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.2f);
+                        newEntity.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, finalTeleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
+                        newEntity.getWorld().playSound(finalTeleportLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.2f);
 
-                        // Zero velocity again after teleport
-                        finalTarget.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                        // Zero velocity
+                        newEntity.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
                     });
                 }
             }
