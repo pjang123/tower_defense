@@ -173,7 +173,14 @@ public class MobManager {
         }
 
         // Mobs never push each other off the track or clump up.
-        entity.setCollidable(false);
+        // Use scoreboard team collision rules instead of setCollidable(false) so projectiles can still hit.
+        org.bukkit.scoreboard.Scoreboard scoreboard = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+        org.bukkit.scoreboard.Team tdMobTeam = scoreboard.getTeam("td_mobs");
+        if (tdMobTeam == null) {
+            tdMobTeam = scoreboard.registerNewTeam("td_mobs");
+            tdMobTeam.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE, org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+        }
+        tdMobTeam.addEntry(entity.getUniqueId().toString());
 
         // Force persistence so vanilla's despawn/garbage-collection never wipes a TD mob (Giants in
         // particular vanish otherwise, since their huge hitbox keeps them far from any player).
@@ -409,6 +416,10 @@ public class MobManager {
                 if (mount instanceof Mob mountMob) {
                     org.bukkit.Bukkit.getMobGoals().removeAllGoals(mountMob);
                 }
+                // Mark ALL mounts as TD mobs (prevents burning in sunlight AND protects from player damage)
+                mount.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "td_mob"),
+                    PersistentDataType.BYTE, (byte) 1);
                 mount.addPassenger(entity);
             }
         }
@@ -451,7 +462,14 @@ public class MobManager {
 
         // Apply standard TD mob configuration
         zombie.setBaby(false);
-        zombie.setCollidable(false);
+        // Use scoreboard team collision rules instead of setCollidable(false) so projectiles can still hit
+        org.bukkit.scoreboard.Scoreboard scoreboard = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+        org.bukkit.scoreboard.Team tdMobTeam = scoreboard.getTeam("td_mobs");
+        if (tdMobTeam == null) {
+            tdMobTeam = scoreboard.registerNewTeam("td_mobs");
+            tdMobTeam.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE, org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+        }
+        tdMobTeam.addEntry(zombie.getUniqueId().toString());
         zombie.setRemoveWhenFarAway(false);
         zombie.setPersistent(true);
         org.bukkit.Bukkit.getMobGoals().removeAllGoals(zombie);
@@ -703,6 +721,12 @@ public class MobManager {
     }
 
     private void handleMobMovement(TDMob mob, Iterator<TDMob> iterator, long currentTick) {
+        // Skip movement if mob was recently teleported by Chorus Tower
+        if (mob.isTeleported()) {
+            mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+            return;
+        }
+
         String mobArena = mob.getEntity().getPersistentDataContainer().get(
             new org.bukkit.NamespacedKey(plugin, "td_arena"),
             org.bukkit.persistence.PersistentDataType.STRING

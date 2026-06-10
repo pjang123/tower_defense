@@ -52,11 +52,11 @@ public class MobListener implements Listener {
     public void onMobBurn(EntityCombustEvent event) {
         Entity entity = event.getEntity();
         NamespacedKey key = new NamespacedKey(plugin, "td_mob");
-        
-        // If the entity has our custom TD Mob tag
+
+        // If the entity has our custom TD Mob tag (includes both mobs and mounts)
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             NamespacedKey fireImmuneKey = new NamespacedKey(plugin, "td_fire_immune");
-            
+
             // If immune to fire, cancel all combustion
             if (entity.getPersistentDataContainer().has(fireImmuneKey, PersistentDataType.BYTE)) {
                 event.setCancelled(true);
@@ -177,8 +177,8 @@ public class MobListener implements Listener {
                             mob.setHealth(newMaxHealth);
                         }
                         
-                        // Play damage hurt flash and sound
-                        mob.playEffect(org.bukkit.EntityEffect.HURT);
+                        // Play damage hurt flash and sound (use damage() to trigger hurt animation)
+                        mob.damage(0.0);
                         org.bukkit.Sound hurtSound = (mob instanceof org.bukkit.entity.MagmaCube) 
                             ? org.bukkit.Sound.ENTITY_MAGMA_CUBE_HURT 
                             : org.bukkit.Sound.ENTITY_SLIME_HURT;
@@ -1096,7 +1096,18 @@ public class MobListener implements Listener {
                 arrow.setShooter(player);
                 arrow.setVelocity(direction.multiply(2.5));
                 arrow.setPickupStatus(org.bukkit.entity.AbstractArrow.PickupStatus.DISALLOWED);
-                
+
+                // Set arrow damage based on bow level
+                double arrowDamage = switch (bowLevel) {
+                    case 1 -> 4.0;  // Bow
+                    case 2 -> 6.0;  // Crossbow with Quick Charge I
+                    case 3 -> 8.0;  // Crossbow with Quick Charge III + Piercing IV
+                    default -> 4.0;
+                };
+                arrow.setDamage(arrowDamage);
+                plugin.getLogger().info("ARROW SPAWNED - Player: " + player.getName() +
+                    ", Bow level: " + bowLevel + ", Arrow damage set to: " + arrow.getDamage());
+
                 if (item.getType() == org.bukkit.Material.CROSSBOW) {
                     player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
                     if (bowLevel == 3) {
@@ -1147,9 +1158,18 @@ public class MobListener implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
     public void onEntityDamageByEntity(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         org.bukkit.entity.Entity victim = event.getEntity();
+
+        // DEBUG: Log all arrow hits
+        if (event.getDamager() instanceof org.bukkit.entity.Arrow arrow) {
+            plugin.getLogger().info("ARROW HIT - Shooter: " + arrow.getShooter() +
+                ", Victim: " + victim.getType() +
+                ", Damage: " + event.getDamage() +
+                ", Arrow damage: " + arrow.getDamage() +
+                ", Event cancelled: " + event.isCancelled());
+        }
 
         // Wardens are velocity-driven track mobs; cancel any damage they deal (notably the sonic
         // boom) so they never blast allied mobs walking the same path.
@@ -1188,15 +1208,15 @@ public class MobListener implements Listener {
 
         NamespacedKey tdKey = new NamespacedKey(plugin, "td_mob");
 
-        // Only run checks for custom TD Mobs
+        // Only run checks for custom TD Mobs (includes both mobs and mounts)
         if (!victim.getPersistentDataContainer().has(tdKey, PersistentDataType.BYTE)) {
             return;
         }
 
-        // A player's arrow always damages TD mobs natively. The wrong-track cancellation below was
-        // also blocking the player's own custom arrows, so they dealt no damage.
-        if (event.getDamager() instanceof org.bukkit.entity.Projectile proj
-                && proj.getShooter() instanceof org.bukkit.entity.Player) {
+        // ALWAYS block damage to mounts (any entity serving as a vehicle)
+        // Check if victim is carrying a passenger (rider) - if so, it's a mount
+        if (!victim.getPassengers().isEmpty()) {
+            event.setCancelled(true);
             return;
         }
 
@@ -1227,7 +1247,8 @@ public class MobListener implements Listener {
 
             String playerArena = plugin.getGameManager().getPlayerArena(attacker.getUniqueId());
 
-            // Attack is cancelled if player is trying to hit a mob on the opponent's track
+            // Players can ONLY damage mobs on their OWN track (where they placed towers to defend)
+            // Cancel if trying to hit a mob on the OPPONENT's track (where they sent the mobs)
             if (!mobArena.equals(playerArena)) {
                 event.setCancelled(true);
             }

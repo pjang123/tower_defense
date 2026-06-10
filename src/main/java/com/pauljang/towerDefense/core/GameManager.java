@@ -237,12 +237,23 @@ public class GameManager {
             gameWorld.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
         }
 
+        // FIX: First, teleport all queued players from lobby_world to game_world
+        // This ensures they're in game_world before we try to assign them to arenas
+        org.bukkit.Location gameWorldSpawn = gameWorld != null ? gameWorld.getSpawnLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
+        for (java.util.UUID uuid : matchQueue) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && !player.getWorld().getName().equals("game_world")) {
+                player.teleport(gameWorldSpawn);
+                player.sendMessage(ChatColor.GREEN + "Teleporting to the game world!");
+            }
+        }
+
         // Populate matchQueue from the players physically in game_world if not already queued
+        // (This handles the legacy case where players manually enter game_world)
         if (matchQueue.size() < matchSize) {
-            matchQueue.clear();
             if (gameWorld != null) {
                 for (Player p : gameWorld.getPlayers()) {
-                    if (matchQueue.size() < matchSize) {
+                    if (!matchQueue.contains(p.getUniqueId()) && matchQueue.size() < matchSize) {
                         matchQueue.add(p.getUniqueId());
                     }
                 }
@@ -250,7 +261,7 @@ public class GameManager {
         }
 
         // Teleport queued players to their arena starts, assign arenas, and initialize stats
-        org.bukkit.Location spawnLoc = gameWorld != null ? gameWorld.getSpawnLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
+        org.bukkit.Location spawnLoc = gameWorldSpawn;
 
         int count = 0;
         for (java.util.UUID uuid : matchQueue) {
