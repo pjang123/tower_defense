@@ -994,10 +994,16 @@ public class TowerManager {
                         org.bukkit.entity.Entity newVehicle = null;
                         if (vehicleType != null) {
                             newVehicle = finalTeleportLoc.getWorld().spawnEntity(finalTeleportLoc, vehicleType);
-                            // Configure vehicle
+                            // Configure vehicle - use scoreboard team for collision
                             if (newVehicle instanceof org.bukkit.entity.Mob vehicleMob) {
                                 org.bukkit.Bukkit.getMobGoals().removeAllGoals(vehicleMob);
-                                vehicleMob.setCollidable(false);
+                                org.bukkit.scoreboard.Scoreboard scoreboard = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+                                org.bukkit.scoreboard.Team tdMobTeam = scoreboard.getTeam("td_mobs");
+                                if (tdMobTeam == null) {
+                                    tdMobTeam = scoreboard.registerNewTeam("td_mobs");
+                                    tdMobTeam.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE, org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+                                }
+                                tdMobTeam.addEntry(vehicleMob.getUniqueId().toString());
                                 vehicleMob.setRemoveWhenFarAway(false);
                                 vehicleMob.setPersistent(true);
                             }
@@ -1020,8 +1026,14 @@ public class TowerManager {
                             plugin.getLogger().info("[CHORUS DEBUG] Mounted entity on vehicle");
                         }
 
-                        // Restore properties
-                        newEntity.setCollidable(false);
+                        // Restore properties - use scoreboard team for collision instead of setCollidable
+                        org.bukkit.scoreboard.Scoreboard scoreboard = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+                        org.bukkit.scoreboard.Team tdMobTeam = scoreboard.getTeam("td_mobs");
+                        if (tdMobTeam == null) {
+                            tdMobTeam = scoreboard.registerNewTeam("td_mobs");
+                            tdMobTeam.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE, org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+                        }
+                        tdMobTeam.addEntry(newEntity.getUniqueId().toString());
                         newEntity.setRemoveWhenFarAway(false);
                         newEntity.setPersistent(true);
                         org.bukkit.Bukkit.getMobGoals().removeAllGoals(newEntity);

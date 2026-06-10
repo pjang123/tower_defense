@@ -177,8 +177,8 @@ public class MobListener implements Listener {
                             mob.setHealth(newMaxHealth);
                         }
                         
-                        // Play damage hurt flash and sound
-                        mob.playEffect(org.bukkit.EntityEffect.HURT);
+                        // Play damage hurt flash and sound (use damage() to trigger hurt animation)
+                        mob.damage(0.0);
                         org.bukkit.Sound hurtSound = (mob instanceof org.bukkit.entity.MagmaCube) 
                             ? org.bukkit.Sound.ENTITY_MAGMA_CUBE_HURT 
                             : org.bukkit.Sound.ENTITY_SLIME_HURT;
@@ -1096,7 +1096,18 @@ public class MobListener implements Listener {
                 arrow.setShooter(player);
                 arrow.setVelocity(direction.multiply(2.5));
                 arrow.setPickupStatus(org.bukkit.entity.AbstractArrow.PickupStatus.DISALLOWED);
-                
+
+                // Set arrow damage based on bow level
+                double arrowDamage = switch (bowLevel) {
+                    case 1 -> 4.0;  // Bow
+                    case 2 -> 6.0;  // Crossbow with Quick Charge I
+                    case 3 -> 8.0;  // Crossbow with Quick Charge III + Piercing IV
+                    default -> 4.0;
+                };
+                arrow.setDamage(arrowDamage);
+                plugin.getLogger().info("ARROW SPAWNED - Player: " + player.getName() +
+                    ", Bow level: " + bowLevel + ", Arrow damage set to: " + arrow.getDamage());
+
                 if (item.getType() == org.bukkit.Material.CROSSBOW) {
                     player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
                     if (bowLevel == 3) {
@@ -1147,9 +1158,18 @@ public class MobListener implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
     public void onEntityDamageByEntity(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         org.bukkit.entity.Entity victim = event.getEntity();
+
+        // DEBUG: Log all arrow hits
+        if (event.getDamager() instanceof org.bukkit.entity.Arrow arrow) {
+            plugin.getLogger().info("ARROW HIT - Shooter: " + arrow.getShooter() +
+                ", Victim: " + victim.getType() +
+                ", Damage: " + event.getDamage() +
+                ", Arrow damage: " + arrow.getDamage() +
+                ", Event cancelled: " + event.isCancelled());
+        }
 
         // Wardens are velocity-driven track mobs; cancel any damage they deal (notably the sonic
         // boom) so they never blast allied mobs walking the same path.
