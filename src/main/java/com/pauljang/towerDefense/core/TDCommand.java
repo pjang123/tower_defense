@@ -46,7 +46,12 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td accept " + ChatColor.WHITE + "- Accept a pending duel challenge");
                 player.sendMessage(ChatColor.YELLOW + "/td lobby " + ChatColor.WHITE + "- Return to the lobby and leave the queue");
                 player.sendMessage(ChatColor.YELLOW + "/td forfeit " + ChatColor.WHITE + "- Forfeit the active game");
-                player.sendMessage(ChatColor.YELLOW + "/td forcestart " + ChatColor.WHITE + "- Start the countdown with 2+ queued players");
+                player.sendMessage(ChatColor.YELLOW + "/td forcestart " + ChatColor.WHITE + "- Force the multiplayer map vote with the current queue (Admin)");
+                player.sendMessage(ChatColor.YELLOW + "/td start " + ChatColor.WHITE + "- Force-start a single-player match on a random map (Admin)");
+                player.sendMessage(ChatColor.YELLOW + "/td stop " + ChatColor.WHITE + "- End your current match");
+                player.sendMessage(ChatColor.YELLOW + "/td status " + ChatColor.WHITE + "- Show the current game state");
+                player.sendMessage(ChatColor.YELLOW + "/td giveitems " + ChatColor.WHITE + "- Give yourself the GUI menu hotbar items");
+                player.sendMessage(ChatColor.YELLOW + "/td setarena <player> <arena> " + ChatColor.WHITE + "- Assign a player to an arena (Admin)");
                 player.sendMessage(ChatColor.YELLOW + "/td wand " + ChatColor.WHITE + "- Gives you the Setup Wand");
                 player.sendMessage(ChatColor.YELLOW + "/td plotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Setup mode for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td deleteplotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Deletion mode for an arena");
@@ -214,8 +219,101 @@ public class TDCommand implements CommandExecutor {
                 gameManager.forfeit(player);
                 break;
 
+            case "start":
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use this command.");
+                    break;
+                }
+                if (gameManager.getPlayerMatch(player.getUniqueId()) != null) {
+                    player.sendMessage(ChatColor.RED + "You're already in a match! Use /td stop first.");
+                    break;
+                }
+                java.util.List<com.pauljang.towerDefense.data.MapManager.MapData> spMaps =
+                        plugin.getMapManager().getAvailableMaps(true);
+                if (spMaps.isEmpty()) {
+                    player.sendMessage(ChatColor.RED + "No single-player maps found in GAME_WORLD_TEMPLATES/SINGLE_PLAYER/.");
+                    break;
+                }
+                com.pauljang.towerDefense.data.MapManager.MapData chosenMap =
+                        spMaps.get(new java.util.Random().nextInt(spMaps.size()));
+                player.sendMessage(ChatColor.GREEN + "Force-starting a single-player match on "
+                        + chosenMap.getDisplayName() + "...");
+                gameManager.startMatch(java.util.Collections.singletonList(player.getUniqueId()), chosenMap);
+                break;
+
+            case "stop":
+                Match stopMatch = gameManager.getPlayerMatch(player.getUniqueId());
+                if (stopMatch == null) {
+                    player.sendMessage(ChatColor.RED + "You're not in an active match.");
+                    break;
+                }
+                gameManager.endMatch(stopMatch);
+                player.sendMessage(ChatColor.GREEN + "Match ended.");
+                break;
+
+            case "forcestart":
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use this command.");
+                    break;
+                }
+                if (plugin.getQueueManager().forceStartMultiplayer()) {
+                    player.sendMessage(ChatColor.GREEN + "Force-starting the multiplayer map vote with the current queue!");
+                } else {
+                    player.sendMessage(ChatColor.RED + "No players are in the multiplayer queue to force-start.");
+                }
+                break;
+
+            case "upgrades":
+                gameManager.openUpgradesGUI(player);
+                break;
+
+            case "giveitems":
+            case "menuitems":
+                // Mob Spawner menu item (slot 7)
+                org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
+                org.bukkit.inventory.meta.ItemMeta spawnerMeta = spawnerItem.getItemMeta();
+                if (spawnerMeta != null) {
+                    spawnerMeta.setDisplayName(ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Mob Spawner Menu");
+                    spawnerMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Mob Spawner GUI."));
+                    spawnerItem.setItemMeta(spawnerMeta);
+                }
+                player.getInventory().setItem(7, spawnerItem);
+
+                // Player Upgrades menu item (slot 8)
+                org.bukkit.inventory.ItemStack upgradeItem = new org.bukkit.inventory.ItemStack(Material.EMERALD);
+                org.bukkit.inventory.meta.ItemMeta upgradeMeta = upgradeItem.getItemMeta();
+                if (upgradeMeta != null) {
+                    upgradeMeta.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Player Upgrades Menu");
+                    upgradeMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Player Upgrades GUI."));
+                    upgradeItem.setItemMeta(upgradeMeta);
+                }
+                player.getInventory().setItem(8, upgradeItem);
+                player.sendMessage(ChatColor.GREEN + "Gave you the GUI menu hotbar items in slots 7 and 8!");
+                break;
+
+            case "setarena":
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use this command.");
+                    break;
+                }
+                if (args.length < 3) {
+                    player.sendMessage(ChatColor.RED + "Usage: /td setarena <player> <arena>");
+                    break;
+                }
+                Player arenaTarget = org.bukkit.Bukkit.getPlayer(args[1]);
+                if (arenaTarget == null) {
+                    player.sendMessage(ChatColor.RED + "Player not found!");
+                    break;
+                }
+                gameManager.setPlayerArena(arenaTarget.getUniqueId(), args[2]);
+                player.sendMessage(ChatColor.GREEN + "Set " + arenaTarget.getName() + "'s arena to: " + args[2]);
+                arenaTarget.sendMessage(ChatColor.GREEN + "You have been assigned to Arena: " + args[2]);
+                break;
+
             case "status":
-                player.sendMessage(ChatColor.YELLOW + "State: " + gameManager.getCurrentState().name());
+                GameState curState = gameManager.getCurrentState();
+                player.sendMessage(ChatColor.YELLOW + "State: " + (curState != null ? curState.name() : "NONE"));
+                player.sendMessage(ChatColor.YELLOW + "Active matches: " + gameManager.getActiveMatches().size());
                 break;
 
             default:
@@ -260,9 +358,17 @@ public class TDCommand implements CommandExecutor {
     private void loadWorld(Player player, String worldName) {
         plugin.getLogger().info("loadWorld called for: " + worldName);
 
-        // Check if world is already loaded
-        org.bukkit.World existingWorld = org.bukkit.Bukkit.getWorld(worldName);
-        plugin.getLogger().info("Bukkit.getWorld result: " + (existingWorld != null ? existingWorld.getName() : "null"));
+        // Check if world is already loaded. Bukkit.getWorld(name) can miss a world that Paper migrated
+        // into another world's dimensions/ folder or registered under a namespaced key, which made the
+        // check report "not loaded" for a world that actually was — and then re-copy/re-create it. Scan
+        // every loaded world by name as an authoritative fallback.
+        org.bukkit.World existingWorld = findLoadedWorld(worldName);
+        plugin.getLogger().info("Loaded-world lookup for '" + worldName + "': " + (existingWorld != null ? existingWorld.getName() : "null"));
+        if (existingWorld == null) {
+            StringBuilder loaded = new StringBuilder();
+            for (org.bukkit.World w : org.bukkit.Bukkit.getWorlds()) loaded.append(w.getName()).append(" ");
+            plugin.getLogger().info("Currently loaded worlds: " + loaded.toString().trim());
+        }
 
         if (existingWorld != null) {
             player.sendMessage(ChatColor.YELLOW + "World '" + worldName + "' is already loaded!");
@@ -513,6 +619,26 @@ public class TDCommand implements CommandExecutor {
         if (directory.exists()) {
             throw new java.io.IOException("Failed to delete after " + attempts + " attempts: " + directory.getAbsolutePath());
         }
+    }
+
+    /**
+     * Authoritative "is this world loaded" check. Bukkit.getWorld(name) only matches the legacy world
+     * name and can return null for worlds Paper migrated into a dimensions/ folder or registered under a
+     * namespaced key, so we fall back to scanning every loaded world and matching by name (case-
+     * insensitively, and tolerating namespaced/path-suffixed names).
+     */
+    private org.bukkit.World findLoadedWorld(String worldName) {
+        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+        if (world != null) return world;
+        for (org.bukkit.World loaded : org.bukkit.Bukkit.getWorlds()) {
+            String name = loaded.getName();
+            if (name.equalsIgnoreCase(worldName)
+                    || name.endsWith("/" + worldName)
+                    || name.endsWith(":" + worldName)) {
+                return loaded;
+            }
+        }
+        return null;
     }
 
     public File getTemplateSource(String worldName) {

@@ -1,6 +1,7 @@
 package com.pauljang.towerDefense.entities;
 
 import com.pauljang.towerDefense.TowerDefense;
+import com.pauljang.towerDefense.TDKeys;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -200,19 +201,19 @@ public class MobManager {
         }
 
         // Mark as a TD Mob so we can handle events (like sunlight burning)
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+        entity.getPersistentDataContainer().set(TDKeys.MOB, PersistentDataType.BYTE, (byte) 1);
 
         // Store preset key
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, presetKey);
+        entity.getPersistentDataContainer().set(TDKeys.PRESET, PersistentDataType.STRING, presetKey);
 
         // Store gold reward amount in container
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, goldReward);
+        entity.getPersistentDataContainer().set(TDKeys.GOLD_REWARD, PersistentDataType.INTEGER, goldReward);
 
         // Store xp reward amount in container
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, xpReward);
+        entity.getPersistentDataContainer().set(TDKeys.XP_REWARD, PersistentDataType.INTEGER, xpReward);
 
         // Store arena ID in container
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
+        entity.getPersistentDataContainer().set(TDKeys.ARENA, PersistentDataType.STRING, arena);
 
         // Prevent zombification for nether mobs in the overworld
         if (entity instanceof org.bukkit.entity.Piglin piglin) {
@@ -235,11 +236,11 @@ public class MobManager {
         if (immuneToSlow || isSlowShieldActive) {
             // Slow (Prismarine) and Freeze (Ice) now use distinct immunity keys; a slow-immune mob
             // resists both, so tag it with each.
-            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_slow_immune"), PersistentDataType.BYTE, (byte) 1);
-            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_freeze_immune"), PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(TDKeys.SLOW_IMMUNE, PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(TDKeys.FREEZE_IMMUNE, PersistentDataType.BYTE, (byte) 1);
         }
         if (immuneToFire) {
-            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_fire_immune"), PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(TDKeys.FIRE_IMMUNE, PersistentDataType.BYTE, (byte) 1);
         }
 
         // Make the mob immune to knockback via attributes
@@ -349,13 +350,13 @@ public class MobManager {
         if (!profile.getImmunities().isEmpty()) {
             String immunityStr = String.join(",", profile.getImmunities());
             entity.getPersistentDataContainer().set(
-                new org.bukkit.NamespacedKey(plugin, "td_immunities"),
+                TDKeys.IMMUNITIES,
                 org.bukkit.persistence.PersistentDataType.STRING, immunityStr);
         }
 
         // Store the castle damage this mob deals when it reaches the end of the track.
         entity.getPersistentDataContainer().set(
-            new org.bukkit.NamespacedKey(plugin, "td_castle_damage"),
+            TDKeys.CASTLE_DAMAGE,
             org.bukkit.persistence.PersistentDataType.INTEGER, Math.max(1, (int) Math.round(profile.getDamage())));
 
         // Record this mob's tier on its TDMob wrapper (the most recent entry spawnMob appended).
@@ -421,7 +422,7 @@ public class MobManager {
                 }
                 // Mark ALL mounts as TD mobs (prevents burning in sunlight AND protects from player damage)
                 mount.getPersistentDataContainer().set(
-                    new NamespacedKey(plugin, "td_mob"),
+                    TDKeys.MOB,
                     PersistentDataType.BYTE, (byte) 1);
                 mount.addPassenger(entity);
             }
@@ -483,17 +484,17 @@ public class MobManager {
 
         // Mark as TD mob
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+            TDKeys.MOB, PersistentDataType.BYTE, (byte) 1);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, "zombie");
+            TDKeys.PRESET, PersistentDataType.STRING, "zombie");
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, 2);
+            TDKeys.GOLD_REWARD, PersistentDataType.INTEGER, 2);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, 7);
+            TDKeys.XP_REWARD, PersistentDataType.INTEGER, 7);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
+            TDKeys.ARENA, PersistentDataType.STRING, arena);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_castle_damage"), PersistentDataType.INTEGER, 1);
+            TDKeys.CASTLE_DAMAGE, PersistentDataType.INTEGER, 1);
 
         // Set zombie stats (Tier 1 from CSV: HP=80, Speed=2.0)
         org.bukkit.attribute.AttributeInstance kbResist = zombie.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
@@ -571,7 +572,7 @@ public class MobManager {
         // but still honour a real POISON effect if some other source applied one.
         boolean poisoned = mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON);
         if (!poisoned) {
-            org.bukkit.NamespacedKey poisonedUntilKey = new NamespacedKey(plugin, "td_poisoned_until");
+            org.bukkit.NamespacedKey poisonedUntilKey = TDKeys.POISONED_UNTIL;
             if (mob.getPersistentDataContainer().has(poisonedUntilKey, PersistentDataType.LONG)) {
                 long poisonUntil = mob.getPersistentDataContainer().get(poisonedUntilKey, PersistentDataType.LONG);
                 if (System.currentTimeMillis() < poisonUntil) poisoned = true;
@@ -582,7 +583,7 @@ public class MobManager {
         }
         // Freeze (Ice Tower, PDC key). The Ice Tower also natively applies SLOWNESS, so the snail is
         // suppressed while frozen to avoid showing both ❄ and 🐌 for the same effect.
-        org.bukkit.NamespacedKey frozenKey = new NamespacedKey(plugin, "td_frozen_until");
+        org.bukkit.NamespacedKey frozenKey = TDKeys.FROZEN_UNTIL;
         boolean isFrozen = false;
         if (mob.getPersistentDataContainer().has(frozenKey, PersistentDataType.LONG)) {
             long freezeEnd = mob.getPersistentDataContainer().get(frozenKey, PersistentDataType.LONG);
@@ -596,7 +597,7 @@ public class MobManager {
             status.append(" ").append(org.bukkit.ChatColor.BLUE).append("🐌");
         }
         // Vulnerable (Dripstone hazard tiles, +15% damage taken)
-        org.bukkit.NamespacedKey vulnKey = new NamespacedKey(plugin, "td_vulnerable_until");
+        org.bukkit.NamespacedKey vulnKey = TDKeys.VULNERABLE_UNTIL;
         if (mob.getPersistentDataContainer().has(vulnKey, PersistentDataType.LONG)) {
             long vulnUntil = mob.getPersistentDataContainer().get(vulnKey, PersistentDataType.LONG);
             if (System.currentTimeMillis() < vulnUntil) {
@@ -661,13 +662,13 @@ public class MobManager {
                         }
 
                         // Poison damage-over-time.
-                        org.bukkit.NamespacedKey poisonedUntilKey = new org.bukkit.NamespacedKey(plugin, "td_poisoned_until");
+                        org.bukkit.NamespacedKey poisonedUntilKey = TDKeys.POISONED_UNTIL;
                         if (mob.getEntity().getPersistentDataContainer().has(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
                             long poisonUntil = mob.getEntity().getPersistentDataContainer().get(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
                             if (System.currentTimeMillis() < poisonUntil) {
                                 if (tickCounter % 20 == 0) {
                                     double pdmg = mob.getEntity().getPersistentDataContainer().getOrDefault(
-                                            new org.bukkit.NamespacedKey(plugin, "td_poison_damage"),
+                                            TDKeys.POISON_DAMAGE,
                                             org.bukkit.persistence.PersistentDataType.DOUBLE, 1.0);
                                     mob.getEntity().damage(pdmg);
                                     mob.getEntity().getWorld().spawnParticle(org.bukkit.Particle.WITCH,
@@ -723,7 +724,7 @@ public class MobManager {
      */
     private boolean isVelocityDriven(org.bukkit.entity.Mob entity, double heightOffset) {
         return entity.getPersistentDataContainer().has(
-                new org.bukkit.NamespacedKey(plugin, "td_mob"),
+                TDKeys.MOB,
                 org.bukkit.persistence.PersistentDataType.BYTE);
     }
 
@@ -752,7 +753,7 @@ public class MobManager {
 
         // Freeze status check (applied by Ice Towers)
         boolean isFrozen = false;
-        org.bukkit.NamespacedKey freezeUntilKey = new org.bukkit.NamespacedKey(plugin, "td_frozen_until");
+        org.bukkit.NamespacedKey freezeUntilKey = TDKeys.FROZEN_UNTIL;
         if (mob.getEntity().getPersistentDataContainer().has(freezeUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
             long frozenUntil = mob.getEntity().getPersistentDataContainer().get(freezeUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
             if (System.currentTimeMillis() < frozenUntil) {
@@ -799,7 +800,7 @@ public class MobManager {
         boolean isFreezeActive = plugin.getGameManager().isSpellActive(match, mobArena, "FREEZE");
         boolean isHasteActive = plugin.getGameManager().isSpellActive(match, mobArena, "HASTE_RUSH");
         boolean isSlowImmune = mob.getEntity().getPersistentDataContainer().has(
-            new org.bukkit.NamespacedKey(plugin, "td_slow_immune"),
+            TDKeys.SLOW_IMMUNE,
             org.bukkit.persistence.PersistentDataType.BYTE
         );
 
@@ -814,7 +815,7 @@ public class MobManager {
         }
 
         String presetKey = mob.getEntity().getPersistentDataContainer().get(
-            new org.bukkit.NamespacedKey(plugin, "td_preset"),
+            TDKeys.PRESET,
             org.bukkit.persistence.PersistentDataType.STRING
         );
         if (presetKey == null) presetKey = mob.getEntity().getType().name().toLowerCase();
@@ -964,7 +965,7 @@ public class MobManager {
         if (entity.getType() == EntityType.CREEPER) {
             return plugin.getConfig().getInt("mobs.creeper.castle-damage", 5);
         }
-        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "td_castle_damage");
+        org.bukkit.NamespacedKey key = TDKeys.CASTLE_DAMAGE;
         if (entity.getPersistentDataContainer().has(key, org.bukkit.persistence.PersistentDataType.INTEGER)) {
             return entity.getPersistentDataContainer().get(key, org.bukkit.persistence.PersistentDataType.INTEGER);
         }

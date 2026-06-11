@@ -1,0 +1,327 @@
+{
+  "bug_fixing/gemini-code-1781146264874.java": {
+    "mtime": 1781146267.578474,
+    "ast_hash": "f9a0dad4bb87e23ee7b61121538f0769",
+    "semantic_hash": "f9a0dad4bb87e23ee7b61121538f0769"
+  },
+  "src/main/java/com/pauljang/towerDefense/TowerDefense.java": {
+    "mtime": 1781160685.3582654,
+    "ast_hash": "ab46a6f2eef94fb547e6c978b2c3f112",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/core/GameManager.java": {
+    "mtime": 1781160229.6040092,
+    "ast_hash": "b8e78368427f8b3e3d3a359718586ca5",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/core/GameState.java": {
+    "mtime": 1780449929.4393156,
+    "ast_hash": "df9c47014e6f66bbe732e05d383cb869",
+    "semantic_hash": "df9c47014e6f66bbe732e05d383cb869"
+  },
+  "src/main/java/com/pauljang/towerDefense/core/Match.java": {
+    "mtime": 1781158059.277205,
+    "ast_hash": "2885261c940523914a8d26291f8cdb9d",
+    "semantic_hash": "2885261c940523914a8d26291f8cdb9d"
+  },
+  "src/main/java/com/pauljang/towerDefense/core/QueueManager.java": {
+    "mtime": 1781160250.9505482,
+    "ast_hash": "55ea53c5f2c060ed8eeed932fa05a252",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/core/TDCommand.java": {
+    "mtime": 1781160285.3757746,
+    "ast_hash": "ac6dce34c36e8530138846d730a1e0b9",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/core/WaveManager.java": {
+    "mtime": 1781160207.441478,
+    "ast_hash": "ef42d91d3338cd536d23b1ca107c4532",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/data/MapManager.java": {
+    "mtime": 1781158059.279714,
+    "ast_hash": "bd84d875d74191b7d3645d96e8002144",
+    "semantic_hash": "bd84d875d74191b7d3645d96e8002144"
+  },
+  "src/main/java/com/pauljang/towerDefense/data/PlotConfigManager.java": {
+    "mtime": 1781158059.2807193,
+    "ast_hash": "5ce1f865aa980f166edcfcd3e1560e8d",
+    "semantic_hash": "5ce1f865aa980f166edcfcd3e1560e8d"
+  },
+  "src/main/java/com/pauljang/towerDefense/data/TDWaypoint.java": {
+    "mtime": 1780552482.8093722,
+    "ast_hash": "72d6d287de2bb38c369dda3cb5a8da30",
+    "semantic_hash": "72d6d287de2bb38c369dda3cb5a8da30"
+  },
+  "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java": {
+    "mtime": 1781158059.2807193,
+    "ast_hash": "5f2938a6e13c92d3f1e1b67ff757faaf",
+    "semantic_hash": "5f2938a6e13c92d3f1e1b67ff757faaf"
+  },
+  "src/main/java/com/pauljang/towerDefense/entities/MobManager.java": {
+    "mtime": 1781160701.4765038,
+    "ast_hash": "956b66bdb992600af2f80f6ca5442971",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/entities/MobStateProfile.java": {
+    "mtime": 1780778911.6627192,
+    "ast_hash": "b0875b6b81f798e0bfebfdf70a3df172",
+    "semantic_hash": "b0875b6b81f798e0bfebfdf70a3df172"
+  },
+  "src/main/java/com/pauljang/towerDefense/entities/MobUpgradeRegistry.java": {
+    "mtime": 1780995044.2630703,
+    "ast_hash": "9de9ebba4d06ed19ed76c61e3d0d483f",
+    "semantic_hash": "9de9ebba4d06ed19ed76c61e3d0d483f"
+  },
+  "src/main/java/com/pauljang/towerDefense/entities/PresetMobType.java": {
+    "mtime": 1780761230.135053,
+    "ast_hash": "1c94c776749f897b0bf68c3ff2ef338f",
+    "semantic_hash": "1c94c776749f897b0bf68c3ff2ef338f"
+  },
+  "src/main/java/com/pauljang/towerDefense/entities/TDMob.java": {
+    "mtime": 1781068555.92065,
+    "ast_hash": "092f60acc7233e750d80639fa7f8486b",
+    "semantic_hash": "092f60acc7233e750d80639fa7f8486b"
+  },
+  "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java": {
+    "mtime": 1781160702.8912377,
+    "ast_hash": "90e4fc2bf3e0e69d03a4eb5f11f450cb",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/listeners/WandListener.java": {
+    "mtime": 1780639774.3959286,
+    "ast_hash": "5ff21808aecf7fd36d56c28f568c9d9d",
+    "semantic_hash": "5ff21808aecf7fd36d56c28f568c9d9d"
+  },
+  "src/main/java/com/pauljang/towerDefense/listeners/WorldUnloadListener.java": {
+    "mtime": 1781158059.2837226,
+    "ast_hash": "b34f21bd75f045c6e06557ba4d9dfe29",
+    "semantic_hash": "b34f21bd75f045c6e06557ba4d9dfe29"
+  },
+  "src/main/java/com/pauljang/towerDefense/setup/SetupManager.java": {
+    "mtime": 1780631880.694519,
+    "ast_hash": "63a5556bcb98a8057637bfe544137889",
+    "semantic_hash": "63a5556bcb98a8057637bfe544137889"
+  },
+  "src/main/java/com/pauljang/towerDefense/towers/TargetingMode.java": {
+    "mtime": 1780506985.0222023,
+    "ast_hash": "e23a4d732506c6f4511863141068eda2",
+    "semantic_hash": "e23a4d732506c6f4511863141068eda2"
+  },
+  "src/main/java/com/pauljang/towerDefense/towers/Tower.java": {
+    "mtime": 1781071801.9693666,
+    "ast_hash": "784fb2252afd968103b00c7faab70e0f",
+    "semantic_hash": "784fb2252afd968103b00c7faab70e0f"
+  },
+  "src/main/java/com/pauljang/towerDefense/towers/TowerConfigManager.java": {
+    "mtime": 1781129648.147933,
+    "ast_hash": "e4150177ce41100f777420b445f3394b",
+    "semantic_hash": "e4150177ce41100f777420b445f3394b"
+  },
+  "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java": {
+    "mtime": 1781160704.1713698,
+    "ast_hash": "f1e6fe1f81492d220aade4bd15d4710e",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/pauljang/towerDefense/towers/TowerType.java": {
+    "mtime": 1781071746.2611983,
+    "ast_hash": "2008b53c214d7a5e89ac0144469363f3",
+    "semantic_hash": "2008b53c214d7a5e89ac0144469363f3"
+  },
+  "MAP_SETUP_GUIDE.md": {
+    "mtime": 1781158059.2717018,
+    "ast_hash": "e8763c075b3f7ca9cc5e43bb814327bc",
+    "semantic_hash": "e8763c075b3f7ca9cc5e43bb814327bc"
+  },
+  "MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md": {
+    "mtime": 1781158059.2727015,
+    "ast_hash": "e6a4014d55236fd9f9d31d147890022e",
+    "semantic_hash": "e6a4014d55236fd9f9d31d147890022e"
+  },
+  "PRELIMINARY_BALANCING.md": {
+    "mtime": 1780507037.398548,
+    "ast_hash": "0aca8c2d2bdd5c06fb587e862849a30d",
+    "semantic_hash": "0aca8c2d2bdd5c06fb587e862849a30d"
+  },
+  "PROJECT_DESCRIPTION.md": {
+    "mtime": 1781068555.9176497,
+    "ast_hash": "b1829c08204530a1a9df3ca3ca5507fb",
+    "semantic_hash": "b1829c08204530a1a9df3ca3ca5507fb"
+  },
+  "PROJECT_STRUCTURE.md": {
+    "mtime": 1780777468.3024824,
+    "ast_hash": "d1432e66be50f5c6928b688bba069186",
+    "semantic_hash": "d1432e66be50f5c6928b688bba069186"
+  },
+  "PROJECT_SUMMARY.md": {
+    "mtime": 1780630101.8370316,
+    "ast_hash": "c2df632d1050caf634ef64c358b80832",
+    "semantic_hash": "c2df632d1050caf634ef64c358b80832"
+  },
+  "README.md": {
+    "mtime": 1780449142.5973952,
+    "ast_hash": "ac2e1a9298c61f03f756ab6d6437b953",
+    "semantic_hash": "ac2e1a9298c61f03f756ab6d6437b953"
+  },
+  "SESSION_CONTEXT.md": {
+    "mtime": 1780790287.7291262,
+    "ast_hash": "9db600403cc84a1fff5c3ffb50831229",
+    "semantic_hash": "9db600403cc84a1fff5c3ffb50831229"
+  },
+  "TOWERS.md": {
+    "mtime": 1780548842.9905791,
+    "ast_hash": "d6a8651ff2e40a2036dbfea5c1d21188",
+    "semantic_hash": "d6a8651ff2e40a2036dbfea5c1d21188"
+  },
+  "bug_fixing/MOB_UPDATE_6_6_25.md": {
+    "mtime": 1780782526.789169,
+    "ast_hash": "4f0f7320d596cbd107234d5e76a60838",
+    "semantic_hash": "4f0f7320d596cbd107234d5e76a60838"
+  },
+  "bug_fixing/commit_msg.txt": {
+    "mtime": 1780646486.0777657,
+    "ast_hash": "429dac3bebc2cda9d1b5decce8f8e278",
+    "semantic_hash": "429dac3bebc2cda9d1b5decce8f8e278"
+  },
+  "bug_fixing/mob_implementation_guide.md": {
+    "mtime": 1780995044.2560544,
+    "ast_hash": "f732affab55704b1307c910f7d378c19",
+    "semantic_hash": "f732affab55704b1307c910f7d378c19"
+  },
+  "bug_fixing/tower_agent_specification.md": {
+    "mtime": 1781070019.7823186,
+    "ast_hash": "9e0ab880990d9fbf075864bf5205a934",
+    "semantic_hash": "9e0ab880990d9fbf075864bf5205a934"
+  },
+  "bug_fixing/tower_defense_code_fixes_batch6.md": {
+    "mtime": 1781036404.3569624,
+    "ast_hash": "177363dcedd3f59c7b5b5b891a5f2395",
+    "semantic_hash": "177363dcedd3f59c7b5b5b891a5f2395"
+  },
+  "bug_fixing/tower_defense_final_adjustments.md": {
+    "mtime": 1781128744.0208385,
+    "ast_hash": "d07ee498904f83c4506d4e606860c0ca",
+    "semantic_hash": "d07ee498904f83c4506d4e606860c0ca"
+  },
+  "bug_fixing/tower_defense_final_adjustments_v5.md": {
+    "mtime": 1781032076.1879523,
+    "ast_hash": "75eaf52c98f959721290c5045b0eedcc",
+    "semantic_hash": "75eaf52c98f959721290c5045b0eedcc"
+  },
+  "bug_fixing/tower_defense_final_polish.md": {
+    "mtime": 1781029329.5872266,
+    "ast_hash": "ac21d6268d74e13973b30037837bbdb5",
+    "semantic_hash": "ac21d6268d74e13973b30037837bbdb5"
+  },
+  "bug_fixing/tower_defense_fixes.md": {
+    "mtime": 1780995044.2590685,
+    "ast_hash": "ba217e4f64cc6e5746aa4856f2334f53",
+    "semantic_hash": "ba217e4f64cc6e5746aa4856f2334f53"
+  },
+  "bug_fixing/tower_defense_fixes_batch7.md": {
+    "mtime": 1781137709.4084532,
+    "ast_hash": "1fa5f31b34ab0f4fc8fc2106ec627122",
+    "semantic_hash": "1fa5f31b34ab0f4fc8fc2106ec627122"
+  },
+  "bug_fixing/tower_defense_fixes_batch8.md": {
+    "mtime": 1781139519.755077,
+    "ast_hash": "1f3c68f1cd254196cfa140e640f073a6",
+    "semantic_hash": "1f3c68f1cd254196cfa140e640f073a6"
+  },
+  "bug_fixing/tower_defense_fixes_batch9.md": {
+    "mtime": 1781145576.3167925,
+    "ast_hash": "6a03062b2969af969c408e240a64adf0",
+    "semantic_hash": "6a03062b2969af969c408e240a64adf0"
+  },
+  "bug_fixing/tower_defense_polish_fixes.md": {
+    "mtime": 1781023604.23892,
+    "ast_hash": "5842c7de9455d33849f80fa8a2e2c7b7",
+    "semantic_hash": "5842c7de9455d33849f80fa8a2e2c7b7"
+  },
+  "bug_fixing/tower_defense_progression_fixes.md": {
+    "mtime": 1781025427.772205,
+    "ast_hash": "ae12b6722bb59617d242f26646eea973",
+    "semantic_hash": "ae12b6722bb59617d242f26646eea973"
+  },
+  "bug_fixing/tower_defense_update_2.md": {
+    "mtime": 1780995044.2590685,
+    "ast_hash": "b675eee19a728a8d86e5c81dff30d567",
+    "semantic_hash": "b675eee19a728a8d86e5c81dff30d567"
+  },
+  "bug_fixing/tower_defense_update_3.md": {
+    "mtime": 1780995044.2590685,
+    "ast_hash": "ded51b036ff5e91a44752f617587b696",
+    "semantic_hash": "ded51b036ff5e91a44752f617587b696"
+  },
+  "bug_fixing/tower_defense_update_claude_v2.md": {
+    "mtime": 1780995044.2660708,
+    "ast_hash": "c2ed0160bbae9b14db5c9c33cb6fd4ab",
+    "semantic_hash": "c2ed0160bbae9b14db5c9c33cb6fd4ab"
+  },
+  "bug_fixing/ui_pathing_and_siege_combined.md": {
+    "mtime": 1781031151.6837587,
+    "ast_hash": "2f94ac981a9af440492139d3b565aa51",
+    "semantic_hash": "2f94ac981a9af440492139d3b565aa51"
+  },
+  "bug_fixing/update_big.md": {
+    "mtime": 1780995044.2660708,
+    "ast_hash": "3c71c32eff72f5dd5290da08febe4a25",
+    "semantic_hash": "3c71c32eff72f5dd5290da08febe4a25"
+  },
+  "classpath.txt": {
+    "mtime": 1780748268.2864575,
+    "ast_hash": "cc460ea81ca9e2b7ce8d3484cda14987",
+    "semantic_hash": "cc460ea81ca9e2b7ce8d3484cda14987"
+  },
+  "map_yamls/mp_map0.yml": {
+    "mtime": 1781158059.274701,
+    "ast_hash": "14c50a1977674fa12b590addf7b9d5a2",
+    "semantic_hash": "14c50a1977674fa12b590addf7b9d5a2"
+  },
+  "map_yamls/mp_map1.yml": {
+    "mtime": 1781158059.274701,
+    "ast_hash": "11ba0db5d48cbb946d94e71cb2574177",
+    "semantic_hash": "11ba0db5d48cbb946d94e71cb2574177"
+  },
+  "map_yamls/sp_map1.yml": {
+    "mtime": 1781158059.274701,
+    "ast_hash": "04058e32d0f439f75ecac69e1ed72fa9",
+    "semantic_hash": "04058e32d0f439f75ecac69e1ed72fa9"
+  },
+  "src/main/resources/config.yml": {
+    "mtime": 1781158059.2857234,
+    "ast_hash": "c606c5b6b2acb76927455ad507988500",
+    "semantic_hash": "c606c5b6b2acb76927455ad507988500"
+  },
+  "src/main/resources/plugin.yml": {
+    "mtime": 1780630377.4089394,
+    "ast_hash": "26f5a50d000e615fdfac437f640989f0",
+    "semantic_hash": "26f5a50d000e615fdfac437f640989f0"
+  },
+  "src/main/resources/towers.yaml": {
+    "mtime": 1781158059.2867239,
+    "ast_hash": "928d014b22f35bde90a530a1e8099287",
+    "semantic_hash": "928d014b22f35bde90a530a1e8099287"
+  },
+  "src/main/resources/waves.yml": {
+    "mtime": 1781158059.2867239,
+    "ast_hash": "b0f36e084b261671f9ff13f19606582c",
+    "semantic_hash": "b0f36e084b261671f9ff13f19606582c"
+  },
+  "bug_fixing/world_folder.png": {
+    "mtime": 1781158059.2737007,
+    "ast_hash": "927344867c2305813c5860c564bcd9ef",
+    "semantic_hash": "927344867c2305813c5860c564bcd9ef"
+  },
+  "src/main/java/com/pauljang/towerDefense/TDKeys.java": {
+    "mtime": 1781160680.4053338,
+    "ast_hash": "9d0a00d98f4889ce18665cf552448fe4",
+    "semantic_hash": ""
+  },
+  "gemini-code-1781158577643.md": {
+    "mtime": 1781158579.5427938,
+    "ast_hash": "62eadb21ea924d53a1371598e26f7800",
+    "semantic_hash": ""
+  }
+}

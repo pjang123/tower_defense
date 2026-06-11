@@ -26,6 +26,18 @@ public class QueueManager {
 
     public void toggleQueue(Player player, boolean singlePlayer) {
         UUID uuid = player.getUniqueId();
+
+        // Once map voting has begun the player has been pulled out of the queue and is about to be
+        // teleported into a match world — don't let them re-queue and end up double-booked.
+        if (activeVotes.containsKey(uuid)) {
+            player.sendMessage(ChatColor.RED + "You're already being placed into a game! Please wait for the map vote to finish.");
+            return;
+        }
+        if (plugin.getGameManager().getPlayerMatch(uuid) != null) {
+            player.sendMessage(ChatColor.RED + "You're already in a game. Use /td forfeit to leave first.");
+            return;
+        }
+
         if (singlePlayer) {
             if (singlePlayerQueue.remove(uuid)) {
                 player.sendMessage(ChatColor.YELLOW + "You left the Single Player queue.");
@@ -97,6 +109,18 @@ public class QueueManager {
 
     public VotingSession getSession(UUID uuid) {
         return activeVotes.get(uuid);
+    }
+
+    /**
+     * Admin force-start: immediately begin the multiplayer map vote with whoever is currently queued,
+     * bypassing the usual players-per-match wait. Returns false if the multiplayer queue is empty.
+     */
+    public boolean forceStartMultiplayer() {
+        if (multiPlayerQueue.isEmpty()) return false;
+        List<UUID> players = new ArrayList<>(multiPlayerQueue);
+        multiPlayerQueue.clear();
+        startVoting(players, false);
+        return true;
     }
 
     public class VotingSession {

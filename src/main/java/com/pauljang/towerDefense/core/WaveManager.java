@@ -55,8 +55,14 @@ public class WaveManager {
             ticker = new BukkitRunnable() {
                 @Override
                 public void run() {
-                    if (match.getCurrentState() != GameState.ACTIVE) {
+                    // The wave ticker can fire on the same tick the start countdown finishes, before the
+                    // match flips to ACTIVE. Only stop permanently once the match has ENDED; while it's
+                    // still STARTING, wait rather than cancelling (otherwise waves never spawn).
+                    if (match.getCurrentState() == GameState.ENDED) {
                         cancel();
+                        return;
+                    }
+                    if (match.getCurrentState() != GameState.ACTIVE) {
                         return;
                     }
 

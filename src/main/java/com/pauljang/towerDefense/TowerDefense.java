@@ -35,6 +35,9 @@ public final class TowerDefense extends JavaPlugin {
         // Save default config.yml
         saveDefaultConfig();
 
+        // Build the shared NamespacedKeys before any manager spawns mobs or reads PDC data.
+        TDKeys.init(this);
+
         // Create structures directory if it doesn't exist
         java.io.File structuresDir = new java.io.File(getDataFolder(), "structures");
         if (!structuresDir.exists()) {

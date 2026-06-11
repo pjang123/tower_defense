@@ -115,6 +115,12 @@ public class GameManager {
         Match match = new Match(plugin, mapData);
         activeMatches.put(match.getMatchId(), match);
 
+        // The singleton subsystems (tower firing in TowerManager, mob combat/gold in MobListener,
+        // and the passive-income/spell tickers in this class) all gate on the global currentState.
+        // The new per-match flow tracks state on the Match, so we must also drive the global state
+        // or the game never "wakes up" after players are teleported in.
+        currentState = GameState.STARTING;
+
         plugin.getLogger().info("Starting match with map: " + mapData.getDisplayName() + " (ID: " + mapData.getId() + ")");
         plugin.getLogger().info("Map is Single Player: " + mapData.isSinglePlayer());
         plugin.getLogger().info("Template directory: " + mapData.getDirectory().getAbsolutePath());
@@ -251,6 +257,11 @@ public class GameManager {
                 }
 
                 match.setCurrentState(GameState.ACTIVE);
+                // Wake the singleton subsystems (towers, mob combat, passive gold/HUD tickers) which
+                // still read the global state. Without this the match world loads and players spawn,
+                // but nothing actually runs — the "game never starts" symptom.
+                currentState = GameState.ACTIVE;
+                matchStartTime = System.currentTimeMillis();
                 plugin.getLogger().info("Match " + match.getMatchId() + " is now ACTIVE");
             }
         }, 0L, 20L); // Run every second
@@ -912,29 +923,12 @@ public class GameManager {
             plugin.getLogger().info("Deleted migrated game_world folder in " + primaryWorldName + " directory.");
         }
 
-        // 3. Copy the game_world_template directory to game_world
-        java.io.File templateFolder = new java.io.File(org.bukkit.Bukkit.getWorldContainer(), "game_world_template");
-        if (templateFolder.exists()) {
-            try {
-                copyDirectory(templateFolder, gameWorldFolder);
-                plugin.getLogger().info("Successfully copied game_world_template to game_world.");
-            } catch (java.io.IOException e) {
-                plugin.getLogger().severe("Failed to copy game_world_template to game_world: " + e.getMessage());
-                e.printStackTrace();
-            }
-        } else {
-            plugin.getLogger().warning("game_world_template folder not found! A new empty world will be generated.");
-        }
-
-        // 4. Load the fresh game_world map
-        org.bukkit.WorldCreator gameCreator = new org.bukkit.WorldCreator("game_world");
-        org.bukkit.World createdWorld = org.bukkit.Bukkit.createWorld(gameCreator);
-        if (createdWorld != null) {
-            createdWorld.setDifficulty(org.bukkit.Difficulty.EASY);
-            createdWorld.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
-            createdWorld.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
-        }
-        plugin.getLogger().info("game_world loaded successfully.");
+        // The legacy single "game_world" is no longer used: the multi-map architecture clones a fresh
+        // per-match world (match_xxxx) for every game from GAME_WORLD_TEMPLATES. We deliberately do NOT
+        // recreate game_world here anymore — recreating it caused Paper to migrate a stray world into
+        // lobby_world/dimensions/minecraft/game_world on every startup. This method now only cleans up
+        // any leftover game_world folders from older versions.
+        plugin.getLogger().info("game_world reset complete (legacy world intentionally not recreated).");
     }
 
     private void deleteDirectory(java.io.File file) {
@@ -1125,7 +1119,67 @@ public class GameManager {
     }
 
     private void handleMatchEnd(Match match) {
-        // Logic to return players to lobby and delete world
+        endMatch(match);
+    }
+
+    /**
+     * Cleanly tears down a match: stops its wave session, returns its players to the lobby, releases its
+     * per-match plot/waypoint config, and unloads + deletes its cloned world (both the server-root copy
+     * and Paper's migrated copy under the primary world's dimensions/ folder). When the last match ends
+     * the global state drops back to LOBBY so the singleton tower/mob/gold systems go dormant again.
+     */
+    public void endMatch(Match match) {
+        if (match == null) return;
+
+        activeMatches.remove(match.getMatchId());
+        plugin.getWaveManager().stopWaves(match);
+
+        org.bukkit.World lobby = Bukkit.getWorld("lobby_world");
+        Location lobbySpawn = lobby != null ? lobby.getSpawnLocation() : Bukkit.getWorlds().get(0).getSpawnLocation();
+        for (UUID id : new ArrayList<>(match.getPlayers())) {
+            playerToMatch.remove(id);
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                p.getInventory().clear();
+                p.teleport(lobbySpawn);
+                p.setGameMode(org.bukkit.GameMode.ADVENTURE);
+                p.setAllowFlight(true);
+                giveLobbyItems(p);
+                p.sendMessage(ChatColor.YELLOW + "The match has ended. You have been returned to the lobby.");
+            }
+        }
+
+        // Release per-match config so a future match on the same template loads fresh.
+        plugin.getWaypointConfigManager().unloadMatch(match);
+        plugin.getPlotConfigManager().unloadMatch(match);
+
+        // Unload and delete the cloned match world.
+        org.bukkit.World world = match.getWorld();
+        if (world != null && !world.getPlayers().isEmpty()) {
+            for (Player p : world.getPlayers()) p.teleport(lobbySpawn);
+        }
+        if (world != null) {
+            final String worldName = world.getName();
+            Bukkit.unloadWorld(world, false);
+            System.gc(); // release file locks (Windows)
+
+            File container = Bukkit.getWorldContainer();
+            File worldFolder = new File(container, worldName);
+            String primaryWorldName = Bukkit.getWorlds().isEmpty() ? "lobby_world" : Bukkit.getWorlds().get(0).getName();
+            File migratedFolder = new File(container, primaryWorldName + "/dimensions/minecraft/" + worldName);
+
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (worldFolder.exists()) deleteDirectory(worldFolder);
+                if (migratedFolder.exists()) deleteDirectory(migratedFolder);
+                plugin.getLogger().info("Cleaned up match world: " + worldName);
+            }, 40L);
+        }
+
+        // Drop the global state once no matches remain so towers/mobs/gold stop ticking in the lobby.
+        if (activeMatches.isEmpty()) {
+            currentState = GameState.LOBBY;
+        }
+        plugin.getLogger().info("Match " + match.getMatchId() + " ended and cleaned up.");
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.pauljang.towerDefense.towers;
 
 import com.pauljang.towerDefense.TowerDefense;
+import com.pauljang.towerDefense.TDKeys;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -710,7 +711,7 @@ public class TowerManager {
         }
         if (tick % 2 != 0) return;
         String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
-        org.bukkit.NamespacedKey vulnKey = new org.bukkit.NamespacedKey(plugin, "td_vulnerable_until");
+        org.bukkit.NamespacedKey vulnKey = TDKeys.VULNERABLE_UNTIL;
         long until = System.currentTimeMillis() + 4000L;
         for (Location tile : tower.getHazardTiles()) {
             for (Mob mob : getMobsInRadius(tile, 1.5, arena)) {
@@ -817,7 +818,7 @@ public class TowerManager {
                     b.setPersistent(true);
                     b.setRemoveWhenFarAway(false);
                     // td_tower_pet (not td_mob): keeps bees out of mob rewards/health-bar systems
-                    b.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "td_tower_pet"),
+                    b.getPersistentDataContainer().set(TDKeys.TOWER_PET,
                             org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
                     try {
                         org.bukkit.Bukkit.getMobGoals().removeAllGoals(b);
@@ -903,7 +904,7 @@ public class TowerManager {
             if (!mob.getWorld().equals(towerLoc.getWorld())) continue;
 
             String mobArena = mob.getPersistentDataContainer().get(
-                new org.bukkit.NamespacedKey(plugin, "td_arena"),
+                TDKeys.ARENA,
                 org.bukkit.persistence.PersistentDataType.STRING
             );
             if (mobArena == null) mobArena = "1";
@@ -1027,7 +1028,7 @@ public class TowerManager {
                 int fireTicks = plugin.getTowerConfigManager().getStat(TowerType.FIRE, tower.getLevel(), "fire_ticks", 60 + (tower.getLevel() - 1) * 40);
                 double damage = tower.getDamage();
                 java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
-                org.bukkit.NamespacedKey fireDmgKey = new org.bukkit.NamespacedKey(plugin, "td_fire_damage");
+                org.bukkit.NamespacedKey fireDmgKey = TDKeys.FIRE_DAMAGE;
                 for (Mob mob : targets) {
                     mob.setFireTicks(fireTicks);
                     mob.getPersistentDataContainer().set(fireDmgKey, org.bukkit.persistence.PersistentDataType.DOUBLE, damage);
@@ -1165,7 +1166,7 @@ public class TowerManager {
                     // Adjust Y coordinate - waypoints are at block level, mobs need to be higher
                     // Check if this is a flying mob first
                     String presetKey = target.getPersistentDataContainer().get(
-                        new org.bukkit.NamespacedKey(plugin, "td_preset"),
+                        TDKeys.PRESET,
                         org.bukkit.persistence.PersistentDataType.STRING
                     );
                     if (presetKey == null) presetKey = target.getType().name().toLowerCase();
@@ -1269,7 +1270,7 @@ public class TowerManager {
                             // Mark the mount as a TD mob so it doesn't burn in sunlight (existing listener handles td_mob tag)
                             if (newVehicle instanceof org.bukkit.entity.AbstractHorse horse) {
                                 horse.getPersistentDataContainer().set(
-                                    new org.bukkit.NamespacedKey(plugin, "td_mob"),
+                                    TDKeys.MOB,
                                     org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
                             }
                             plugin.getLogger().info("[CHORUS DEBUG] Spawned new vehicle");
@@ -1436,8 +1437,8 @@ public class TowerManager {
                     }
                 }
 
-                org.bukkit.NamespacedKey poisonDmgKey = new org.bukkit.NamespacedKey(plugin, "td_poison_damage");
-                org.bukkit.NamespacedKey poisonedUntilKey = new org.bukkit.NamespacedKey(plugin, "td_poisoned_until");
+                org.bukkit.NamespacedKey poisonDmgKey = TDKeys.POISON_DAMAGE;
+                org.bukkit.NamespacedKey poisonedUntilKey = TDKeys.POISONED_UNTIL;
                 long poisonEndTime = System.currentTimeMillis() + (poisonDur * 50L);
                 for (Mob mob : targets) {
                     if (isMobImmuneToTower(mob, "POISON")) {
@@ -1456,9 +1457,9 @@ public class TowerManager {
                 int slowDur = plugin.getTowerConfigManager().getStat(TowerType.ICE, tower.getLevel(), "freeze_duration", 40 + (tower.getLevel() - 1) * 20);
                 double damage = tower.getDamage();
                 java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
-                org.bukkit.NamespacedKey freezeKey = new org.bukkit.NamespacedKey(plugin, "td_frozen_until");
+                org.bukkit.NamespacedKey freezeKey = TDKeys.FROZEN_UNTIL;
                 // Ice Tower (Freeze) checks td_freeze_immune; Prismarine (Slow) keeps td_slow_immune.
-                org.bukkit.NamespacedKey freezeImmuneKey = new org.bukkit.NamespacedKey(plugin, "td_freeze_immune");
+                org.bukkit.NamespacedKey freezeImmuneKey = TDKeys.FREEZE_IMMUNE;
 
                 for (Mob mob : targets) {
                     if (mob.getPersistentDataContainer().has(freezeImmuneKey, org.bukkit.persistence.PersistentDataType.BYTE)
@@ -1740,7 +1741,7 @@ public class TowerManager {
             if (!mob.getWorld().equals(center.getWorld())) continue;
 
             String mobArena = mob.getPersistentDataContainer().get(
-                new org.bukkit.NamespacedKey(plugin, "td_arena"),
+                TDKeys.ARENA,
                 org.bukkit.persistence.PersistentDataType.STRING
             );
             if (mobArena == null) mobArena = "1";
@@ -1790,7 +1791,7 @@ public class TowerManager {
      */
     private boolean isMobImmuneToTower(Mob mob, String towerKeyword) {
         String immunities = mob.getPersistentDataContainer().get(
-                new org.bukkit.NamespacedKey(plugin, "td_immunities"),
+                TDKeys.IMMUNITIES,
                 org.bukkit.persistence.PersistentDataType.STRING);
         if (immunities == null || immunities.isEmpty()) return false;
         return immunities.toUpperCase().contains(towerKeyword.toUpperCase());

@@ -1,6 +1,7 @@
 package com.pauljang.towerDefense.listeners;
 
 import com.pauljang.towerDefense.TowerDefense;
+import com.pauljang.towerDefense.TDKeys;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
@@ -51,11 +52,11 @@ public class MobListener implements Listener {
     @EventHandler
     public void onMobBurn(EntityCombustEvent event) {
         Entity entity = event.getEntity();
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
 
         // If the entity has our custom TD Mob tag (includes both mobs and mounts)
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
-            NamespacedKey fireImmuneKey = new NamespacedKey(plugin, "td_fire_immune");
+            NamespacedKey fireImmuneKey = TDKeys.FIRE_IMMUNE;
 
             // If immune to fire, cancel all combustion
             if (entity.getPersistentDataContainer().has(fireImmuneKey, PersistentDataType.BYTE)) {
@@ -78,7 +79,7 @@ public class MobListener implements Listener {
         Entity entity = event.getEntity();
         if (!(entity instanceof Mob mob)) return;
 
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
         if (mob.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             // Enderman teleport dodge: 30% chance to negate any incoming damage with a teleport effect.
             if (mob.getType() == org.bukkit.entity.EntityType.ENDERMAN) {
@@ -91,7 +92,7 @@ public class MobListener implements Listener {
             }
 
             // Check for fire-related damage if the mob has fire immunity
-            NamespacedKey fireImmuneKey = new NamespacedKey(plugin, "td_fire_immune");
+            NamespacedKey fireImmuneKey = TDKeys.FIRE_IMMUNE;
             EntityDamageEvent.DamageCause cause = event.getCause();
             if (mob.getPersistentDataContainer().has(fireImmuneKey, PersistentDataType.BYTE)) {
                 if (cause == EntityDamageEvent.DamageCause.FIRE ||
@@ -106,7 +107,7 @@ public class MobListener implements Listener {
 
             // Custom fire tick damage scaling
             if (cause == EntityDamageEvent.DamageCause.FIRE_TICK) {
-                NamespacedKey fireDmgKey = new NamespacedKey(plugin, "td_fire_damage");
+                NamespacedKey fireDmgKey = TDKeys.FIRE_DAMAGE;
                 if (mob.getPersistentDataContainer().has(fireDmgKey, PersistentDataType.DOUBLE)) {
                     double customDmg = mob.getPersistentDataContainer().get(fireDmgKey, PersistentDataType.DOUBLE);
                     event.setDamage(customDmg);
@@ -115,7 +116,7 @@ public class MobListener implements Listener {
 
             // Custom poison tick damage scaling
             if (cause == EntityDamageEvent.DamageCause.POISON) {
-                NamespacedKey poisonDmgKey = new NamespacedKey(plugin, "td_poison_damage");
+                NamespacedKey poisonDmgKey = TDKeys.POISON_DAMAGE;
                 if (mob.getPersistentDataContainer().has(poisonDmgKey, PersistentDataType.DOUBLE)) {
                     double customDmg = mob.getPersistentDataContainer().get(poisonDmgKey, PersistentDataType.DOUBLE);
                     event.setDamage(customDmg);
@@ -123,7 +124,7 @@ public class MobListener implements Listener {
             }
 
             // Dripstone vulnerability: +15% damage taken from all sources while tagged
-            NamespacedKey vulnKey = new NamespacedKey(plugin, "td_vulnerable_until");
+            NamespacedKey vulnKey = TDKeys.VULNERABLE_UNTIL;
             Long vulnUntil = mob.getPersistentDataContainer().get(vulnKey, PersistentDataType.LONG);
             if (vulnUntil != null) {
                 if (System.currentTimeMillis() < vulnUntil) {
@@ -173,7 +174,7 @@ public class MobListener implements Listener {
                         
                         // Recalculate and set the new max health based on the original config health
                         String presetKey = mob.getPersistentDataContainer().get(
-                            new NamespacedKey(plugin, "td_preset"),
+                            TDKeys.PRESET,
                             PersistentDataType.STRING
                         );
                         if (presetKey == null) presetKey = mob.getType().name().toLowerCase();
@@ -223,7 +224,7 @@ public class MobListener implements Listener {
         // TD mobs (notably Endermen) now keep their AI enabled so they can be driven along the
         // track. Vanilla Endermen teleport away when damaged, which would break the path flow, so
         // cancel any self-initiated teleport for entities tagged as TD mobs.
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
         if (event.getEntity().getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             event.setCancelled(true);
         }
@@ -232,7 +233,7 @@ public class MobListener implements Listener {
     @EventHandler
     public void onMobKnockback(io.papermc.paper.event.entity.EntityKnockbackEvent event) {
         Entity entity = event.getEntity();
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             event.setCancelled(true);
         }
@@ -241,10 +242,10 @@ public class MobListener implements Listener {
     @EventHandler
     public void onPotionEffect(org.bukkit.event.entity.EntityPotionEffectEvent event) {
         Entity entity = event.getEntity();
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
         if (!entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) return;
 
-        NamespacedKey slowImmuneKey = new NamespacedKey(plugin, "td_slow_immune");
+        NamespacedKey slowImmuneKey = TDKeys.SLOW_IMMUNE;
         if (entity.getPersistentDataContainer().has(slowImmuneKey, PersistentDataType.BYTE)) {
             org.bukkit.potion.PotionEffect newEffect = event.getNewEffect();
             if (newEffect != null) {
@@ -289,7 +290,7 @@ public class MobListener implements Listener {
     @EventHandler
     public void onMobDeath(org.bukkit.event.entity.EntityDeathEvent event) {
         Entity entity = event.getEntity();
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             event.getDrops().clear();
             event.setDroppedExp(0);
@@ -307,11 +308,11 @@ public class MobListener implements Listener {
             }
 
             // Get the arena this mob was walking on
-            String mobArena = entity.getPersistentDataContainer().get(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING);
+            String mobArena = entity.getPersistentDataContainer().get(TDKeys.ARENA, PersistentDataType.STRING);
             if (mobArena == null) mobArena = "1";
 
             // Award bounty gold only to active players on that track
-            NamespacedKey rewardKey = new NamespacedKey(plugin, "td_gold_reward");
+            NamespacedKey rewardKey = TDKeys.GOLD_REWARD;
             if (entity.getPersistentDataContainer().has(rewardKey, PersistentDataType.INTEGER)) {
                 int reward = entity.getPersistentDataContainer().get(rewardKey, PersistentDataType.INTEGER);
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
@@ -322,7 +323,7 @@ public class MobListener implements Listener {
             }
 
             // Award experience only to the player who sent the mob (on the opposite track)
-            NamespacedKey xpRewardKey = new NamespacedKey(plugin, "td_xp_reward");
+            NamespacedKey xpRewardKey = TDKeys.XP_REWARD;
             if (entity.getPersistentDataContainer().has(xpRewardKey, PersistentDataType.INTEGER)) {
                 int xpReward = entity.getPersistentDataContainer().get(xpRewardKey, PersistentDataType.INTEGER);
                 String senderArena = mobArena.equals("1") ? "2" : "1";
@@ -360,13 +361,13 @@ public class MobListener implements Listener {
                     double radius = 3.0;
                     for (org.bukkit.entity.Entity nearby : deathLoc.getWorld().getNearbyEntities(deathLoc, radius, radius, radius)) {
                         if (nearby instanceof org.bukkit.entity.Slime child) {
-                            NamespacedKey mobKey = new NamespacedKey(plugin, "td_mob");
+                            NamespacedKey mobKey = TDKeys.MOB;
                             if (!child.getPersistentDataContainer().has(mobKey, PersistentDataType.BYTE)) {
                                 child.getPersistentDataContainer().set(mobKey, PersistentDataType.BYTE, (byte) 1);
-                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
-                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, child.getType() == org.bukkit.entity.EntityType.MAGMA_CUBE ? "magma_cube" : "slime");
-                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, 0); // No farming split slimes
-                                child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, 0);
+                                child.getPersistentDataContainer().set(TDKeys.ARENA, PersistentDataType.STRING, arena);
+                                child.getPersistentDataContainer().set(TDKeys.PRESET, PersistentDataType.STRING, child.getType() == org.bukkit.entity.EntityType.MAGMA_CUBE ? "magma_cube" : "slime");
+                                child.getPersistentDataContainer().set(TDKeys.GOLD_REWARD, PersistentDataType.INTEGER, 0); // No farming split slimes
+                                child.getPersistentDataContainer().set(TDKeys.XP_REWARD, PersistentDataType.INTEGER, 0);
 
                                 org.bukkit.attribute.AttributeInstance kbResist = child.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
                                 if (kbResist != null) {
@@ -391,7 +392,7 @@ public class MobListener implements Listener {
         Entity entity = event.getEntity();
         if (entity == null) return;
 
-        NamespacedKey key = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey key = TDKeys.MOB;
         if (entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
             event.setCancelled(true);
             event.setTarget(null);
@@ -1284,7 +1285,7 @@ public class MobListener implements Listener {
         // Wardens are velocity-driven track mobs; cancel any damage they deal (notably the sonic
         // boom) so they never blast allied mobs walking the same path.
         if (event.getDamager() instanceof org.bukkit.entity.Warden warden
-                && warden.getPersistentDataContainer().has(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE)) {
+                && warden.getPersistentDataContainer().has(TDKeys.MOB, PersistentDataType.BYTE)) {
             event.setCancelled(true);
             return;
         }
@@ -1316,7 +1317,7 @@ public class MobListener implements Listener {
             }
         }
 
-        NamespacedKey tdKey = new NamespacedKey(plugin, "td_mob");
+        NamespacedKey tdKey = TDKeys.MOB;
 
         // Only run checks for custom TD Mobs (includes both mobs and mounts)
         if (!victim.getPersistentDataContainer().has(tdKey, PersistentDataType.BYTE)) {
@@ -1351,7 +1352,7 @@ public class MobListener implements Listener {
         }
 
         if (attacker != null) {
-            NamespacedKey arenaKey = new NamespacedKey(plugin, "td_arena");
+            NamespacedKey arenaKey = TDKeys.ARENA;
             String mobArena = victim.getPersistentDataContainer().get(arenaKey, PersistentDataType.STRING);
             if (mobArena == null) mobArena = "1";
 
