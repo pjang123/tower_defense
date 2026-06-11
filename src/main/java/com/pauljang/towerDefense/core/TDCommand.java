@@ -33,7 +33,7 @@ public class TDCommand implements CommandExecutor {
         Player player = (Player) sender;
 
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|saveconfig|loadworld|unloadworld|spawnmob|gui|upgrades|giveitems|setarena|challenge|accept|lobby|forfeit|forcestart>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|saveconfig|loadworld|unloadworld|spawnmob|gui|upgrades|giveitems|givegold|givexp|setarena|challenge|accept|lobby|forfeit|forcestart>");
             return true;
         }
 
@@ -51,6 +51,8 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td stop " + ChatColor.WHITE + "- End your current match");
                 player.sendMessage(ChatColor.YELLOW + "/td status " + ChatColor.WHITE + "- Show the current game state");
                 player.sendMessage(ChatColor.YELLOW + "/td giveitems " + ChatColor.WHITE + "- Give yourself the GUI menu hotbar items");
+                player.sendMessage(ChatColor.YELLOW + "/td givegold [player] <amount> " + ChatColor.WHITE + "- Give gold to a player in a match (Admin)");
+                player.sendMessage(ChatColor.YELLOW + "/td givexp [player] <amount> " + ChatColor.WHITE + "- Give TD XP to a player in a match (Admin)");
                 player.sendMessage(ChatColor.YELLOW + "/td setarena <player> <arena> " + ChatColor.WHITE + "- Assign a player to an arena (Admin)");
                 player.sendMessage(ChatColor.YELLOW + "/td wand " + ChatColor.WHITE + "- Gives you the Setup Wand");
                 player.sendMessage(ChatColor.YELLOW + "/td plotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Setup mode for an arena");
@@ -209,6 +211,13 @@ public class TDCommand implements CommandExecutor {
                 break;
 
             case "lobby":
+                // If they're in an active match, leaving must tear the match down (forfeit) so they
+                // aren't left registered in it — otherwise the sidebar/gold loop keep treating them as
+                // in-game while they stand in the lobby.
+                if (gameManager.getPlayerMatch(player.getUniqueId()) != null) {
+                    gameManager.forfeit(player);
+                    break;
+                }
                 org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
                 if (lobbyWorld != null) player.teleport(lobbyWorld.getSpawnLocation());
                 gameManager.giveLobbyItems(player);
@@ -309,6 +318,88 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.GREEN + "Set " + arenaTarget.getName() + "'s arena to: " + args[2]);
                 arenaTarget.sendMessage(ChatColor.GREEN + "You have been assigned to Arena: " + args[2]);
                 break;
+
+            case "givegold": {
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use this command.");
+                    break;
+                }
+                // Forms: /td givegold <amount>  OR  /td givegold <player> <amount>
+                Player goldTarget;
+                String goldAmountArg;
+                if (args.length >= 3) {
+                    goldTarget = org.bukkit.Bukkit.getPlayer(args[1]);
+                    goldAmountArg = args[2];
+                } else if (args.length == 2) {
+                    goldTarget = player;
+                    goldAmountArg = args[1];
+                } else {
+                    player.sendMessage(ChatColor.RED + "Usage: /td givegold [player] <amount>");
+                    break;
+                }
+                if (goldTarget == null) {
+                    player.sendMessage(ChatColor.RED + "Player not found!");
+                    break;
+                }
+                int goldAmount;
+                try {
+                    goldAmount = Integer.parseInt(goldAmountArg);
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Amount must be a whole number!");
+                    break;
+                }
+                if (gameManager.getPlayerMatch(goldTarget.getUniqueId()) == null) {
+                    player.sendMessage(ChatColor.RED + goldTarget.getName() + " is not in an active match.");
+                    break;
+                }
+                gameManager.addGold(goldTarget.getUniqueId(), goldAmount, false);
+                player.sendMessage(ChatColor.GREEN + "Gave " + goldAmount + " gold to " + goldTarget.getName() + ".");
+                if (goldTarget != player) {
+                    goldTarget.sendMessage(ChatColor.GREEN + "You received " + goldAmount + " gold!");
+                }
+                break;
+            }
+
+            case "givexp": {
+                if (!player.hasPermission("towerdefense.admin") && !player.isOp()) {
+                    player.sendMessage(ChatColor.RED + "You must be OP or have towerdefense.admin to use this command.");
+                    break;
+                }
+                // Forms: /td givexp <amount>  OR  /td givexp <player> <amount>
+                Player xpTarget;
+                String xpAmountArg;
+                if (args.length >= 3) {
+                    xpTarget = org.bukkit.Bukkit.getPlayer(args[1]);
+                    xpAmountArg = args[2];
+                } else if (args.length == 2) {
+                    xpTarget = player;
+                    xpAmountArg = args[1];
+                } else {
+                    player.sendMessage(ChatColor.RED + "Usage: /td givexp [player] <amount>");
+                    break;
+                }
+                if (xpTarget == null) {
+                    player.sendMessage(ChatColor.RED + "Player not found!");
+                    break;
+                }
+                int xpAmount;
+                try {
+                    xpAmount = Integer.parseInt(xpAmountArg);
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Amount must be a whole number!");
+                    break;
+                }
+                if (gameManager.getPlayerMatch(xpTarget.getUniqueId()) == null) {
+                    player.sendMessage(ChatColor.RED + xpTarget.getName() + " is not in an active match.");
+                    break;
+                }
+                gameManager.addExp(xpTarget.getUniqueId(), xpAmount);
+                player.sendMessage(ChatColor.GREEN + "Gave " + xpAmount + " XP to " + xpTarget.getName() + ".");
+                if (xpTarget != player) {
+                    xpTarget.sendMessage(ChatColor.GREEN + "You received " + xpAmount + " TD XP!");
+                }
+                break;
+            }
 
             case "status":
                 GameState curState = gameManager.getCurrentState();

@@ -75,6 +75,45 @@ public class WaypointConfigManager {
         matchWaypoints.remove(match);
     }
 
+    /**
+     * Mirrors a template's waypoints into the in-memory global config, remapped to the live match world's
+     * name. The singleton systems that read waypoints by arena from the global config — tower targeting
+     * (TowerManager.getWaypointGraph/getWaypoints), spell track particles, castle holograms, the
+     * waypoint setup overlay — would otherwise find nothing for the freshly cloned match world. In-memory
+     * only; never written back to waypoints.yml on disk.
+     *
+     * Only one match is active at a time for the singleton systems, so this replaces any prior waypoints.
+     */
+    public void loadGlobalForMatch(File mapFile, org.bukkit.World world) {
+        FileConfiguration mapConfig = YamlConfiguration.loadConfiguration(mapFile);
+        config.set("waypoints", null); // single active match: drop any waypoints from a previous match
+        if (mapConfig.contains("waypoints")) {
+            for (String arena : mapConfig.getConfigurationSection("waypoints").getKeys(false)) {
+                // Skip old-format waypoints (those with a 'world' key directly under them)
+                if (mapConfig.contains("waypoints." + arena + ".world")) continue;
+                org.bukkit.configuration.ConfigurationSection arenaSection = mapConfig.getConfigurationSection("waypoints." + arena);
+                if (arenaSection == null) continue;
+                for (String wpId : arenaSection.getKeys(false)) {
+                    String src = "waypoints." + arena + "." + wpId;
+                    String dst = "waypoints." + arena + "." + wpId;
+                    config.set(dst + ".world", world.getName());
+                    config.set(dst + ".x", mapConfig.getDouble(src + ".x"));
+                    config.set(dst + ".y", mapConfig.getDouble(src + ".y"));
+                    config.set(dst + ".z", mapConfig.getDouble(src + ".z"));
+                    config.set(dst + ".next", mapConfig.getStringList(src + ".next"));
+                }
+                plugin.getLogger().info("Mirrored waypoints for arena " + arena + " into the global config for world " + world.getName());
+            }
+        } else {
+            plugin.getLogger().warning("No waypoints section found in " + mapFile.getName() + " to mirror into global config");
+        }
+    }
+
+    /** Clears the in-memory global waypoints once a match ends. Does not touch waypoints.yml on disk. */
+    public void clearGlobal() {
+        config.set("waypoints", null);
+    }
+
     public Map<String, TDWaypoint> getWaypointGraph(Match match, String arena) {
         return matchWaypoints.getOrDefault(match, Collections.emptyMap()).getOrDefault(arena, Collections.emptyMap());
     }

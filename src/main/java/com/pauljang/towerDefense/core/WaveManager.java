@@ -40,6 +40,12 @@ public class WaveManager {
         if (session != null) session.stop();
     }
 
+    /** Current wave number for a match's single-player wave session, or 0 if it has no active session. */
+    public int getCurrentWave(Match match) {
+        WaveSession session = activeWaves.get(match.getMatchId());
+        return session != null ? session.currentWave : 0;
+    }
+
     public class WaveSession {
         private final Match match;
         private int currentWave = 1;

@@ -182,6 +182,7 @@ public class GameManager {
         // Configure world settings
         world.setDifficulty(org.bukkit.Difficulty.EASY);
         world.setAutoSave(false); // Don't auto-save match worlds
+        world.setKeepSpawnInMemory(false); // Release spawn-chunk file locks so endMatch can delete the world
 
         plugin.getLogger().info("Successfully loaded world: " + worldName);
         match.setWorld(world);
@@ -194,6 +195,18 @@ public class GameManager {
 
         plugin.getPlotConfigManager().loadMapConfig(match, plotsFile);
         plugin.getWaypointConfigManager().loadMapConfig(match, waypointsFile);
+
+        // CRITICAL: also mirror the template's plots/waypoints into the in-memory GLOBAL config, remapped
+        // to this cloned match world's name. The singleton tower-placement, tower-targeting, spell and
+        // castle-HUD systems all read the global config by world name (getPlotAt, getPlotArena,
+        // getWaypoints(arena), getWaypointGraph(arena), ...). Without this the cloned world has no plots
+        // registered against it and players cannot place towers, and towers/holograms have no waypoints.
+        plugin.getPlotConfigManager().loadGlobalForMatch(plotsFile, world);
+        plugin.getWaypointConfigManager().loadGlobalForMatch(waypointsFile, world);
+
+        // Reset the global castle health used by the boss bar / holograms for the new match.
+        arenaHealth.put("1", maxCastleHealth);
+        arenaHealth.put("2", maxCastleHealth);
 
         // Assign players to arenas and prepare them
         for (int i = 0; i < playerIds.size(); i++) {
@@ -262,6 +275,14 @@ public class GameManager {
                 // but nothing actually runs — the "game never starts" symptom.
                 currentState = GameState.ACTIVE;
                 matchStartTime = System.currentTimeMillis();
+
+                // Show the castle HUD now the match is live. The new per-match startMatch flow never
+                // called these (only the legacy handleGameStart did), so the boss bar and castle
+                // holograms never appeared — the "missing scoreboards" symptom.
+                showBossBar();
+                updateCastleHologram("1");
+                updateCastleHologram("2");
+
                 plugin.getLogger().info("Match " + match.getMatchId() + " is now ACTIVE");
             }
         }, 0L, 20L); // Run every second
@@ -674,25 +695,40 @@ public class GameManager {
      * game and awards the win to the opposing team. Returns the lobby shortly after.
      */
     public void forfeit(Player player) {
-        if (currentState != GameState.ACTIVE && currentState != GameState.STARTING) {
-            player.sendMessage(ChatColor.RED + "There is no active game to forfeit.");
-            return;
-        }
-
-        String arena = getPlayerArena(player.getUniqueId());
-        if ((!"1".equals(arena) && !"2".equals(arena)) || !matchQueue.contains(player.getUniqueId())) {
+        // Per-match games (single player and the cloned-world duels) track membership via playerToMatch,
+        // not the legacy matchQueue, so resolve the match that way and tear it down through endMatch.
+        Match match = playerToMatch.get(player.getUniqueId());
+        if (match == null) {
             player.sendMessage(ChatColor.RED + "You are not currently in an active game.");
             return;
         }
 
-        Bukkit.broadcastMessage(ChatColor.RED + "[Tower Defense] " + player.getName() + " has forfeited the match!");
+        String arena = match.getPlayerArenas().getOrDefault(player.getUniqueId(), "1");
 
-        // Zero this arena's health to trigger the end-game victory/forfeit handling.
-        arenaHealth.put(arena, 0);
-        setGameState(GameState.ENDED);
+        // Tell everyone in the match who forfeited.
+        for (UUID id : new ArrayList<>(match.getPlayers())) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                p.sendMessage(ChatColor.RED + "[Tower Defense] " + player.getName() + " has forfeited the match!");
+            }
+        }
 
-        // Return to lobby state after a short delay so the victory screen is visible.
-        Bukkit.getScheduler().runTaskLater(plugin, () -> setGameState(GameState.LOBBY), 100L);
+        // In multiplayer, award the win to the opposing arena before the match closes.
+        if (!match.getMapData().isSinglePlayer()) {
+            String winningArena = "1".equals(arena) ? "2" : "1";
+            for (UUID id : new ArrayList<>(match.getPlayers())) {
+                if (winningArena.equals(match.getPlayerArenas().get(id))) {
+                    Player w = Bukkit.getPlayer(id);
+                    if (w != null) {
+                        w.sendTitle(ChatColor.GREEN + "VICTORY", ChatColor.YELLOW + "Your opponent forfeited!", 10, 70, 20);
+                        w.playSound(w.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+                    }
+                }
+            }
+        }
+
+        match.setCurrentState(GameState.ENDED);
+        endMatch(match);
     }
 
     public java.util.List<java.util.UUID> getMatchQueue() {
@@ -883,8 +919,36 @@ public class GameManager {
             lobbyWorld.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
         }
 
+        // Sweep any leftover match_xxxx worlds from a previous run (crash, or a delete that was still
+        // file-locked when the server shut down) so they don't accumulate on disk.
+        cleanupStaleMatchWorlds();
+
         // Load or reset game world
         resetGameWorld();
+    }
+
+    /**
+     * Deletes leftover cloned match worlds (folders named "match_...") both at the world-container root
+     * and under each loaded world's dimensions/minecraft/ folder where Paper migrates them. Runs at
+     * startup, when no match is active, so nothing in use is touched.
+     */
+    private void cleanupStaleMatchWorlds() {
+        File container = Bukkit.getWorldContainer();
+        deleteMatchFoldersIn(container);
+        for (World w : Bukkit.getWorlds()) {
+            deleteMatchFoldersIn(new File(container, w.getName() + "/dimensions/minecraft"));
+        }
+    }
+
+    private void deleteMatchFoldersIn(File dir) {
+        File[] matchDirs = dir.listFiles((d, name) -> name.startsWith("match_"));
+        if (matchDirs == null) return;
+        for (File matchDir : matchDirs) {
+            if (matchDir.isDirectory()) {
+                deleteDirectory(matchDir);
+                plugin.getLogger().info("Removed stale match world folder: " + matchDir.getAbsolutePath());
+            }
+        }
     }
 
     public void resetGameWorld() {
@@ -939,6 +1003,40 @@ public class GameManager {
             }
         }
         file.delete();
+    }
+
+    /**
+     * Deletes the given match-world folders off the main thread, retrying for a while. After a world is
+     * unloaded the OS (especially Windows) can keep region-file handles open for a moment, so the first
+     * delete attempt often fails; retrying on an async thread (where sleeping is safe) lets the handles
+     * release without freezing the server. Pure filesystem work — no Bukkit API is touched here.
+     */
+    private void deleteWorldFoldersAsync(String worldName, java.io.File... folders) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            System.gc(); // hint the JVM to release memory-mapped region files
+            boolean allGone = false;
+            for (int attempt = 1; attempt <= 12 && !allGone; attempt++) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                allGone = true;
+                for (java.io.File folder : folders) {
+                    if (folder.exists()) {
+                        deleteDirectory(folder);
+                        if (folder.exists()) allGone = false;
+                    }
+                }
+            }
+            if (allGone) {
+                plugin.getLogger().info("Cleaned up match world files for: " + worldName);
+            } else {
+                plugin.getLogger().warning("Could not fully delete match world files for " + worldName
+                        + " (files may still be locked); they will be swept on the next server start.");
+            }
+        });
     }
 
     public void damageCastle(int amount) {
@@ -1104,10 +1202,21 @@ public class GameManager {
         int current = match.getArenaHealth().getOrDefault(arena, maxCastleHealth);
         int updated = Math.max(0, current - amount);
         match.getArenaHealth().put(arena, updated);
-        
-        // Update BossBar and Holograms if they exist
-        // ... (Need to refactor show/update methods to be match-aware too)
-        
+
+        // Mirror to the global castle health so the singleton boss bar / holograms reflect the damage.
+        // (Only one match is live at a time for these HUD elements.)
+        arenaHealth.put(arena, updated);
+        updateBossBar();
+        updateCastleHologram(arena);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (arena.equals(getPlayerArena(player.getUniqueId()))) {
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
+            }
+            String teamName = "1".equals(arena) ? "Blue Team" : "Red Team";
+            player.sendActionBar(ChatColor.RED + "⚠ " + teamName + " Damaged! Health: " + updated + "/" + maxCastleHealth + " ⚠");
+        }
+
         if (updated <= 0) {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (match.getCurrentState() == GameState.ACTIVE) {
@@ -1138,12 +1247,14 @@ public class GameManager {
         Location lobbySpawn = lobby != null ? lobby.getSpawnLocation() : Bukkit.getWorlds().get(0).getSpawnLocation();
         for (UUID id : new ArrayList<>(match.getPlayers())) {
             playerToMatch.remove(id);
+            playerScoreboards.remove(id);
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
                 p.getInventory().clear();
                 p.teleport(lobbySpawn);
                 p.setGameMode(org.bukkit.GameMode.ADVENTURE);
                 p.setAllowFlight(true);
+                p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
                 giveLobbyItems(p);
                 p.sendMessage(ChatColor.YELLOW + "The match has ended. You have been returned to the lobby.");
             }
@@ -1153,6 +1264,13 @@ public class GameManager {
         plugin.getWaypointConfigManager().unloadMatch(match);
         plugin.getPlotConfigManager().unloadMatch(match);
 
+        // Drop the global mirror of this match's plots/waypoints and tear down the shared HUD so neither
+        // lingers into the lobby or the next match.
+        plugin.getPlotConfigManager().clearGlobal();
+        plugin.getWaypointConfigManager().clearGlobal();
+        cleanupBossBar();
+        cleanupCastleHolograms();
+
         // Unload and delete the cloned match world.
         org.bukkit.World world = match.getWorld();
         if (world != null && !world.getPlayers().isEmpty()) {
@@ -1160,19 +1278,20 @@ public class GameManager {
         }
         if (world != null) {
             final String worldName = world.getName();
-            Bukkit.unloadWorld(world, false);
-            System.gc(); // release file locks (Windows)
+
+            // Remove all entities first so chunks aren't held by entity references when we delete the files.
+            world.getEntities().forEach(org.bukkit.entity.Entity::remove);
+
+            boolean unloaded = Bukkit.unloadWorld(world, false); // false = do not save the throwaway match world
+            plugin.getLogger().info("Unloaded match world " + worldName + ": " + unloaded);
 
             File container = Bukkit.getWorldContainer();
             File worldFolder = new File(container, worldName);
+            // Paper migrates loaded worlds into <primary>/dimensions/minecraft/<name>, so delete that copy too.
             String primaryWorldName = Bukkit.getWorlds().isEmpty() ? "lobby_world" : Bukkit.getWorlds().get(0).getName();
             File migratedFolder = new File(container, primaryWorldName + "/dimensions/minecraft/" + worldName);
 
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (worldFolder.exists()) deleteDirectory(worldFolder);
-                if (migratedFolder.exists()) deleteDirectory(migratedFolder);
-                plugin.getLogger().info("Cleaned up match world: " + worldName);
-            }, 40L);
+            deleteWorldFoldersAsync(worldName, worldFolder, migratedFolder);
         }
 
         // Drop the global state once no matches remain so towers/mobs/gold stop ticking in the lobby.
@@ -1954,9 +2073,123 @@ public class GameManager {
         lobbyQueueSecondsLeft = 3; // Force transport in 3 seconds
     }
 
+    // Per-player sidebar scoreboards, reused across ticks so updates don't flicker.
+    private final Map<UUID, org.bukkit.scoreboard.Scoreboard> playerScoreboards = new HashMap<>();
+
     public void updateScoreboard(Player player) {
-        // This method can be implemented later for scoreboard display
-        // For now it's a no-op to prevent compilation errors
+        UUID uuid = player.getUniqueId();
+        Match match = playerToMatch.get(uuid);
+
+        // Not in a match: tear down any sidebar we gave them and restore the main scoreboard.
+        if (match == null) {
+            if (playerScoreboards.remove(uuid) != null) {
+                player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+            }
+            return;
+        }
+
+        // Get (or build) this player's dedicated scoreboard + sidebar objective.
+        org.bukkit.scoreboard.Scoreboard board = playerScoreboards.get(uuid);
+        org.bukkit.scoreboard.Objective obj;
+        if (board == null || player.getScoreboard() != board) {
+            board = Bukkit.getScoreboardManager().getNewScoreboard();
+            obj = board.registerNewObjective("td_sidebar", "dummy",
+                    ChatColor.GOLD + "" + ChatColor.BOLD + "TOWER DEFENSE");
+            obj.setDisplaySlot(org.bukkit.scoreboard.DisplaySlot.SIDEBAR);
+            playerScoreboards.put(uuid, board);
+            player.setScoreboard(board);
+        } else {
+            obj = board.getObjective("td_sidebar");
+            if (obj == null) {
+                obj = board.registerNewObjective("td_sidebar", "dummy",
+                        ChatColor.GOLD + "" + ChatColor.BOLD + "TOWER DEFENSE");
+                obj.setDisplaySlot(org.bukkit.scoreboard.DisplaySlot.SIDEBAR);
+            }
+        }
+
+        // Compose the lines (top to bottom).
+        String arena = getPlayerArena(uuid);
+        String teamLabel = "1".equals(arena)
+                ? ChatColor.BLUE + "" + ChatColor.BOLD + "BLUE"
+                : ChatColor.RED + "" + ChatColor.BOLD + "RED";
+        int myHealth = match.getArenaHealth().getOrDefault(arena, maxCastleHealth);
+
+        // Strikethrough spaces render as a clean horizontal rule regardless of font glyph support.
+        String sep = ChatColor.DARK_GRAY + "" + ChatColor.STRIKETHROUGH + "              ";
+
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        lines.add(sep);
+        lines.add(ChatColor.GRAY + "Team: " + teamLabel);
+        lines.add(ChatColor.GOLD + "Gold: " + ChatColor.WHITE + "$" + getGold(uuid));
+        lines.add(ChatColor.GREEN + "EXP: " + ChatColor.WHITE + getExp(uuid) + " XP");
+        lines.add(" "); // spacer
+        lines.add(ChatColor.RED + "" + ChatColor.BOLD + "Your Castle " + ChatColor.GRAY + "(" + myHealth + "/" + maxCastleHealth + ")");
+        lines.add(healthBar(myHealth));
+        if (match.getMapData().isSinglePlayer()) {
+            int wave = plugin.getWaveManager().getCurrentWave(match);
+            lines.add("  "); // spacer
+            lines.add(ChatColor.AQUA + "" + ChatColor.BOLD + "Wave: " + ChatColor.WHITE + wave);
+        } else {
+            String oppArena = "1".equals(arena) ? "2" : "1";
+            int oppHealth = match.getArenaHealth().getOrDefault(oppArena, maxCastleHealth);
+            lines.add("  "); // spacer
+            lines.add(ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Enemy Castle " + ChatColor.GRAY + "(" + oppHealth + "/" + maxCastleHealth + ")");
+            lines.add(healthBar(oppHealth));
+        }
+        lines.add(sep);
+
+        renderSidebar(board, obj, lines);
+    }
+
+    /**
+     * Renders the given lines into the sidebar objective using one team per row. Each row uses a unique,
+     * invisible entry string (a color code) as a stable key and carries its visible text in the team
+     * prefix, so re-rendering each tick updates text in place rather than removing/re-adding lines
+     * (which causes flicker).
+     */
+    private void renderSidebar(org.bukkit.scoreboard.Scoreboard board, org.bukkit.scoreboard.Objective obj, java.util.List<String> lines) {
+        int n = lines.size();
+        for (int i = 0; i < n; i++) {
+            String teamId = "td_line_" + i;
+            String entry = ChatColor.values()[i].toString() + ChatColor.RESET; // unique + invisible
+            org.bukkit.scoreboard.Team team = board.getTeam(teamId);
+            if (team == null) {
+                team = board.registerNewTeam(teamId);
+            }
+            if (!team.hasEntry(entry)) {
+                team.addEntry(entry);
+            }
+            team.setPrefix(lines.get(i));
+            obj.getScore(entry).setScore(n - i); // higher score = higher on the sidebar
+        }
+        // Drop any rows left over from a previously longer render.
+        for (int i = n; i < ChatColor.values().length; i++) {
+            String teamId = "td_line_" + i;
+            String entry = ChatColor.values()[i].toString() + ChatColor.RESET;
+            board.resetScores(entry);
+            org.bukkit.scoreboard.Team team = board.getTeam(teamId);
+            if (team != null) team.unregister();
+        }
+    }
+
+    /**
+     * Builds a 10-segment castle-health bar using the same "■" glyph as the castle holograms (proven to
+     * render here). Filled segments are coloured by remaining ratio; the rest are dark gray.
+     */
+    private String healthBar(int health) {
+        int totalBars = 10;
+        double ratio = maxCastleHealth > 0 ? (double) health / maxCastleHealth : 0.0;
+        ratio = Math.max(0.0, Math.min(1.0, ratio));
+        int filled = (int) Math.round(ratio * totalBars);
+
+        ChatColor color = ratio >= 0.6 ? ChatColor.GREEN : ratio >= 0.25 ? ChatColor.YELLOW : ChatColor.RED;
+
+        StringBuilder bar = new StringBuilder();
+        bar.append(color);
+        for (int i = 0; i < filled; i++) bar.append("■");
+        bar.append(ChatColor.DARK_GRAY);
+        for (int i = filled; i < totalBars; i++) bar.append("■");
+        return bar.toString();
     }
 
     public void updateTabNames() {

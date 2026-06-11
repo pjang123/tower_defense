@@ -46,6 +46,44 @@ public class PlotConfigManager {
         matchPlots.remove(match);
     }
 
+    /**
+     * Mirrors a template's plots into the in-memory global config, remapped to the live match world's
+     * name. The singleton tower/placement systems (getPlotAt, getPlotArena, getPlotBounds, isPlotOverlapping,
+     * getPlotCenter, ...) all read this global config and match plots by world name. Without this, the
+     * freshly cloned match world ("match_xxxx") has no plots registered against it, so getPlotAt() returns
+     * null and players cannot place towers. In-memory only — this never writes back to plots.yml on disk.
+     *
+     * Only one match is active at a time for the singleton systems, so this replaces any prior plots.
+     */
+    public void loadGlobalForMatch(File mapFile, org.bukkit.World world) {
+        FileConfiguration mapConfig = YamlConfiguration.loadConfiguration(mapFile);
+        config.set("plots", null); // single active match: drop any plots from a previous match
+        if (mapConfig.contains("plots")) {
+            org.bukkit.configuration.ConfigurationSection plotsSection = mapConfig.getConfigurationSection("plots");
+            for (String key : plotsSection.getKeys(false)) {
+                String src = "plots." + key + ".";
+                String dst = "plots." + key + ".";
+                config.set(dst + "arena", mapConfig.getString(src + "arena", "1"));
+                config.set(dst + "pos1.world", world.getName());
+                config.set(dst + "pos1.x", mapConfig.getInt(src + "pos1.x"));
+                config.set(dst + "pos1.y", mapConfig.getInt(src + "pos1.y"));
+                config.set(dst + "pos1.z", mapConfig.getInt(src + "pos1.z"));
+                config.set(dst + "pos2.world", world.getName());
+                config.set(dst + "pos2.x", mapConfig.getInt(src + "pos2.x"));
+                config.set(dst + "pos2.y", mapConfig.getInt(src + "pos2.y"));
+                config.set(dst + "pos2.z", mapConfig.getInt(src + "pos2.z"));
+            }
+            plugin.getLogger().info("Mirrored " + plotsSection.getKeys(false).size() + " plots into the global config for world " + world.getName());
+        } else {
+            plugin.getLogger().warning("No plots section found in " + mapFile.getName() + " to mirror into global config");
+        }
+    }
+
+    /** Clears the in-memory global plots once a match ends. Does not touch plots.yml on disk. */
+    public void clearGlobal() {
+        config.set("plots", null);
+    }
+
     public Map<String, Location> getPlots(Match match) {
         return matchPlots.getOrDefault(match, Collections.emptyMap());
     }

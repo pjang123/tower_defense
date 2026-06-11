@@ -722,13 +722,13 @@ public class MobListener implements Listener {
                 case 14 -> type = com.pauljang.towerDefense.towers.TowerType.REDSTONE;
                 case 15 -> type = com.pauljang.towerDefense.towers.TowerType.POISON;
                 case 16 -> type = com.pauljang.towerDefense.towers.TowerType.ICE;
-                case 19 -> type = com.pauljang.towerDefense.towers.TowerType.GOLEM;
-                case 20 -> type = com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST;
-                case 21 -> type = com.pauljang.towerDefense.towers.TowerType.DRIPSTONE;
-                case 22 -> type = com.pauljang.towerDefense.towers.TowerType.THUNDER;
-                case 23 -> type = com.pauljang.towerDefense.towers.TowerType.TURRET;
-                case 24 -> type = com.pauljang.towerDefense.towers.TowerType.BOMBARDIER;
-                case 25 -> type = com.pauljang.towerDefense.towers.TowerType.BEEHIVE;
+                case 28 -> type = com.pauljang.towerDefense.towers.TowerType.GOLEM;
+                case 29 -> type = com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST;
+                case 30 -> type = com.pauljang.towerDefense.towers.TowerType.DRIPSTONE;
+                case 31 -> type = com.pauljang.towerDefense.towers.TowerType.THUNDER;
+                case 32 -> type = com.pauljang.towerDefense.towers.TowerType.TURRET;
+                case 33 -> type = com.pauljang.towerDefense.towers.TowerType.BOMBARDIER;
+                case 34 -> type = com.pauljang.towerDefense.towers.TowerType.BEEHIVE;
             }
 
             if (type != null) {
