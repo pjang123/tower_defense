@@ -6,7 +6,7 @@ game:
   # Number of players required to fill a match queue and start a game.
   # Players are alternated between Blue (Arena 1) and Red (Arena 2) teams,
   # supporting up to 4v4 (8 players). Use /td forcestart to begin with fewer.
-  players-per-match: 8
+  players-per-match: 2
 
 # Spells configuration (costs in gold, durations in seconds)
 spells:

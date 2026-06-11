@@ -1,6 +1,7 @@
 package com.pauljang.towerDefense.entities;
 
 import com.pauljang.towerDefense.TowerDefense;
+import com.pauljang.towerDefense.TDKeys;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -11,8 +12,11 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
+import com.pauljang.towerDefense.core.Match;
 import com.pauljang.towerDefense.entities.MobStateProfile;
 import com.pauljang.towerDefense.entities.MobUpgradeRegistry;
+import com.pauljang.towerDefense.entities.PresetMobType;
+import com.pauljang.towerDefense.data.TDWaypoint;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +37,6 @@ public class MobManager {
 
     private final TowerDefense plugin;
     private final MobUpgradeRegistry upgradeRegistry;
-    private final List<TDMob> activeMobs = new ArrayList<>();
     // Per-player queue tracks the exact tier of each queued mob: chain -> (tier -> count).
     // This preserves mixed-tier waves (e.g. five Lvl 1 Zombies plus one Lvl 5 Zombie).
     private final Map<UUID, Map<String, Map<Integer, Integer>>> playerQueues = new HashMap<>();
@@ -44,38 +47,39 @@ public class MobManager {
         startMobTicker();
     }
 
-    public void spawnMob(EntityType type) {
-        spawnMob("1", type);
+    // Legacy methods - these require a Match parameter
+    public void spawnMob(Match match, EntityType type) {
+        spawnMob(match, "1", type);
     }
 
-    public void spawnMob(String arena, EntityType type) {
-        spawnMob(arena, type, 1.0, -1.0, 0.0, false, false, 15, 5);
+    public void spawnMob(Match match, String arena, EntityType type) {
+        spawnMob(match, arena, type, 1.0, -1.0, 0.0, false, false, 15, 5);
     }
 
-    public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
-        spawnMob("1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
+    public void spawnMob(Match match, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
+        spawnMob(match, "1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
     }
 
-    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
-        spawnMob(arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
+    public void spawnMob(Match match, String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire) {
+        spawnMob(match, arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, 15, 5);
     }
 
-    public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
+    public void spawnMob(Match match, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
         int xpReward = Math.max(1, goldReward / 3);
-        spawnMob("1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+        spawnMob(match, "1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
     }
 
-    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
+    public void spawnMob(Match match, String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward) {
         int xpReward = Math.max(1, goldReward / 3);
-        spawnMob(arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+        spawnMob(match, arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
     }
 
-    public void spawnMob(EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
-        spawnMob("1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
+    public void spawnMob(Match match, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
+        spawnMob(match, "1", type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward);
     }
 
-    public void spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
-        spawnMob(arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward, type.name().toLowerCase());
+    public void spawnMob(Match match, String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward) {
+        spawnMob(match, arena, type, speedMultiplier, maxHealth, armor, immuneToSlow, immuneToFire, goldReward, xpReward, type.name().toLowerCase());
     }
 
     public MobUpgradeRegistry getUpgradeRegistry() {
@@ -138,8 +142,8 @@ public class MobManager {
         };
     }
 
-    public Mob spawnMob(String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward, String presetKey) {
-        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+    public Mob spawnMob(Match match, String arena, EntityType type, double speedMultiplier, double maxHealth, double armor, boolean immuneToSlow, boolean immuneToFire, int goldReward, int xpReward, String presetKey) {
+        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(match, arena);
         if (graph.isEmpty() || !graph.containsKey("0")) {
             plugin.getLogger().warning("Cannot spawn mob: No starting waypoint '0' defined for arena " + arena + "!");
             return null;
@@ -197,19 +201,19 @@ public class MobManager {
         }
 
         // Mark as a TD Mob so we can handle events (like sunlight burning)
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+        entity.getPersistentDataContainer().set(TDKeys.MOB, PersistentDataType.BYTE, (byte) 1);
 
         // Store preset key
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, presetKey);
+        entity.getPersistentDataContainer().set(TDKeys.PRESET, PersistentDataType.STRING, presetKey);
 
         // Store gold reward amount in container
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, goldReward);
+        entity.getPersistentDataContainer().set(TDKeys.GOLD_REWARD, PersistentDataType.INTEGER, goldReward);
 
         // Store xp reward amount in container
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, xpReward);
+        entity.getPersistentDataContainer().set(TDKeys.XP_REWARD, PersistentDataType.INTEGER, xpReward);
 
         // Store arena ID in container
-        entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
+        entity.getPersistentDataContainer().set(TDKeys.ARENA, PersistentDataType.STRING, arena);
 
         // Prevent zombification for nether mobs in the overworld
         if (entity instanceof org.bukkit.entity.Piglin piglin) {
@@ -232,11 +236,11 @@ public class MobManager {
         if (immuneToSlow || isSlowShieldActive) {
             // Slow (Prismarine) and Freeze (Ice) now use distinct immunity keys; a slow-immune mob
             // resists both, so tag it with each.
-            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_slow_immune"), PersistentDataType.BYTE, (byte) 1);
-            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_freeze_immune"), PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(TDKeys.SLOW_IMMUNE, PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(TDKeys.FREEZE_IMMUNE, PersistentDataType.BYTE, (byte) 1);
         }
         if (immuneToFire) {
-            entity.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_fire_immune"), PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(TDKeys.FIRE_IMMUNE, PersistentDataType.BYTE, (byte) 1);
         }
 
         // Make the mob immune to knockback via attributes
@@ -292,7 +296,7 @@ public class MobManager {
 
         TDMob tdMob = new TDMob(entity, graph);
         tdMob.setArena(arena);
-        activeMobs.add(tdMob);
+        match.getActiveMobs().add(tdMob);
         return entity;
     }
 
@@ -300,7 +304,7 @@ public class MobManager {
      * Spawns a mob using the upgrade chain + tier from the registry,
      * applying equipment, mount, and flying attributes from the CSV profile.
      */
-    public void spawnMobByChain(String arena, String upgradeChain, int tier) {
+    public void spawnMobByChain(Match match, String arena, String upgradeChain, int tier) {
         String chain = upgradeChain.toLowerCase();
         MobStateProfile profile = upgradeRegistry.getProfile(chain, tier);
         if (profile == null) {
@@ -333,7 +337,7 @@ public class MobManager {
             plugin.getConfig().set("mobs." + presetKey + ".height-offset", 5.0);
         }
 
-        Mob entity = spawnMob(arena, profile.getEntityType(), profile.getSpeed(), profile.getHp(),
+        Mob entity = spawnMob(match, arena, profile.getEntityType(), profile.getSpeed(), profile.getHp(),
                 0.0, slowImmune, fireImmune, killGold, xpReward, presetKey);
         if (entity == null) return;
 
@@ -346,18 +350,18 @@ public class MobManager {
         if (!profile.getImmunities().isEmpty()) {
             String immunityStr = String.join(",", profile.getImmunities());
             entity.getPersistentDataContainer().set(
-                new org.bukkit.NamespacedKey(plugin, "td_immunities"),
+                TDKeys.IMMUNITIES,
                 org.bukkit.persistence.PersistentDataType.STRING, immunityStr);
         }
 
         // Store the castle damage this mob deals when it reaches the end of the track.
         entity.getPersistentDataContainer().set(
-            new org.bukkit.NamespacedKey(plugin, "td_castle_damage"),
+            TDKeys.CASTLE_DAMAGE,
             org.bukkit.persistence.PersistentDataType.INTEGER, Math.max(1, (int) Math.round(profile.getDamage())));
 
         // Record this mob's tier on its TDMob wrapper (the most recent entry spawnMob appended).
-        if (!activeMobs.isEmpty()) {
-            TDMob spawned = activeMobs.get(activeMobs.size() - 1);
+        if (!match.getActiveMobs().isEmpty()) {
+            TDMob spawned = match.getActiveMobs().get(match.getActiveMobs().size() - 1);
             if (spawned.getEntity().equals(entity)) {
                 spawned.setTier(tier);
             }
@@ -418,7 +422,7 @@ public class MobManager {
                 }
                 // Mark ALL mounts as TD mobs (prevents burning in sunlight AND protects from player damage)
                 mount.getPersistentDataContainer().set(
-                    new NamespacedKey(plugin, "td_mob"),
+                    TDKeys.MOB,
                     PersistentDataType.BYTE, (byte) 1);
                 mount.addPassenger(entity);
             }
@@ -435,13 +439,13 @@ public class MobManager {
      * SOLUTION: Spawn the zombie directly at the Giant's location by manually creating it instead of
      * using spawnMobByChain which hardcodes waypoint 0 as the spawn point.
      */
-    public void summonZombieAt(TDMob giant, String arena) {
+    public void summonZombieAt(Match match, TDMob giant, String arena) {
         Mob giantEntity = giant.getEntity();
         if (giantEntity.isDead() || !giantEntity.isValid()) return;
 
         // Get the waypoint graph for this arena
         java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph =
-            plugin.getWaypointConfigManager().getWaypointGraph(arena);
+            plugin.getWaypointConfigManager().getWaypointGraph(match, arena);
         if (graph.isEmpty()) {
             plugin.getLogger().warning("Cannot summon zombie: No waypoints for arena " + arena);
             return;
@@ -480,17 +484,17 @@ public class MobManager {
 
         // Mark as TD mob
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_mob"), PersistentDataType.BYTE, (byte) 1);
+            TDKeys.MOB, PersistentDataType.BYTE, (byte) 1);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, "zombie");
+            TDKeys.PRESET, PersistentDataType.STRING, "zombie");
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, 2);
+            TDKeys.GOLD_REWARD, PersistentDataType.INTEGER, 2);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, 7);
+            TDKeys.XP_REWARD, PersistentDataType.INTEGER, 7);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_arena"), PersistentDataType.STRING, arena);
+            TDKeys.ARENA, PersistentDataType.STRING, arena);
         zombie.getPersistentDataContainer().set(
-            new NamespacedKey(plugin, "td_castle_damage"), PersistentDataType.INTEGER, 1);
+            TDKeys.CASTLE_DAMAGE, PersistentDataType.INTEGER, 1);
 
         // Set zombie stats (Tier 1 from CSV: HP=80, Speed=2.0)
         org.bukkit.attribute.AttributeInstance kbResist = zombie.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
@@ -526,7 +530,7 @@ public class MobManager {
         zombieTDMob.setCurrentWaypointId(giantCurrentWaypoint);
 
         // Add to active mobs - the zombie is already at the correct location
-        activeMobs.add(zombieTDMob);
+        match.getActiveMobs().add(zombieTDMob);
     }
 
 
@@ -568,7 +572,7 @@ public class MobManager {
         // but still honour a real POISON effect if some other source applied one.
         boolean poisoned = mob.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON);
         if (!poisoned) {
-            org.bukkit.NamespacedKey poisonedUntilKey = new NamespacedKey(plugin, "td_poisoned_until");
+            org.bukkit.NamespacedKey poisonedUntilKey = TDKeys.POISONED_UNTIL;
             if (mob.getPersistentDataContainer().has(poisonedUntilKey, PersistentDataType.LONG)) {
                 long poisonUntil = mob.getPersistentDataContainer().get(poisonedUntilKey, PersistentDataType.LONG);
                 if (System.currentTimeMillis() < poisonUntil) poisoned = true;
@@ -579,7 +583,7 @@ public class MobManager {
         }
         // Freeze (Ice Tower, PDC key). The Ice Tower also natively applies SLOWNESS, so the snail is
         // suppressed while frozen to avoid showing both ❄ and 🐌 for the same effect.
-        org.bukkit.NamespacedKey frozenKey = new NamespacedKey(plugin, "td_frozen_until");
+        org.bukkit.NamespacedKey frozenKey = TDKeys.FROZEN_UNTIL;
         boolean isFrozen = false;
         if (mob.getPersistentDataContainer().has(frozenKey, PersistentDataType.LONG)) {
             long freezeEnd = mob.getPersistentDataContainer().get(frozenKey, PersistentDataType.LONG);
@@ -593,7 +597,7 @@ public class MobManager {
             status.append(" ").append(org.bukkit.ChatColor.BLUE).append("🐌");
         }
         // Vulnerable (Dripstone hazard tiles, +15% damage taken)
-        org.bukkit.NamespacedKey vulnKey = new NamespacedKey(plugin, "td_vulnerable_until");
+        org.bukkit.NamespacedKey vulnKey = TDKeys.VULNERABLE_UNTIL;
         if (mob.getPersistentDataContainer().has(vulnKey, PersistentDataType.LONG)) {
             long vulnUntil = mob.getPersistentDataContainer().get(vulnKey, PersistentDataType.LONG);
             if (System.currentTimeMillis() < vulnUntil) {
@@ -629,92 +633,88 @@ public class MobManager {
 
             @Override
             public void run() {
-                Iterator<TDMob> iterator = activeMobs.iterator();
-                while (iterator.hasNext()) {
-                    TDMob mob = iterator.next();
-                    
-                    if (mob.getEntity().isDead() || !mob.getEntity().isValid()) {
-                        iterator.remove();
-                        continue;
-                    }
-
-                    if (tickCounter % 5 == 0) {
-                        updateHealthBar(mob.getEntity());
-                    }
-
-                    // Damage Storm check
-                    String mobArena = mob.getEntity().getPersistentDataContainer().get(
-                        new org.bukkit.NamespacedKey(plugin, "td_arena"),
-                        org.bukkit.persistence.PersistentDataType.STRING
-                    );
-                    if (mobArena == null) mobArena = "1";
-                    if (plugin.getGameManager().isSpellActive(mobArena, "DAMAGE_STORM")) {
-                        if (tickCounter % 20 == 0) {
-                            double dps = plugin.getConfig().getDouble("spells.damage-storm.damage-per-second", 2.0);
-                            mob.getEntity().damage(dps);
-                            mob.getEntity().getWorld().spawnParticle(
-                                org.bukkit.Particle.LAVA,
-                                mob.getEntity().getLocation().add(0, 0.5, 0),
-                                5, 0.2, 0.2, 0.2, 0.05
-                            );
+                for (Match match : plugin.getGameManager().getActiveMatches()) {
+                    Iterator<TDMob> iterator = match.getActiveMobs().iterator();
+                    while (iterator.hasNext()) {
+                        TDMob mob = iterator.next();
+                        
+                        if (mob.getEntity().isDead() || !mob.getEntity().isValid()) {
+                            iterator.remove();
+                            continue;
                         }
-                    }
 
-                    // Poison damage-over-time. Driven by a PDC timestamp rather than the vanilla POISON
-                    // effect so it also affects poison-immune undead (Zombies, Skeletons, …).
-                    org.bukkit.NamespacedKey poisonedUntilKey = new org.bukkit.NamespacedKey(plugin, "td_poisoned_until");
-                    if (mob.getEntity().getPersistentDataContainer().has(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
-                        long poisonUntil = mob.getEntity().getPersistentDataContainer().get(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
-                        if (System.currentTimeMillis() < poisonUntil) {
+                        if (tickCounter % 5 == 0) {
+                            updateHealthBar(mob.getEntity());
+                        }
+
+                        // Damage Storm check
+                        String mobArena = mob.getArena();
+                        if (plugin.getGameManager().isSpellActive(match, mobArena, "DAMAGE_STORM")) {
                             if (tickCounter % 20 == 0) {
-                                double pdmg = mob.getEntity().getPersistentDataContainer().getOrDefault(
-                                        new org.bukkit.NamespacedKey(plugin, "td_poison_damage"),
-                                        org.bukkit.persistence.PersistentDataType.DOUBLE, 1.0);
-                                mob.getEntity().damage(pdmg);
-                                mob.getEntity().getWorld().spawnParticle(org.bukkit.Particle.WITCH,
-                                        mob.getEntity().getLocation().add(0, 0.5, 0), 6, 0.25, 0.4, 0.25, 0.0);
+                                double dps = plugin.getConfig().getDouble("spells.damage-storm.damage-per-second", 2.0);
+                                mob.getEntity().damage(dps);
+                                mob.getEntity().getWorld().spawnParticle(
+                                    org.bukkit.Particle.LAVA,
+                                    mob.getEntity().getLocation().add(0, 0.5, 0),
+                                    5, 0.2, 0.2, 0.2, 0.05
+                                );
                             }
-                        } else {
-                            mob.getEntity().getPersistentDataContainer().remove(poisonedUntilKey);
                         }
-                    }
 
-                    // Witches heal nearby allied mobs every 3 seconds; the heal scales with their tier.
-                    if (mob.getEntity() instanceof org.bukkit.entity.Witch witchHealer && tickCounter % 60 == 0) {
-                        double healAmount = mob.getTier() * 10.0;
-                        witchHealer.getWorld().spawnParticle(org.bukkit.Particle.HEART, witchHealer.getLocation().add(0, 2, 0), 3);
-                        for (TDMob ally : activeMobs) {
-                            org.bukkit.entity.Mob allyEnt = ally.getEntity();
-                            if (allyEnt == null || allyEnt.isDead() || !allyEnt.isValid()) continue;
-                            if (!ally.getArena().equals(mob.getArena())) continue;
-                            if (allyEnt.getLocation().distanceSquared(witchHealer.getLocation()) >= 25.0) continue;
-                            org.bukkit.attribute.AttributeInstance maxHpAttr = allyEnt.getAttribute(Attribute.MAX_HEALTH);
-                            if (maxHpAttr == null) continue;
-                            double maxHp = maxHpAttr.getValue();
-                            allyEnt.setHealth(Math.min(maxHp, allyEnt.getHealth() + healAmount));
-                            allyEnt.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, allyEnt.getLocation().add(0, 1, 0), 5);
-                        }
-                    }
-
-                    // Giants periodically summon a Tier 1 Zombie at their position (every 5 seconds),
-                    // but only while the Giant is alive and valid so summons stop on death. The spawn
-                    // is deferred a tick so we don't structurally modify activeMobs mid-iteration.
-                    if (mob.getEntity().getType() == EntityType.GIANT && tickCounter % 100 == 0) {
-                        final TDMob giantMob = mob;
-                        final String giantArena = mobArena;
-                        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                            org.bukkit.entity.Mob giantEntity = giantMob.getEntity();
-                            if (!giantEntity.isDead() && giantEntity.isValid()) {
-                                summonZombieAt(giantMob, giantArena);
+                        // Poison damage-over-time.
+                        org.bukkit.NamespacedKey poisonedUntilKey = TDKeys.POISONED_UNTIL;
+                        if (mob.getEntity().getPersistentDataContainer().has(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
+                            long poisonUntil = mob.getEntity().getPersistentDataContainer().get(poisonedUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
+                            if (System.currentTimeMillis() < poisonUntil) {
+                                if (tickCounter % 20 == 0) {
+                                    double pdmg = mob.getEntity().getPersistentDataContainer().getOrDefault(
+                                            TDKeys.POISON_DAMAGE,
+                                            org.bukkit.persistence.PersistentDataType.DOUBLE, 1.0);
+                                    mob.getEntity().damage(pdmg);
+                                    mob.getEntity().getWorld().spawnParticle(org.bukkit.Particle.WITCH,
+                                            mob.getEntity().getLocation().add(0, 0.5, 0), 6, 0.25, 0.4, 0.25, 0.0);
+                                }
+                            } else {
+                                mob.getEntity().getPersistentDataContainer().remove(poisonedUntilKey);
                             }
-                        });
-                    }
+                        }
 
-                    handleMobMovement(mob, iterator, tickCounter);
+                        // Witches heal nearby allied mobs every 3 seconds
+                        if (mob.getEntity() instanceof org.bukkit.entity.Witch witchHealer && tickCounter % 60 == 0) {
+                            double healAmount = mob.getTier() * 10.0;
+                            witchHealer.getWorld().spawnParticle(org.bukkit.Particle.HEART, witchHealer.getLocation().add(0, 2, 0), 3);
+                            for (TDMob ally : match.getActiveMobs()) {
+                                org.bukkit.entity.Mob allyEnt = ally.getEntity();
+                                if (allyEnt == null || allyEnt.isDead() || !allyEnt.isValid()) continue;
+                                if (!ally.getArena().equals(mob.getArena())) continue;
+                                if (allyEnt.getLocation().distanceSquared(witchHealer.getLocation()) >= 25.0) continue;
+                                org.bukkit.attribute.AttributeInstance maxHpAttr = allyEnt.getAttribute(Attribute.MAX_HEALTH);
+                                if (maxHpAttr == null) continue;
+                                double maxHp = maxHpAttr.getValue();
+                                allyEnt.setHealth(Math.min(maxHp, allyEnt.getHealth() + healAmount));
+                                allyEnt.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, allyEnt.getLocation().add(0, 1, 0), 5);
+                            }
+                        }
+
+                        // Giants periodically summon a Tier 1 Zombie
+                        if (mob.getEntity().getType() == EntityType.GIANT && tickCounter % 100 == 0) {
+                            final TDMob giantMob = mob;
+                            final String giantArena = mobArena;
+                            final Match currentMatch = match;
+                            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                                org.bukkit.entity.Mob giantEntity = giantMob.getEntity();
+                                if (!giantEntity.isDead() && giantEntity.isValid()) {
+                                    summonZombieAt(currentMatch, giantMob, giantArena);
+                                }
+                            });
+                        }
+
+                        handleMobMovement(match, mob, iterator, tickCounter);
+                    }
                 }
                 tickCounter++;
             }
-        }.runTaskTimer(plugin, 0L, 1L); // Run every tick (20 times per second) for snappy transitions
+        }.runTaskTimer(plugin, 0L, 1L); // Run every tick
     }
 
     /**
@@ -724,22 +724,18 @@ public class MobManager {
      */
     private boolean isVelocityDriven(org.bukkit.entity.Mob entity, double heightOffset) {
         return entity.getPersistentDataContainer().has(
-                new org.bukkit.NamespacedKey(plugin, "td_mob"),
+                TDKeys.MOB,
                 org.bukkit.persistence.PersistentDataType.BYTE);
     }
 
-    private void handleMobMovement(TDMob mob, Iterator<TDMob> iterator, long currentTick) {
+    private void handleMobMovement(Match match, TDMob mob, Iterator<TDMob> iterator, long currentTick) {
         // Skip movement if mob was recently teleported by Chorus Tower
         if (mob.isTeleported()) {
             mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
             return;
         }
 
-        String mobArena = mob.getEntity().getPersistentDataContainer().get(
-            new org.bukkit.NamespacedKey(plugin, "td_arena"),
-            org.bukkit.persistence.PersistentDataType.STRING
-        );
-        if (mobArena == null) mobArena = "1";
+        String mobArena = mob.getArena();
 
         // Witches will otherwise stop walking to drink potions — a hardcoded vanilla mechanic that
         // applies a heavy internal slowness while the drink animation plays. Continuously strip any
@@ -757,7 +753,7 @@ public class MobManager {
 
         // Freeze status check (applied by Ice Towers)
         boolean isFrozen = false;
-        org.bukkit.NamespacedKey freezeUntilKey = new org.bukkit.NamespacedKey(plugin, "td_frozen_until");
+        org.bukkit.NamespacedKey freezeUntilKey = TDKeys.FROZEN_UNTIL;
         if (mob.getEntity().getPersistentDataContainer().has(freezeUntilKey, org.bukkit.persistence.PersistentDataType.LONG)) {
             long frozenUntil = mob.getEntity().getPersistentDataContainer().get(freezeUntilKey, org.bukkit.persistence.PersistentDataType.LONG);
             if (System.currentTimeMillis() < frozenUntil) {
@@ -788,7 +784,7 @@ public class MobManager {
                     // Attack logic: damage castle every 40 ticks
                     if (currentTick - mob.getLastAttackTick() >= 40) {
                         mob.setLastAttackTick(currentTick);
-                        plugin.getGameManager().damageCastle(mobArena, 1);
+                        plugin.getGameManager().damageCastle(match, mobArena, 1);
                         mob.getEntity().swingMainHand();
                         for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
                             if (mobArena.equals(plugin.getGameManager().getPlayerArena(p.getUniqueId()))) {
@@ -801,10 +797,10 @@ public class MobManager {
             return;
         }
 
-        boolean isFreezeActive = plugin.getGameManager().isSpellActive(mobArena, "FREEZE");
-        boolean isHasteActive = plugin.getGameManager().isSpellActive(mobArena, "HASTE_RUSH");
+        boolean isFreezeActive = plugin.getGameManager().isSpellActive(match, mobArena, "FREEZE");
+        boolean isHasteActive = plugin.getGameManager().isSpellActive(match, mobArena, "HASTE_RUSH");
         boolean isSlowImmune = mob.getEntity().getPersistentDataContainer().has(
-            new org.bukkit.NamespacedKey(plugin, "td_slow_immune"),
+            TDKeys.SLOW_IMMUNE,
             org.bukkit.persistence.PersistentDataType.BYTE
         );
 
@@ -819,7 +815,7 @@ public class MobManager {
         }
 
         String presetKey = mob.getEntity().getPersistentDataContainer().get(
-            new org.bukkit.NamespacedKey(plugin, "td_preset"),
+            TDKeys.PRESET,
             org.bukkit.persistence.PersistentDataType.STRING
         );
         if (presetKey == null) presetKey = mob.getEntity().getType().name().toLowerCase();
@@ -836,7 +832,7 @@ public class MobManager {
                 Location loc = mob.getEntity().getLocation();
                 loc.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, loc, 1);
                 loc.getWorld().playSound(loc, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
-                plugin.getGameManager().damageCastle(mobArena, getCastleDamage(mob.getEntity()));
+                plugin.getGameManager().damageCastle(match, mobArena, getCastleDamage(mob.getEntity()));
 
                 org.bukkit.entity.Entity creeperVehicle = mob.getEntity().getVehicle();
                 if (creeperVehicle != null) creeperVehicle.remove();
@@ -859,7 +855,7 @@ public class MobManager {
             long now = System.currentTimeMillis();
             if (now - mob.getLastCastleAttackTime() >= 1500L) {
                 mob.setLastCastleAttackTime(now);
-                plugin.getGameManager().damageCastle(mobArena, getCastleDamage(mob.getEntity()));
+                plugin.getGameManager().damageCastle(match, mobArena, getCastleDamage(mob.getEntity()));
                 mob.getEntity().getWorld().playSound(mob.getEntity().getLocation(),
                         org.bukkit.Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1.0f, 0.8f);
                 mob.getEntity().swingMainHand();
@@ -969,15 +965,15 @@ public class MobManager {
         if (entity.getType() == EntityType.CREEPER) {
             return plugin.getConfig().getInt("mobs.creeper.castle-damage", 5);
         }
-        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "td_castle_damage");
+        org.bukkit.NamespacedKey key = TDKeys.CASTLE_DAMAGE;
         if (entity.getPersistentDataContainer().has(key, org.bukkit.persistence.PersistentDataType.INTEGER)) {
             return entity.getPersistentDataContainer().get(key, org.bukkit.persistence.PersistentDataType.INTEGER);
         }
         return 1;
     }
 
-    public void cleanup() {
-        for (TDMob mob : activeMobs) {
+    public void cleanup(Match match) {
+        for (TDMob mob : match.getActiveMobs()) {
             // Remove any health-bar ArmorStand passenger (invisible mobs) so none are left floating.
             for (org.bukkit.entity.Entity passenger : mob.getEntity().getPassengers()) {
                 if (passenger instanceof org.bukkit.entity.ArmorStand) {
@@ -986,11 +982,22 @@ public class MobManager {
             }
             mob.getEntity().remove();
         }
-        activeMobs.clear();
+        match.getActiveMobs().clear();
+    }
+
+    public void cleanup() {
+        for (Match match : plugin.getGameManager().getActiveMatches()) {
+            cleanup(match);
+        }
+    }
+
+    public List<TDMob> getActiveMobs(Match match) {
+        return match.getActiveMobs();
     }
 
     public List<TDMob> getActiveMobs() {
-        return activeMobs;
+        // Warning: This returns an empty list or needs to be refactored elsewhere
+        return new ArrayList<>();
     }
 
     // --- GUI & Queue System ---
@@ -1090,6 +1097,8 @@ public class MobManager {
         // Determine opponent's arena
         String playerArena = plugin.getGameManager().getPlayerArena(uuid);
         String targetArena = playerArena.equals("1") ? "2" : "1";
+        Match match = plugin.getGameManager().getPlayerMatch(uuid);
+        if (match == null) return;
 
         // Spawn mobs spaced 20 ticks (1.0s) apart to space out the wave
         new BukkitRunnable() {
@@ -1102,7 +1111,7 @@ public class MobManager {
                     return;
                 }
                 QueuedSpawn qs = spawnList.get(index);
-                spawnMobByChain(targetArena, qs.chain(), qs.tier());
+                spawnMobByChain(match, targetArena, qs.chain(), qs.tier());
                 index++;
             }
         }.runTaskTimer(plugin, 0L, 20L);
