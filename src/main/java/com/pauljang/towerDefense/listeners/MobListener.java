@@ -316,7 +316,7 @@ public class MobListener implements Listener {
                 int reward = entity.getPersistentDataContainer().get(rewardKey, PersistentDataType.INTEGER);
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
                     if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(mobArena)) {
-                        plugin.getGameManager().addGold(player.getUniqueId(), reward);
+                        plugin.getGameManager().addGold(player.getUniqueId(), reward, false);
                     }
                 }
             }
@@ -337,14 +337,25 @@ public class MobListener implements Listener {
             if (entity instanceof org.bukkit.entity.Slime || entity instanceof org.bukkit.entity.MagmaCube) {
                 final Location deathLoc = entity.getLocation();
                 final String arena = mobArena;
+
+                // Find the parent mob and its match
+                com.pauljang.towerDefense.core.Match parentMatch = null;
                 String parentWpId = "0";
-                for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
-                    if (tdMob.getEntity().equals(entity)) {
-                        parentWpId = tdMob.getCurrentWaypointId();
-                        break;
+                for (com.pauljang.towerDefense.core.Match match : plugin.getGameManager().getActiveMatches()) {
+                    for (com.pauljang.towerDefense.entities.TDMob tdMob : match.getActiveMobs()) {
+                        if (tdMob.getEntity().equals(entity)) {
+                            parentWpId = tdMob.getCurrentWaypointId();
+                            parentMatch = match;
+                            break;
+                        }
                     }
+                    if (parentMatch != null) break;
                 }
+
+                if (parentMatch == null) return; // No match found, skip splitting
+
                 final String wpId = parentWpId;
+                final com.pauljang.towerDefense.core.Match finalMatch = parentMatch;
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     double radius = 3.0;
                     for (org.bukkit.entity.Entity nearby : deathLoc.getWorld().getNearbyEntities(deathLoc, radius, radius, radius)) {
@@ -356,16 +367,16 @@ public class MobListener implements Listener {
                                 child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_preset"), PersistentDataType.STRING, child.getType() == org.bukkit.entity.EntityType.MAGMA_CUBE ? "magma_cube" : "slime");
                                 child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_gold_reward"), PersistentDataType.INTEGER, 0); // No farming split slimes
                                 child.getPersistentDataContainer().set(new NamespacedKey(plugin, "td_xp_reward"), PersistentDataType.INTEGER, 0);
-                                
+
                                 org.bukkit.attribute.AttributeInstance kbResist = child.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
                                 if (kbResist != null) {
                                     kbResist.setBaseValue(1.0);
                                 }
-                                
-                                java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(arena);
+
+                                java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(finalMatch, arena);
                                 com.pauljang.towerDefense.entities.TDMob childTDMob = new com.pauljang.towerDefense.entities.TDMob(child, graph);
                                 childTDMob.setCurrentWaypointId(wpId);
-                                plugin.getMobManager().getActiveMobs().add(childTDMob);
+                                finalMatch.getActiveMobs().add(childTDMob);
                                 plugin.getMobManager().updateHealthBar(child);
                             }
                         }
@@ -502,9 +513,34 @@ public class MobListener implements Listener {
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             int slot = event.getRawSlot();
-            if (slot == 13) {
+            if (slot == 11) {
+                // Single Player queue
                 player.closeInventory();
-                plugin.getGameManager().toggleQueue(player);
+                plugin.getQueueManager().toggleQueue(player, true);
+            } else if (slot == 15) {
+                // Multiplayer queue
+                player.closeInventory();
+                plugin.getQueueManager().toggleQueue(player, false);
+            }
+            return;
+        }
+
+        // Voting GUI
+        if (title.startsWith(org.bukkit.ChatColor.BLUE + "Vote for a Map!")) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+
+            int slot = event.getRawSlot();
+            // Map options are in slots 11, 12, 13
+            if (slot >= 11 && slot <= 13) {
+                int mapIndex = slot - 11;
+                com.pauljang.towerDefense.core.QueueManager.VotingSession session =
+                    plugin.getQueueManager().getSession(player.getUniqueId());
+                if (session != null) {
+                    session.castVote(player.getUniqueId(), mapIndex);
+                    player.sendMessage(org.bukkit.ChatColor.GREEN + "Vote cast!");
+                }
             }
             return;
         }
@@ -537,7 +573,7 @@ public class MobListener implements Listener {
                     }
                 }
                 plugin.getMobManager().clearQueue(player.getUniqueId());
-                if (totalRefund > 0) plugin.getGameManager().addGold(player.getUniqueId(), totalRefund);
+                if (totalRefund > 0) plugin.getGameManager().addGold(player.getUniqueId(), totalRefund, false);
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 0.8f, 0.8f);
                 player.sendMessage(org.bukkit.ChatColor.RED + "Queue cleared. Refunded " + totalRefund + " Gold.");
                 plugin.getMobManager().openMobSpawnerGUI(player);
@@ -863,7 +899,7 @@ public class MobListener implements Listener {
                 case 40 -> { // Destroy Tower
                     int refund = tower.getTotalValue() / 2;
                     plugin.getTowerManager().removeTower(plotId);
-                    plugin.getGameManager().addGold(player.getUniqueId(), refund);
+                    plugin.getGameManager().addGold(player.getUniqueId(), refund, false);
                     player.closeInventory();
                     player.sendMessage(org.bukkit.ChatColor.RED + "Demolished Tower on plot " + plotId + "! Refunded " + refund + " Gold.");
                     player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_BREAK, 0.8f, 1.0f);
