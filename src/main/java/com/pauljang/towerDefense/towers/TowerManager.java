@@ -151,12 +151,12 @@ public class TowerManager {
         isolateTowerBlocks(center, tower.getStructureSize());
         clearNearbyDroppedItemsLater(center);
 
-        // Dripstone T2+: visible pointed-dripstone hazard spikes on the track that tag passing mobs
-        // as vulnerable (+15% damage taken). Clear any previously-spawned hazard stands first.
+        // Dripstone T2+: visible 3D pointed-dripstone hazard spikes on the track that tag passing
+        // mobs as vulnerable (+15% damage taken). Clear any previously-spawned hazard displays first.
         for (Location loc : tower.getHazardTiles()) {
             if (loc.getWorld() == null) continue;
-            loc.getWorld().getNearbyEntities(loc, 1.0, 1.0, 1.0).stream()
-                .filter(e -> e instanceof ArmorStand && e.getScoreboardTags().contains("td_hazard"))
+            loc.getWorld().getNearbyEntities(loc, 1.0, 2.0, 1.0).stream()
+                .filter(e -> e.getScoreboardTags().contains("td_hazard"))
                 .forEach(org.bukkit.entity.Entity::remove);
         }
         tower.getHazardTiles().clear();
@@ -176,23 +176,23 @@ public class TowerManager {
                     continue;
                 }
 
-                // Sink the marker stand so its dripstone helmet renders just above the track.
-                Location hazardLoc = baseLoc.clone().add(0, -1.2, 0);
-                ArmorStand hazardStand = hazardLoc.getWorld().spawn(hazardLoc, ArmorStand.class, as -> {
-                    as.setInvisible(true);
-                    as.setMarker(true);
-                    as.setGravity(false);
-                    as.setInvulnerable(true);
-                    as.setPersistent(false);
-                    as.addScoreboardTag("td_hazard");
-                    // Flip the head 180 degrees so the pointed dripstone points upward out of the ground.
-                    as.setHeadPose(new org.bukkit.util.EulerAngle(Math.PI, 0, 0));
-                    if (as.getEquipment() != null) {
-                        as.getEquipment().setHelmet(new ItemStack(Material.POINTED_DRIPSTONE));
-                    }
+                Location hazardLoc = baseLoc.clone();
+                org.bukkit.entity.BlockDisplay hazardStand = hazardLoc.getWorld().spawn(hazardLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
+                    org.bukkit.block.data.type.PointedDripstone data =
+                            (org.bukkit.block.data.type.PointedDripstone) Material.POINTED_DRIPSTONE.createBlockData();
+                    data.setVerticalDirection(org.bukkit.block.BlockFace.UP); // Point upwards out of the ground
+                    bd.setBlock(data);
+                    bd.addScoreboardTag("td_hazard");
+                    bd.setPersistent(false);
+                    // Center the 1x1 block on the location.
+                    bd.setTransformation(new org.bukkit.util.Transformation(
+                            new org.joml.Vector3f(-0.5f, 0f, -0.5f),
+                            new org.joml.Quaternionf(),
+                            new org.joml.Vector3f(1f, 1f, 1f),
+                            new org.joml.Quaternionf()
+                    ));
                 });
-                tower.getHazardTiles().add(hazardStand.getEyeLocation());
-                tower.getLandmines().add(hazardStand); // tracked so it cleans up on destroy
+                tower.getHazardTiles().add(hazardStand.getLocation());
                 placed++;
             }
         }
@@ -537,6 +537,15 @@ public class TowerManager {
                 }
             }
             tower.getLandmines().clear();
+
+            // Clean up Dripstone hazard BlockDisplays (tracked only by location now).
+            for (Location loc : tower.getHazardTiles()) {
+                if (loc.getWorld() != null) {
+                    loc.getWorld().getNearbyEntities(loc, 1.0, 2.0, 1.0).stream()
+                        .filter(e -> e.getScoreboardTags().contains("td_hazard"))
+                        .forEach(org.bukkit.entity.Entity::remove);
+                }
+            }
             tower.getHazardTiles().clear();
 
             // Clean up hologram ArmorStands
@@ -849,17 +858,24 @@ public class TowerManager {
         if (tick % 2 != 0) return;
         java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), tower.getRange(), arena);
 
-        // The whole swarm focuses a single lead target.
-        Mob primeTarget = targets.isEmpty() ? null : targets.get(0);
-
+        int targetIndex = 0;
         int index = 0;
         java.util.Iterator<org.bukkit.entity.Bee> beeIt = tower.getSpawnedBees().iterator();
         while (beeIt.hasNext()) {
             org.bukkit.entity.Bee bee = beeIt.next();
             index++;
 
-            if (primeTarget == null || !primeTarget.isValid()) {
-                // Orbit smoothly around the hive while idle
+            // Swarm bees each take a different target; the single Goliath bee always uses the lead.
+            Mob assignedTarget = null;
+            if (targetIndex < targets.size()) {
+                assignedTarget = targets.get(targetIndex);
+                if (!goliath) {
+                    targetIndex++;
+                }
+            }
+
+            if (assignedTarget == null || !assignedTarget.isValid()) {
+                // No target available for this bee, orbit smoothly around the hive while idle
                 double orbitSpeed = 0.05;
                 double radius = 1.5 + (index * 0.2); // slight offset per bee
                 double angle = (tick * orbitSpeed) + (index * Math.PI / 2);
@@ -872,18 +888,18 @@ public class TowerManager {
                 continue;
             }
 
-            double distSq = primeTarget.getLocation().distanceSquared(bee.getLocation());
+            double distSq = assignedTarget.getLocation().distanceSquared(bee.getLocation());
             if (distSq <= 1.44) {
                 Location pop = bee.getLocation();
                 pop.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, pop, 1);
-                pop.getWorld().playSound(pop, Sound.ENTITY_BEE_DEATH, 1.0f, 0.8f);
+                pop.getWorld().playSound(pop, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
                 // Clear i-frames first so multiple bees landing the same tick all deal damage.
-                primeTarget.setNoDamageTicks(0);
-                primeTarget.damage(tower.getDamage());
+                assignedTarget.setNoDamageTicks(0);
+                assignedTarget.damage(tower.getDamage());
                 bee.remove();
                 beeIt.remove();
             } else {
-                org.bukkit.util.Vector dir = primeTarget.getLocation().add(0, 0.5, 0).toVector()
+                org.bukkit.util.Vector dir = assignedTarget.getLocation().add(0, 0.5, 0).toVector()
                         .subtract(bee.getLocation().toVector()).normalize();
                 bee.setVelocity(dir.multiply(0.45));
             }
@@ -1615,15 +1631,18 @@ public class TowerManager {
 
                     org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(start.toVector()).normalize();
 
+                    // Push the spawn point 1.5 blocks forward so arrows clear the tower's own collision box.
+                    Location safeStart = start.clone().add(dir.clone().multiply(1.5));
+
                     for (int i = 0; i < arrows; i++) {
                         // Offset spawn locations slightly so the arrows don't instantly collide with each other.
-                        Location spawnLoc = start.clone().add((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8);
-                        org.bukkit.entity.Arrow arrow = start.getWorld().spawn(spawnLoc, org.bukkit.entity.Arrow.class);
+                        Location spawnLoc = safeStart.clone().add((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5);
+                        org.bukkit.entity.Arrow arrow = safeStart.getWorld().spawn(spawnLoc, org.bukkit.entity.Arrow.class);
                         arrow.setDamage(damage);
                         arrow.setShooter(null);
 
                         // Apply a strong randomized spread to the velocity.
-                        double spread = 0.5;
+                        double spread = 0.35;
                         org.bukkit.util.Vector spreadDir = dir.clone().add(new org.bukkit.util.Vector(
                                 (Math.random() - 0.5) * spread,
                                 (Math.random() - 0.5) * spread,
@@ -1682,25 +1701,27 @@ public class TowerManager {
         }
     }
 
-    // A dripstone projectile falls from above and deals damage exactly on impact (keeps the visual
-    // and the damage in sync). Standard single-target strikes use a pointed-dripstone spike; the
-    // T3 cave-in wave ({@code isWave == true}) drops a full dripstone block and applies AoE damage
-    // to everything within 1.5 blocks of the landing point.
+    // A 3D pointed-dripstone falls from above (rendered with a BlockDisplay so it's a true block in
+    // the world without disrupting pathfinding) and deals damage exactly on impact. The T3 cave-in
+    // wave ({@code isWave == true}) applies AoE damage within 1.5 blocks of the landing point.
     private void playDripstoneStrike(Tower tower, Location targetLoc, double damage, Mob target, boolean isWave) {
         Location startLoc = targetLoc.clone().add(0, 5.0, 0);
         if (startLoc.getWorld() == null) return;
 
-        final Material blockMat = isWave ? Material.DRIPSTONE_BLOCK : Material.POINTED_DRIPSTONE;
-
-        ArmorStand fallingSpike = startLoc.getWorld().spawn(startLoc, ArmorStand.class, as -> {
-            as.setInvisible(true);
-            as.setMarker(true);
-            as.setGravity(false);
-            as.setInvulnerable(true);
-            as.setPersistent(false);
-            if (as.getEquipment() != null) {
-                as.getEquipment().setHelmet(new ItemStack(blockMat));
-            }
+        // Spawn a BlockDisplay for true 3D visuals: a Pointed Dripstone pointing downwards.
+        org.bukkit.entity.BlockDisplay fallingSpike = startLoc.getWorld().spawn(startLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
+            org.bukkit.block.data.type.PointedDripstone data =
+                    (org.bukkit.block.data.type.PointedDripstone) Material.POINTED_DRIPSTONE.createBlockData();
+            data.setVerticalDirection(org.bukkit.block.BlockFace.DOWN); // Point downwards
+            bd.setBlock(data);
+            bd.setPersistent(false);
+            // Center the 1x1 block on the location.
+            bd.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-0.5f, 0f, -0.5f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(1f, 1f, 1f),
+                    new org.joml.Quaternionf()
+            ));
         });
 
         startLoc.getWorld().playSound(startLoc, Sound.BLOCK_POINTED_DRIPSTONE_FALL, 1.0f, 1.0f);
@@ -1721,7 +1742,7 @@ public class TowerManager {
                 fallingSpike.teleport(current);
 
                 if (current.getY() <= targetLoc.getY() + 0.5) {
-                    current.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, current, 15, 0.2, 0.1, 0.2, blockMat.createBlockData());
+                    current.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, current, 15, 0.2, 0.1, 0.2, Material.POINTED_DRIPSTONE.createBlockData());
                     current.getWorld().playSound(current, Sound.BLOCK_POINTED_DRIPSTONE_LAND, 1.0f, 0.9f);
 
                     // Damage lands exactly when the block hits the ground.
