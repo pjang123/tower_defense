@@ -1198,6 +1198,15 @@ public class GameManager {
         return end != null && System.currentTimeMillis() < end;
     }
 
+    /** Returns the epoch-millis end time of an active spell in the arena, or 0 if not active. */
+    public long getSpellEndTime(String arena, String spellType) {
+        java.util.Map<String, Long> spells = activeSpells.get(arena);
+        if (spells == null) return 0L;
+        Long end = spells.get(spellType.toUpperCase());
+        if (end == null || System.currentTimeMillis() >= end) return 0L;
+        return end;
+    }
+
     public void damageCastle(Match match, String arena, int amount) {
         int current = match.getArenaHealth().getOrDefault(arena, maxCastleHealth);
         int updated = Math.max(0, current - amount);

@@ -342,12 +342,6 @@ thunder:
       chain_count: 3
     3:
       cost: 450
-      range: 18.0
-      damage: 11.0
-      cooldown: 75
-      chain_count: 5
-    4:
-      cost: 600
       range: 999.0
       damage: 15.0
       cooldown: 600

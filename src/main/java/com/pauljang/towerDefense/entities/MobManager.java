@@ -951,7 +951,7 @@ public class MobManager {
         Location mobLoc = mob.getEntity().getLocation();
         double reachDistSq = Math.pow(mobLoc.getX() - targetLoc.getX(), 2)
                 + Math.pow(mobLoc.getZ() - targetLoc.getZ(), 2);
-        double reachThreshold = isVelocityDriven(mob.getEntity(), heightOffset) ? 4.0 : 2.25;
+        double reachThreshold = isVelocityDriven(mob.getEntity(), heightOffset) ? 0.5 : 0.25;
         if (reachDistSq < reachThreshold) {
             mob.advanceToNextWaypoint();
         }
