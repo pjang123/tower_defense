@@ -73,6 +73,15 @@ public class TowerManager {
         Tower tower = new Tower(plotId, center, type);
         tower.setPathId(pathId);
         tower.setOwnerId(ownerId);
+
+        // If an EMP is currently active in this arena, the freshly placed tower starts disabled
+        // for the remainder of the EMP window so it can't be used to dodge the disruption.
+        String empArena = plugin.getPlotConfigManager().getPlotArena(plotId);
+        long empEnd = plugin.getGameManager().getSpellEndTime(empArena, "TOWER_EMP");
+        if (empEnd > 0L) {
+            tower.setDisabledUntil(empEnd);
+        }
+
         placedTowers.put(plotId, tower);
 
         buildTowerStructure(tower);
@@ -154,9 +163,21 @@ public class TowerManager {
         tower.getLandmines().removeIf(s -> s == null || !s.isValid());
 
         if (type == TowerType.DRIPSTONE && level >= 2) {
-            for (Location wpLoc : getTrackLocationsWithinRange(tower)) {
+            java.util.List<Location> track = getTrackLocationsWithinRange(tower);
+            int count = plugin.getTowerConfigManager().getStat(TowerType.DRIPSTONE, level, "hazard_count", 6);
+            int placed = 0;
+
+            for (int i = 0; i < 30 && placed < count && !track.isEmpty(); i++) { // up to 30 attempts to find random spots
+                Location baseLoc = track.get(new Random().nextInt(track.size())).clone();
+                // Randomly offset along the path within the tower radius
+                baseLoc.add((Math.random() - 0.5) * 2.5, 0, (Math.random() - 0.5) * 2.5);
+
+                if (baseLoc.distanceSquared(tower.getCenterLocation()) > tower.getRange() * tower.getRange()) {
+                    continue;
+                }
+
                 // Sink the marker stand so its dripstone helmet renders just above the track.
-                Location hazardLoc = wpLoc.clone().add(0, -1.2, 0);
+                Location hazardLoc = baseLoc.clone().add(0, -1.2, 0);
                 ArmorStand hazardStand = hazardLoc.getWorld().spawn(hazardLoc, ArmorStand.class, as -> {
                     as.setInvisible(true);
                     as.setMarker(true);
@@ -164,13 +185,15 @@ public class TowerManager {
                     as.setInvulnerable(true);
                     as.setPersistent(false);
                     as.addScoreboardTag("td_hazard");
+                    // Flip the head 180 degrees so the pointed dripstone points upward out of the ground.
+                    as.setHeadPose(new org.bukkit.util.EulerAngle(Math.PI, 0, 0));
                     if (as.getEquipment() != null) {
                         as.getEquipment().setHelmet(new ItemStack(Material.POINTED_DRIPSTONE));
                     }
                 });
                 tower.getHazardTiles().add(hazardStand.getEyeLocation());
                 tower.getLandmines().add(hazardStand); // tracked so it cleans up on destroy
-                if (tower.getHazardTiles().size() >= 6) break;
+                placed++;
             }
         }
 
@@ -548,7 +571,7 @@ public class TowerManager {
                         // smoke + redstone particles around the tower.
                         java.util.List<ArmorStand> empStands = tower.getHolograms();
                         if (!empStands.isEmpty() && empStands.get(0) != null && empStands.get(0).isValid()) {
-                            empStands.get(0).setCustomName(ChatColor.RED + "" + ChatColor.BOLD + "[DISABLED EMP]");
+                            empStands.get(0).setCustomName(ChatColor.RED + "" + ChatColor.MAGIC + "||| " + ChatColor.RED + ChatColor.BOLD + "[DISABLED EMP] " + ChatColor.RED + ChatColor.MAGIC + "|||");
                             empStands.get(0).setCustomNameVisible(true);
                         }
                         if (tick % 5 == 0) {
@@ -730,9 +753,9 @@ public class TowerManager {
                 it.remove();
                 continue;
             }
-            // The stand is sunk into the ground so the TNT head sits on the track; check at head height
-            Location trigger = mine.getEyeLocation();
-            java.util.List<Mob> hit = getMobsInRadius(trigger, 1.3, arena);
+            // Mobs walk above the sunk stand's origin, so check slightly higher with a wider radius.
+            Location trigger = mine.getLocation().clone().add(0, 1.5, 0);
+            java.util.List<Mob> hit = getMobsInRadius(trigger, 2.0, arena);
             if (!hit.isEmpty()) {
                 trigger.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION_EMITTER, trigger, 1);
                 trigger.getWorld().playSound(trigger, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
@@ -748,30 +771,20 @@ public class TowerManager {
         java.util.List<Location> track = getTrackLocationsWithinRange(tower);
         if (track.isEmpty()) return;
 
-        // Pick a random in-range waypoint, then interpolate a random point toward its next waypoint
-        // so mines scatter along the track segment instead of snapping to waypoint centers.
+        // Pick a random in-range waypoint, then scatter the mine 1-2 blocks off the path center so
+        // mines spread out across the lane instead of stacking on waypoint centers.
         Location wp1 = track.get(new Random().nextInt(track.size()));
         Location mineLoc = wp1.clone();
+        mineLoc.add((Math.random() - 0.5) * 3.0, 0, (Math.random() - 0.5) * 3.0);
 
-        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph =
-                plugin.getWaypointConfigManager().getWaypointGraph(arena);
-        for (com.pauljang.towerDefense.data.TDWaypoint wp : graph.values()) {
-            if (wp.getLocation() != null && wp.getLocation().getWorld() != null
-                    && wp.getLocation().getWorld().equals(wp1.getWorld())
-                    && wp.getLocation().distanceSquared(wp1) < 0.1 && !wp.getNextIds().isEmpty()) {
-                com.pauljang.towerDefense.data.TDWaypoint nextWp = graph.get(wp.getNextIds().get(0));
-                if (nextWp != null && nextWp.getLocation() != null) {
-                    Location wp2 = nextWp.getLocation();
-                    double lerp = Math.random();
-                    mineLoc.add(wp2.toVector().subtract(wp1.toVector()).multiply(lerp));
-                }
-                break;
-            }
+        // Ensure the offset mine is still inside the tower's shooting radius
+        if (mineLoc.distanceSquared(tower.getCenterLocation()) > tower.getRange() * tower.getRange()) {
+            return; // Abort tick, will try again next tick
         }
 
         // Abort this tick if the chosen spot is too close to an existing mine
         for (ArmorStand existing : tower.getLandmines()) {
-            if (existing.isValid() && existing.getEyeLocation().distanceSquared(mineLoc) < 2.25) {
+            if (existing.isValid() && existing.getLocation().distanceSquared(mineLoc) < 3.0) {
                 return;
             }
         }
@@ -864,6 +877,8 @@ public class TowerManager {
                 Location pop = bee.getLocation();
                 pop.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, pop, 1);
                 pop.getWorld().playSound(pop, Sound.ENTITY_BEE_DEATH, 1.0f, 0.8f);
+                // Clear i-frames first so multiple bees landing the same tick all deal damage.
+                primeTarget.setNoDamageTicks(0);
                 primeTarget.damage(tower.getDamage());
                 bee.remove();
                 beeIt.remove();
@@ -1527,7 +1542,7 @@ public class TowerManager {
                 // Passive Redstone Tower
             }
             case DRIPSTONE -> {
-                playDripstoneStrike(target.getLocation(), tower.getDamage(), target);
+                playDripstoneStrike(tower, target.getLocation(), tower.getDamage(), target, false);
 
                 // T3 "Cave-In": a 3-wide, 5-long wave of spikes sweeps back down the path behind
                 // the target, damaging everything in the lane.
@@ -1555,10 +1570,8 @@ public class TowerManager {
 
                                     long delay = length * 3L;
                                     org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                                        playDripstoneStrike(strikeLoc, 0, null);
-                                        for (Mob m : getMobsInRadius(strikeLoc, 1.2, towerArena)) {
-                                            m.damage(waveDamage);
-                                        }
+                                        // isWave=true: the falling block applies its own AoE damage on impact.
+                                        playDripstoneStrike(tower, strikeLoc, waveDamage, null, true);
                                     }, delay);
                                 }
                             }
@@ -1586,7 +1599,8 @@ public class TowerManager {
                     java.util.List<Mob> near = getMobsInRadius(targetLoc, 6.0, towerArena);
                     near.remove(target);
                     near.sort(java.util.Comparator.comparingDouble(m -> m.getLocation().distanceSquared(targetLoc)));
-                    double chainDamage = tower.getDamage() * 0.5;
+                    // Chain lightning now deals full damage (was 50%).
+                    double chainDamage = tower.getDamage() * 1.0;
                     for (int i = 0; i < Math.min(chains, near.size()); i++) {
                         Mob chained = near.get(i);
                         drawParticleLine(target.getEyeLocation(), chained.getEyeLocation(), org.bukkit.Particle.ELECTRIC_SPARK);
@@ -1597,14 +1611,26 @@ public class TowerManager {
             case TURRET -> {
                 if ("scatter".equals(tower.getPathId())) {
                     int arrows = plugin.getTowerConfigManager().getStat(TowerType.TURRET, tower.getPathId(), tower.getLevel(), "arrows", 5);
-                    java.util.List<Mob> targets = getMobsInRadius(tower.getCenterLocation(), range, towerArena);
-                    if (targets.isEmpty()) return;
                     double damage = tower.getDamage();
+
+                    org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(start.toVector()).normalize();
+
                     for (int i = 0; i < arrows; i++) {
-                        Mob hit = targets.get(i % targets.size());
-                        if (!hit.isValid() || hit.isDead()) continue;
-                        hit.damage(damage);
-                        drawParticleLine(start, hit.getEyeLocation(), org.bukkit.Particle.CRIT);
+                        // Offset spawn locations slightly so the arrows don't instantly collide with each other.
+                        Location spawnLoc = start.clone().add((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8);
+                        org.bukkit.entity.Arrow arrow = start.getWorld().spawn(spawnLoc, org.bukkit.entity.Arrow.class);
+                        arrow.setDamage(damage);
+                        arrow.setShooter(null);
+
+                        // Apply a strong randomized spread to the velocity.
+                        double spread = 0.5;
+                        org.bukkit.util.Vector spreadDir = dir.clone().add(new org.bukkit.util.Vector(
+                                (Math.random() - 0.5) * spread,
+                                (Math.random() - 0.5) * spread,
+                                (Math.random() - 0.5) * spread
+                        )).normalize();
+
+                        arrow.setVelocity(spreadDir.multiply(2.5));
                     }
                     start.getWorld().playSound(start, Sound.ENTITY_ARROW_SHOOT, 0.8f, 0.8f);
                 } else { // gatling
@@ -1624,16 +1650,20 @@ public class TowerManager {
                 double damage = tower.getDamage();
                 Location targetLoc = target.getLocation().clone();
 
-                org.bukkit.entity.TNTPrimed tnt = start.getWorld().spawn(start, org.bukkit.entity.TNTPrimed.class, t -> {
+                // Spawn higher up so the bomb clears the tower's own structure instead of sticking inside it.
+                Location bombStart = start.clone().add(0, 1.5, 0);
+
+                org.bukkit.entity.TNTPrimed tnt = bombStart.getWorld().spawn(bombStart, org.bukkit.entity.TNTPrimed.class, t -> {
                     t.setFuseTicks(25);
                     t.setYield(0.0f);
                     t.setIsIncendiary(false);
                     t.setMetadata("td_bombardier", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
                 });
-                org.bukkit.util.Vector dir = targetLoc.toVector().subtract(start.toVector());
+                org.bukkit.util.Vector dir = targetLoc.toVector().subtract(bombStart.toVector());
                 double dist = Math.max(1.0, dir.length());
-                tnt.setVelocity(dir.normalize().multiply(0.07 * dist).setY(0.5));
-                start.getWorld().playSound(start, Sound.ENTITY_TNT_PRIMED, 1.0f, 1.0f);
+                // Boost the Y velocity so it arcs overhead and away from the tower.
+                tnt.setVelocity(dir.normalize().multiply(0.07 * dist).setY(0.6));
+                bombStart.getWorld().playSound(bombStart, Sound.ENTITY_TNT_PRIMED, 1.0f, 1.0f);
 
                 // Detonate ourselves at fuse end (yield 0 means vanilla does no damage or block changes)
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -1652,12 +1682,15 @@ public class TowerManager {
         }
     }
 
-    // A pointed-dripstone spike falls from above the target and deals damage on impact.
-    // When {@code target} is null the strike is purely visual (used by the cave-in wave, which
-    // applies its own area damage on landing).
-    private void playDripstoneStrike(Location targetLoc, double damage, Mob target) {
+    // A dripstone projectile falls from above and deals damage exactly on impact (keeps the visual
+    // and the damage in sync). Standard single-target strikes use a pointed-dripstone spike; the
+    // T3 cave-in wave ({@code isWave == true}) drops a full dripstone block and applies AoE damage
+    // to everything within 1.5 blocks of the landing point.
+    private void playDripstoneStrike(Tower tower, Location targetLoc, double damage, Mob target, boolean isWave) {
         Location startLoc = targetLoc.clone().add(0, 5.0, 0);
         if (startLoc.getWorld() == null) return;
+
+        final Material blockMat = isWave ? Material.DRIPSTONE_BLOCK : Material.POINTED_DRIPSTONE;
 
         ArmorStand fallingSpike = startLoc.getWorld().spawn(startLoc, ArmorStand.class, as -> {
             as.setInvisible(true);
@@ -1666,9 +1699,12 @@ public class TowerManager {
             as.setInvulnerable(true);
             as.setPersistent(false);
             if (as.getEquipment() != null) {
-                as.getEquipment().setHelmet(new ItemStack(Material.POINTED_DRIPSTONE));
+                as.getEquipment().setHelmet(new ItemStack(blockMat));
             }
         });
+
+        startLoc.getWorld().playSound(startLoc, Sound.BLOCK_POINTED_DRIPSTONE_FALL, 1.0f, 1.0f);
+        String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
 
         new BukkitRunnable() {
             int ticks = 0;
@@ -1685,12 +1721,18 @@ public class TowerManager {
                 fallingSpike.teleport(current);
 
                 if (current.getY() <= targetLoc.getY() + 0.5) {
-                    current.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, current, 15, 0.2, 0.1, 0.2, Material.POINTED_DRIPSTONE.createBlockData());
+                    current.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, current, 15, 0.2, 0.1, 0.2, blockMat.createBlockData());
                     current.getWorld().playSound(current, Sound.BLOCK_POINTED_DRIPSTONE_LAND, 1.0f, 0.9f);
 
-                    if (target != null && target.isValid() && !target.isDead()) {
+                    // Damage lands exactly when the block hits the ground.
+                    if (isWave) {
+                        for (Mob m : getMobsInRadius(current, 1.5, arena)) {
+                            m.damage(damage);
+                        }
+                    } else if (target != null && target.isValid() && !target.isDead()) {
                         target.damage(damage);
                     }
+
                     fallingSpike.remove();
                     this.cancel();
                 }

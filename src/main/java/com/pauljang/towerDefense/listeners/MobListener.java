@@ -764,6 +764,7 @@ public class MobListener implements Listener {
                 plugin.getTowerManager().clearPendingPathChoice(player.getUniqueId());
                 tower.setPathId(path);
                 tower.incrementLevel();
+                respawnBeesOnUpgrade(tower);
                 plugin.getTowerManager().buildTowerStructure(tower);
                 plugin.getTowerManager().updateHologram(tower);
                 player.sendMessage(org.bukkit.ChatColor.GREEN + "Upgraded " + type.getDisplayName()
@@ -826,6 +827,7 @@ public class MobListener implements Listener {
                     }
                     if (plugin.getGameManager().removeGold(player.getUniqueId(), cost)) {
                         tower.incrementLevel();
+                        respawnBeesOnUpgrade(tower);
                         plugin.getTowerManager().buildTowerStructure(tower);
                         plugin.getTowerManager().updateHologram(tower);
                         if (tower.getType() == com.pauljang.towerDefense.towers.TowerType.REDSTONE) {
@@ -1568,6 +1570,16 @@ public class MobListener implements Listener {
         if (type == org.bukkit.Material.ICE || type == org.bukkit.Material.FROSTED_ICE || type == org.bukkit.Material.SNOW) {
             event.setCancelled(true);
         }
+    }
+
+    // When a Beehive is upgraded, clear its current swarm so the tower ticker instantly
+    // resummons a fresh swarm at the new path's count/size.
+    private void respawnBeesOnUpgrade(com.pauljang.towerDefense.towers.Tower tower) {
+        if (tower.getType() != com.pauljang.towerDefense.towers.TowerType.BEEHIVE) return;
+        for (org.bukkit.entity.Bee bee : tower.getSpawnedBees()) {
+            if (bee != null && bee.isValid()) bee.remove();
+        }
+        tower.getSpawnedBees().clear();
     }
 
     private boolean isLobbyCompass(org.bukkit.inventory.ItemStack item) {

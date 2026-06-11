@@ -346,12 +346,6 @@ thunder:
       damage: 11.0
       cooldown: 75
       chain_count: 5
-    4:
-      cost: 600
-      range: 999.0
-      damage: 15.0
-      cooldown: 600
-      is_global: true
 
 beehive:
   name: "Beehive"

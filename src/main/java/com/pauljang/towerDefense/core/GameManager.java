@@ -913,6 +913,15 @@ public class GameManager {
         return end != null && System.currentTimeMillis() < end;
     }
 
+    /** Returns the epoch-millis end time of an active spell in the arena, or 0 if not active. */
+    public long getSpellEndTime(String arena, String spellType) {
+        java.util.Map<String, Long> spells = activeSpells.get(arena);
+        if (spells == null) return 0L;
+        Long end = spells.get(spellType.toUpperCase());
+        if (end == null || System.currentTimeMillis() >= end) return 0L;
+        return end;
+    }
+
     /**
      * Computes the cost multiplier that would apply to the player's next cast of this spell, without
      * mutating any state. Each successive cast doubles the multiplier; 10 seconds of inactivity on that
