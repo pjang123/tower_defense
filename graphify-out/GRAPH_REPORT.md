@@ -1,349 +1,388 @@
-# Graph Report - Tower Defense  (2026-06-11)
+# Graph Report - .  (2026-06-11)
 
 ## Corpus Check
-- 55 files · ~73,774 words
+- 20 files · ~82,405 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1170 nodes · 2670 edges · 59 communities (57 shown, 2 thin omitted)
-- Extraction: 72% EXTRACTED · 28% INFERRED · 0% AMBIGUOUS · INFERRED: 744 edges (avg confidence: 0.8)
+- 1210 nodes · 2832 edges · 75 communities (66 shown, 9 thin omitted)
+- Extraction: 72% EXTRACTED · 28% INFERRED · 0% AMBIGUOUS · INFERRED: 786 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
-## Graph Freshness
-- Built from commit: `c6a5e8d8`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
-
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Tower Placement & Lifecycle|Tower Placement & Lifecycle]]
-- [[_COMMUNITY_Game Manager Core|Game Manager Core]]
-- [[_COMMUNITY_Mob Spawning & Upgrades|Mob Spawning & Upgrades]]
-- [[_COMMUNITY_Mob Event Listeners|Mob Event Listeners]]
-- [[_COMMUNITY_Docs & Design Notes|Docs & Design Notes]]
-- [[_COMMUNITY_Wave & Tower Config|Wave & Tower Config]]
-- [[_COMMUNITY_Mob Pathfinding & Waypoints|Mob Pathfinding & Waypoints]]
-- [[_COMMUNITY_Queue & Map Selection|Queue & Map Selection]]
-- [[_COMMUNITY_Setup & Wand Tooling|Setup & Wand Tooling]]
-- [[_COMMUNITY_Match State|Match State]]
-- [[_COMMUNITY_Plot Configuration|Plot Configuration]]
+- [[_COMMUNITY_Tower Placement & Mob Movement|Tower Placement & Mob Movement]]
+- [[_COMMUNITY_Game State & Bukkit Events|Game State & Bukkit Events]]
+- [[_COMMUNITY_Plot Configuration Management|Plot Configuration Management]]
+- [[_COMMUNITY_Tower Config Types & Definitions|Tower Config Types & Definitions]]
+- [[_COMMUNITY_Matchmaking Queue & Voting|Matchmaking Queue & Voting]]
+- [[_COMMUNITY_Match State & Economy|Match State & Economy]]
+- [[_COMMUNITY_Custom Mob (TDMob) Logic|Custom Mob (TDMob) Logic]]
+- [[_COMMUNITY_Map Setup Guide|Map Setup Guide]]
+- [[_COMMUNITY_GameManager Cleanup & Lifecycle|GameManager Cleanup & Lifecycle]]
+- [[_COMMUNITY_Mob Spawner GUI|Mob Spawner GUI]]
+- [[_COMMUNITY_Player Stats & Upgrades|Player Stats & Upgrades]]
+- [[_COMMUNITY_TD Command Handling|TD Command Handling]]
+- [[_COMMUNITY_Waypoint Configuration|Waypoint Configuration]]
+- [[_COMMUNITY_Tower Agent Specification|Tower Agent Specification]]
+- [[_COMMUNITY_Mob Implementation Guide|Mob Implementation Guide]]
+- [[_COMMUNITY_Code Fixes Batch 6|Code Fixes Batch 6]]
+- [[_COMMUNITY_Mob Queue Management|Mob Queue Management]]
+- [[_COMMUNITY_GameManager GUI Items|GameManager GUI Items]]
+- [[_COMMUNITY_Mob Update 6.6.25|Mob Update 6.6.25]]
+- [[_COMMUNITY_Final Tower Adjustments|Final Tower Adjustments]]
+- [[_COMMUNITY_Project Summary|Project Summary]]
 - [[_COMMUNITY_Preset Mob Types|Preset Mob Types]]
-- [[_COMMUNITY_Tower Configs (Batch 1)|Tower Configs (Batch 1)]]
-- [[_COMMUNITY_Tower Configs (Batch 2)|Tower Configs (Batch 2)]]
-- [[_COMMUNITY_Tower Type Enum|Tower Type Enum]]
-- [[_COMMUNITY_Game Config & Spells|Game Config & Spells]]
-- [[_COMMUNITY_Wave Mob Roster|Wave Mob Roster]]
-- [[_COMMUNITY_Pathing & Siege Fixes|Pathing & Siege Fixes]]
-- [[_COMMUNITY_Velocity & Wave Fixes|Velocity & Wave Fixes]]
-- [[_COMMUNITY_Plugin Manifest|Plugin Manifest]]
-- [[_COMMUNITY_Balancing Docs|Balancing Docs]]
-- [[_COMMUNITY_Targeting Modes|Targeting Modes]]
-- [[_COMMUNITY_Multiplayer Maps|Multiplayer Maps]]
-- [[_COMMUNITY_Singleplayer Map|Singleplayer Map]]
-- [[_COMMUNITY_Community 28|Community 28]]
-- [[_COMMUNITY_Community 29|Community 29]]
-- [[_COMMUNITY_Community 31|Community 31]]
-- [[_COMMUNITY_Community 32|Community 32]]
-- [[_COMMUNITY_Community 33|Community 33]]
-- [[_COMMUNITY_Community 36|Community 36]]
-- [[_COMMUNITY_Community 37|Community 37]]
-- [[_COMMUNITY_Community 38|Community 38]]
-- [[_COMMUNITY_Community 39|Community 39]]
-- [[_COMMUNITY_Community 41|Community 41]]
-- [[_COMMUNITY_Community 42|Community 42]]
-- [[_COMMUNITY_Community 43|Community 43]]
-- [[_COMMUNITY_Community 44|Community 44]]
-- [[_COMMUNITY_Community 45|Community 45]]
-- [[_COMMUNITY_Community 47|Community 47]]
-- [[_COMMUNITY_Community 48|Community 48]]
-- [[_COMMUNITY_Community 49|Community 49]]
-- [[_COMMUNITY_Community 50|Community 50]]
-- [[_COMMUNITY_Community 51|Community 51]]
-- [[_COMMUNITY_Community 52|Community 52]]
-- [[_COMMUNITY_Community 53|Community 53]]
-- [[_COMMUNITY_Community 54|Community 54]]
-- [[_COMMUNITY_Community 55|Community 55]]
-- [[_COMMUNITY_Community 56|Community 56]]
-- [[_COMMUNITY_Community 57|Community 57]]
-- [[_COMMUNITY_Community 58|Community 58]]
-- [[_COMMUNITY_Community 59|Community 59]]
-- [[_COMMUNITY_Community 60|Community 60]]
-- [[_COMMUNITY_Community 61|Community 61]]
-- [[_COMMUNITY_Community 63|Community 63]]
-- [[_COMMUNITY_Community 65|Community 65]]
-- [[_COMMUNITY_Community 66|Community 66]]
+- [[_COMMUNITY_MobManager Internals|MobManager Internals]]
+- [[_COMMUNITY_Match Lifecycle & Spells|Match Lifecycle & Spells]]
+- [[_COMMUNITY_Wave Management|Wave Management]]
+- [[_COMMUNITY_Core Plugin Dependencies|Core Plugin Dependencies]]
+- [[_COMMUNITY_Mob Upgrade Registry|Mob Upgrade Registry]]
+- [[_COMMUNITY_Fixes Batch 7|Fixes Batch 7]]
+- [[_COMMUNITY_World Unload Listener|World Unload Listener]]
+- [[_COMMUNITY_Tower Type Materials|Tower Type Materials]]
+- [[_COMMUNITY_Towers Reference Doc|Towers Reference Doc]]
+- [[_COMMUNITY_Branching Tower Paths|Branching Tower Paths]]
+- [[_COMMUNITY_Polish & Progression Fixes|Polish & Progression Fixes]]
+- [[_COMMUNITY_Mob AI & Velocity Fixes|Mob AI & Velocity Fixes]]
+- [[_COMMUNITY_Update 3 Balancing|Update 3 Balancing]]
+- [[_COMMUNITY_Config & Spell Settings|Config & Spell Settings]]
+- [[_COMMUNITY_Multi-Map & Singleplayer Update|Multi-Map & Singleplayer Update]]
+- [[_COMMUNITY_Project Description|Project Description]]
+- [[_COMMUNITY_Claude V2 Update|Claude V2 Update]]
+- [[_COMMUNITY_Project Structure|Project Structure]]
+- [[_COMMUNITY_Preliminary Balancing|Preliminary Balancing]]
+- [[_COMMUNITY_Waypoint Traversal|Waypoint Traversal]]
+- [[_COMMUNITY_Mob Types|Mob Types]]
+- [[_COMMUNITY_Architecture Overview|Architecture Overview]]
+- [[_COMMUNITY_Wave GUI & Warden Fixes|Wave GUI & Warden Fixes]]
+- [[_COMMUNITY_Polymorphic Mob Upgrades|Polymorphic Mob Upgrades]]
+- [[_COMMUNITY_Core File Modifications|Core File Modifications]]
+- [[_COMMUNITY_Velocity Branch Fixes|Velocity Branch Fixes]]
+- [[_COMMUNITY_Branching Path Towers|Branching Path Towers]]
+- [[_COMMUNITY_Active Match Tracking|Active Match Tracking]]
+- [[_COMMUNITY_Map Setup Concepts|Map Setup Concepts]]
+- [[_COMMUNITY_Final Polish Fixes|Final Polish Fixes]]
+- [[_COMMUNITY_Update 2 Fixes|Update 2 Fixes]]
+- [[_COMMUNITY_Classpath Dependencies|Classpath Dependencies]]
+- [[_COMMUNITY_Gemini Audit Directive|Gemini Audit Directive]]
+- [[_COMMUNITY_Dripstone & Bombardier Mechanics|Dripstone & Bombardier Mechanics]]
+- [[_COMMUNITY_Claude V2 Tower Fixes|Claude V2 Tower Fixes]]
+- [[_COMMUNITY_Tower Adjustments Batch|Tower Adjustments Batch]]
+- [[_COMMUNITY_Progression Fixes|Progression Fixes]]
+- [[_COMMUNITY_TDKeys NamespacedKeys|TDKeys NamespacedKeys]]
+- [[_COMMUNITY_Architecture Audit Directives|Architecture Audit Directives]]
+- [[_COMMUNITY_Targeting Mode Enum|Targeting Mode Enum]]
+- [[_COMMUNITY_Beehive Tower Mechanics|Beehive Tower Mechanics]]
+- [[_COMMUNITY_Turret Scatter Mechanics|Turret Scatter Mechanics]]
+- [[_COMMUNITY_State Desync Bugs|State Desync Bugs]]
+- [[_COMMUNITY_World File Lock Bugs|World File Lock Bugs]]
+- [[_COMMUNITY_Thunder Tower Strike|Thunder Tower Strike]]
+- [[_COMMUNITY_Wand Plot Hash Bug|Wand Plot Hash Bug]]
+- [[_COMMUNITY_Multiplayer Map Config|Multiplayer Map Config]]
+- [[_COMMUNITY_Singleplayer Map Config|Singleplayer Map Config]]
+- [[_COMMUNITY_EMP Disable Fix|EMP Disable Fix]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `GameManager` - 83 edges
+1. `GameManager` - 89 edges
 2. `Tower` - 42 edges
 3. `TowerManager` - 40 edges
-4. `MobListener` - 37 edges
+4. `MobListener` - 38 edges
 5. `EventHandler` - 34 edges
-6. `MobManager` - 32 edges
-7. `UUID` - 28 edges
-8. `TDMob` - 26 edges
-9. `String` - 24 edges
-10. `String` - 22 edges
+6. `EventHandler` - 34 edges
+7. `MobManager` - 32 edges
+8. `UUID` - 28 edges
+9. `String` - 26 edges
+10. `TDMob` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `TowerConfigManager.java` --used_by--> `TowerManager.java`  [INFERRED]
-  bug_fixing/tower_defense_final_adjustments.md → PROJECT_STRUCTURE.md
-- `bug_fixing/tower_agent_specification.md` --references--> `TowerManager.java`  [INFERRED]
-  bug_fixing/tower_agent_specification.md → PROJECT_STRUCTURE.md
-- `Golem Tower (5x5)` --implemented_in--> `TowerManager.java`  [INFERRED]
-  PROJECT_SUMMARY.md → PROJECT_STRUCTURE.md
-- `Happy Ghast Tower (5x5)` --implemented_in--> `TowerManager.java`  [INFERRED]
-  PROJECT_SUMMARY.md → PROJECT_STRUCTURE.md
-- `Golem Tower (5x5)` --uses--> `SetupManager.java`  [INFERRED]
-  PROJECT_SUMMARY.md → PROJECT_STRUCTURE.md
+- `Graphify-Based Architecture Audit Directive` --conceptually_related_to--> `Graphify PreToolUse Enforcement Hook`  [INFERRED]
+  gemini-code-1781158577643.md → .claude/settings.json
+- `Dripstone 3D BlockDisplay Rendering` --semantically_similar_to--> `Dripstone Strike Impact-Synced Damage (ArmorStand)`  [INFERRED] [semantically similar]
+  tower_defense_fixes_batch8.md → tower_defense_fixes_batch7.md
+- `Turret Scatter Forward Safe-Spawn Offset` --semantically_similar_to--> `Turret Scatter Spread Mechanics`  [INFERRED] [semantically similar]
+  tower_defense_fixes_batch8.md → tower_defense_fixes_batch7.md
+- `Dripstone Hazards As Dynamic Landmines (Ticker)` --semantically_similar_to--> `Bombardier Arc & Landmine Triggers`  [INFERRED] [semantically similar]
+  tower_defense_fixes_batch9.md → tower_defense_fixes_batch7.md
+- `Beehive Unique-Target Assignment & Sounds` --semantically_similar_to--> `Beehive Swarm I-Frame Clearing`  [INFERRED] [semantically similar]
+  tower_defense_fixes_batch8.md → tower_defense_fixes_batch7.md
 
 ## Import Cycles
 - None detected.
 
 ## Hyperedges (group relationships)
-- **Core Manager Classes** — project_structure_gamemanager, project_structure_mobmanager, project_structure_towermanager, project_structure_plotconfigmanager, project_structure_waypointconfigmanager [EXTRACTED 0.95]
-- **Polymorphic Mob Upgrade System** — session_context_mobstateprofile, session_context_mobupgraderegistry, bugfix_mob_impl_polymorphic_csv, session_context_mob_chain_system [EXTRACTED 0.95]
-- **Branching Path Towers** — bugfix_tower_agent_turret, bugfix_tower_agent_bombardier, bugfix_tower_agent_beehive, bugfix_tower_agent_branching_paths [EXTRACTED 0.95]
-- **Towers with Branching Upgrade Paths** — tower_turret, tower_bombardier, tower_beehive [INFERRED 0.95]
-- **Bug Fixing Documentation Set** — bug_fixing_batch7_fixes, bug_fixing_batch8_fixes, bug_fixing_batch9_fixes, bug_fixing_polish_fixes, bug_fixing_progression_fixes [EXTRACTED 0.95]
-- **Core Configuration Files** — resources_config_yml, resources_towers_yaml, resources_waves_yml, resources_plugin_yml [INFERRED 0.95]
+- **Dripstone Mechanic Evolution (ArmorStand to BlockDisplay to Landmine Ticker)** — tower_defense_fixes_batch7_dripstone_strike, tower_defense_fixes_batch8_dripstone_blockdisplay, tower_defense_fixes_batch9_dripstone_landmine, towers_dripstone [INFERRED 0.85]
+- **Beehive Swarm Targeting Fix Progression** — tower_defense_fixes_batch7_beehive_iframes, tower_defense_fixes_batch8_beehive_targeting, tower_defense_fixes_batch9_beehive_slab_timeout, towers_beehive [INFERRED 0.80]
+- **Match World Lifecycle State & File-Lock Bug Cluster** — bug_report_issue1_game_not_starting, bug_report_issue4_template_plots_waypoints, bug_report_issue5_match_world_dimensions_folder, bug_report_world_file_lock_cleanup [INFERRED 0.80]
 
-## Communities (59 total, 2 thin omitted)
+## Communities (75 total, 9 thin omitted)
 
-### Community 0 - "Tower Placement & Lifecycle"
+### Community 0 - "Tower Placement & Mob Movement"
 Cohesion: 0.05
-Nodes (30): Bee, getHealth(), HappyGhast, Iterator, Particle, ArmorStand, BlockVector, List (+22 more)
+Nodes (36): Bee, BlockVector, getHealth(), HappyGhast, InventoryClickEvent, Iterator, LivingEntity, Particle (+28 more)
 
-### Community 1 - "Game Manager Core"
+### Community 1 - "Game State & Bukkit Events"
 Cohesion: 0.06
-Nodes (17): Collection, GameManager, InventoryClickEvent, BossBar, File, GameState, ItemStack, List (+9 more)
+Nodes (37): BlockFadeEvent, CreatureSpawnEvent, EntityCombustEvent, EntityDamageByEntityEvent, EntityDamageEvent, EntityDeathEvent, EntityDismountEvent, EntityExplodeEvent (+29 more)
 
-### Community 2 - "Mob Spawning & Upgrades"
-Cohesion: 0.06
-Nodes (30): MobManager, MobStateProfile, MobUpgradeRegistry, MobUpgradeRegistry, PresetMobType, ChatColor, EntityType, Integer (+22 more)
+### Community 2 - "Plot Configuration Management"
+Cohesion: 0.08
+Nodes (23): Color, PlotConfigManager, WandListener, PlotConfigManager, SetupManager, SetupState, File, Location (+15 more)
 
-### Community 3 - "Mob Event Listeners"
-Cohesion: 0.06
-Nodes (33): BlockFadeEvent, CreatureSpawnEvent, EntityCombustEvent, EntityDamageByEntityEvent, EntityDamageEvent, EntityDeathEvent, EntityDismountEvent, EntityExplodeEvent (+25 more)
+### Community 3 - "Tower Config Types & Definitions"
+Cohesion: 0.13
+Nodes (16): ConfigurationSection, NavigableMap, Set, Integer, Map, Material, String, TowerDefense (+8 more)
 
-### Community 4 - "Docs & Design Notes"
-Cohesion: 0.25
-Nodes (11): bug_fixing/tower_defense_code_fixes_batch6.md, bug_fixing/tower_defense_final_adjustments_v5.md, bug_fixing/tower_defense_fixes.md, Waypoint (Mob Path Node), GameManager.java, MobListener.java, MobManager.java, TDMob.java (+3 more)
-
-### Community 5 - "Wave & Tower Config"
+### Community 4 - "Matchmaking Queue & Voting"
 Cohesion: 0.09
-Nodes (20): ConfigurationSection, WaveManager, WaveSession, NavigableMap, Set, TowerDefense, Integer, Map (+12 more)
+Nodes (16): QueueManager, VotingSession, MapData, MapManager, MapManager, List, MapData, Player (+8 more)
 
-### Community 7 - "Mob Pathfinding & Waypoints"
-Cohesion: 0.10
-Nodes (11): TDWaypoint, TDMob, List, Location, String, List, Location, Map (+3 more)
-
-### Community 8 - "Queue & Map Selection"
-Cohesion: 0.05
-Nodes (28): QueueManager, VotingSession, MapData, MapManager, GameManager, JavaPlugin, MapManager, MobManager (+20 more)
-
-### Community 9 - "Setup & Wand Tooling"
-Cohesion: 0.14
-Nodes (13): Color, WandListener, SetupManager, SetupState, EventHandler, Location, Player, PlayerInteractEvent (+5 more)
-
-### Community 10 - "Match State"
-Cohesion: 0.11
-Nodes (16): Match, Long, ArmorStand, BossBar, GameState, Integer, List, Map (+8 more)
-
-### Community 11 - "Plot Configuration"
+### Community 5 - "Match State & Economy"
 Cohesion: 0.09
-Nodes (18): PlotConfigManager, WaypointConfigManager, File, Location, Map, Match, String, TowerDefense (+10 more)
+Nodes (15): Match, Long, ArmorStand, BossBar, GameState, Integer, List, Map (+7 more)
 
-### Community 13 - "Preset Mob Types"
-Cohesion: 0.17
-Nodes (9): getColor(), getDisplayName(), getEntityType(), getMaterial(), PresetMobType(), ChatColor, EntityType, Material (+1 more)
+### Community 6 - "Custom Mob (TDMob) Logic"
+Cohesion: 0.12
+Nodes (9): TDMob, Match, TDMob, List, Location, Map, Mob, String (+1 more)
 
-### Community 14 - "Tower Configs (Batch 1)"
-Cohesion: 0.21
-Nodes (10): Tower Defense Update 3, Golem Tower Target Acquisition Fix, Mob Level Reset Per Match, Archer Tower, Fire Tower, Golem Tower, Happy Ghast Tower, Ice Tower (+2 more)
-
-### Community 15 - "Tower Configs (Batch 2)"
-Cohesion: 0.19
-Nodes (15): Beehive Goliath Path, Beehive Swarm Path, Tower Defense Fixes Batch 7, Tower Defense Fixes Batch 8, Tower Defense Fixes Batch 9, Beehive I-Frames Fix, Dripstone Mechanics Fix, EMP Targeting Fix (+7 more)
-
-### Community 16 - "Tower Type Enum"
-Cohesion: 0.22
-Nodes (9): ChatColor, Material, String, getBaseMaterial(), getBlockMaterial(), getColor(), getDisplayName(), getMiddleMaterial() (+1 more)
-
-### Community 17 - "Game Config & Spells"
-Cohesion: 0.15
-Nodes (12): Max Castle Health Setting, Players Per Match Setting, Starting Gold Setting, Damage Storm Spell, Freeze Spell, Haste Rush Spell, Overcharge Spell, Slow Shield Spell (+4 more)
-
-### Community 18 - "Wave Mob Roster"
-Cohesion: 0.20
-Nodes (9): Blaze Mob, Creeper Mob, Ghast Mob, Zombie Pigman Mob, Silverfish Mob, Skeleton Mob, Slime/Magma Cube Mob, Spider Mob (+1 more)
-
-### Community 19 - "Pathing & Siege Fixes"
-Cohesion: 0.29
-Nodes (8): Tower Defense Polish Fixes, Tower Defense Progression Fixes, UI Pathing and Siege Combined Fixes, Universal Castle Attacking Fix, Chorus Tower Teleportation Fix, Giant Zombie Pathing Fix, Giant Mob, Chorus Tower
-
-### Community 20 - "Velocity & Wave Fixes"
-Cohesion: 0.29
-Nodes (7): Tower Defense Claude V2 Update, Tower Defense Update 2, Health-Based Speed Scaling, Universal Velocity Movement Fix, Wave GUI Enhancements, Tower EMP Spell, Wave System
-
-### Community 21 - "Plugin Manifest"
-Cohesion: 0.29
-Nodes (6): Classpath Dependencies, Kyori Adventure API 4.26.1, Google Guava 33.5.0, Paper API 26.1.2, SnakeYAML 2.2, TowerDefense Main Plugin Class
-
-### Community 22 - "Balancing Docs"
-Cohesion: 0.17
-Nodes (11): 1. Mob Statistics, Costs, & Rewards, 2. Player Upgrades & Shops, 3. Tower Progression Balances, Melee Sword Upgrades, Mob Statistics & Rewards, Passive Gold Generator, Permanent Splash Potion Purchases, Player Upgrades (Sword/Bow/Gold Generator) (+3 more)
-
-### Community 23 - "Targeting Modes"
-Cohesion: 0.67
-Nodes (3): String, getDisplayName(), TargetingMode()
-
-### Community 28 - "Community 28"
+### Community 7 - "Map Setup Guide"
 Cohesion: 0.06
 Nodes (34): 10. Map Configuration Files Reference, 11. Common Issues, 12. Quick Setup Checklist, 1. Map File Structure, 2. Prepare Your World Folder, 3. Create map.yml, 4. Load the World, 5.1 Get the Setup Wand (+26 more)
 
-### Community 29 - "Community 29"
+### Community 8 - "GameManager Cleanup & Lifecycle"
+Cohesion: 0.15
+Nodes (3): GameManager, File, Player
+
+### Community 9 - "Mob Spawner GUI"
+Cohesion: 0.15
+Nodes (9): MobStateProfile, ItemStack, Material, Player, String, EntityType, List, Material (+1 more)
+
+### Community 11 - "TD Command Handling"
+Cohesion: 0.16
+Nodes (12): Command, CommandExecutor, CommandSender, TDCommand, SetupManager, File, Override, Player (+4 more)
+
+### Community 12 - "Waypoint Configuration"
+Cohesion: 0.15
+Nodes (11): WaypointConfigManager, File, List, Location, Map, Match, String, TDWaypoint (+3 more)
+
+### Community 13 - "Tower Agent Specification"
 Cohesion: 0.08
 Nodes (24): 1.10 Dripstone Tower (`dripstone`), 1.11 Thunder Tower (`thunder`), 1.1 Archer Tower (`archer`), 1.2 Fire Tower (`fire`), 1.3 Prismarine Tower (`prismarine`), 1.4 Chorus Tower (`chorus`), 1.5 Redstone Tower (`redstone`), 1.6 Poison Tower (`poison`) (+16 more)
 
-### Community 31 - "Community 31"
-Cohesion: 0.11
-Nodes (22): bug_fixing/mob_implementation_guide.md, mob_upgrades_polymorphic.csv, bug_fixing/MOB_UPDATE_6_6_25.md, Queue Migration: PresetMobType → Chain String Keys, Mob Tier Sub-GUI (openMobTierGUI), PresetMobType.java (Enum), Critical Missing Files — Must Be Created, Deployment (+14 more)
+### Community 14 - "Mob Implementation Guide"
+Cohesion: 0.12
+Nodes (21): bug_fixing/mob_implementation_guide.md, mob_upgrades_polymorphic.csv, bug_fixing/MOB_UPDATE_6_6_25.md, Queue Migration: PresetMobType → Chain String Keys, Mob Tier Sub-GUI (openMobTierGUI), Critical Missing Files — Must Be Created, Deployment, Git History (container state) (+13 more)
 
-### Community 32 - "Community 32"
+### Community 15 - "Code Fixes Batch 6"
+Cohesion: 0.10
+Nodes (19): 1. Matchmaking Queue Timer & /td forcestart, 2. /td challenge "Game Ended" Screen Flash, 4. Ice Tower Slowness Symbol Bug, 5. Witch Potion Drinking & Healing Mechanics, 6. Warden Aggression & Sonic Boom, 7. Giant Zombie Summoning Coordinates & Pathing, 8. Player Bow Does No Damage, 9. GUI Explanations & Upgrade Lore (+11 more)
+
+### Community 16 - "Mob Queue Management"
+Cohesion: 0.18
+Nodes (7): MobManager, Integer, PresetMobType, Integer, List, Map, UUID
+
+### Community 17 - "GameManager GUI Items"
+Cohesion: 0.14
+Nodes (8): BossBar, Objective, Scoreboard, BossBar, ItemStack, List, Material, TowerDefense
+
+### Community 18 - "Mob Update 6.6.25"
 Cohesion: 0.11
 Nodes (18): Changes to `MobListener.java`, Changes to `MobManager.java`, `getQueue(UUID)` updated, MOB Update – 6.6.25, `MobStateProfile.java`, `MobUpgradeRegistry.java`, New `addToQueue(UUID, String)` / `removeFromQueue(UUID, String)` overloads, New files (+10 more)
 
-### Community 33 - "Community 33"
-Cohesion: 0.10
-Nodes (19): Command, CommandExecutor, CommandSender, TDCommand, Listener, WorldUnloadListener, SetupManager, File (+11 more)
+### Community 19 - "Final Tower Adjustments"
+Cohesion: 0.11
+Nodes (18): 1. `towers.yaml` Updates, 2. `TowerConfigManager.java` Updates, 3. GUI Updates in `TowerManager.java`, 4. Dripstone Mechanics in `TowerManager.java`, 5. Turret & Bombardier Fixes in `TowerManager.java`, 6. Beehive Mechanics in `TowerManager.java`, 7. 5x5 Tower Placement Validation in `TowerManager.java`, 1. GUI Queue/Dequeue Logic Relocation & Shift-Click Support (+10 more)
 
-### Community 36 - "Community 36"
-Cohesion: 0.13
-Nodes (15): 1. Newly Implemented Features, 2. Code Modifications, 3. Server Directory & Troubleshooting, Directory Structure, [GameManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/GameManager.java), Golem Tower (5x5), Golem Tower (5x5 Size), Happy Ghast Tower (5x5 Size) (+7 more)
+### Community 20 - "Project Summary"
+Cohesion: 0.12
+Nodes (16): Happy Ghast Harness Fix (RED_HARNESS/BLUE_HARNESS), 1. Newly Implemented Features, 2. Code Modifications, 3. Server Directory & Troubleshooting, Directory Structure, [GameManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/GameManager.java), Golem Tower (5x5 Size), Happy Ghast Tower (5x5) (+8 more)
 
-### Community 37 - "Community 37"
-Cohesion: 0.13
-Nodes (14): 1. Removing the Standalone Endermite from GUI, 1. Stop Disabling AI (`MobManager.java`), 2. Consolidate and Fix the Velocity Condition, 2. Updating Silverfish Lvl 4 & 5 Attributes, 3. Prevent Endermen Teleporting (`MobListener.java`), Analysis of the Harness Crash, Fix the Material Enum (`TowerManager` / `HappyGhast` initialization class), Part 1: Pathfinding System and Movement Fixes (+6 more)
+### Community 21 - "Preset Mob Types"
+Cohesion: 0.17
+Nodes (9): getColor(), getDisplayName(), getEntityType(), getMaterial(), PresetMobType(), ChatColor, EntityType, Material (+1 more)
 
-### Community 38 - "Community 38"
+### Community 22 - "MobManager Internals"
+Cohesion: 0.16
+Nodes (9): ChatColor, EntityType, MobStateProfile, MobUpgradeRegistry, ChatColor, EntityType, Mob, MobStateProfile (+1 more)
+
+### Community 24 - "Wave Management"
+Cohesion: 0.17
+Nodes (4): WaveManager, WaveSession, Match, TowerDefense
+
+### Community 25 - "Core Plugin Dependencies"
+Cohesion: 0.15
+Nodes (11): GameManager, GameState, JavaPlugin, MobManager, QueueManager, Override, TowerConfigManager, TowerConfigManager (+3 more)
+
+### Community 26 - "Mob Upgrade Registry"
+Cohesion: 0.20
+Nodes (7): MobUpgradeRegistry, Integer, List, Map, MobStateProfile, String, TowerDefense
+
+### Community 27 - "Fixes Batch 7"
+Cohesion: 0.16
+Nodes (14): Tower Defense Fixes Batch 7, 1. Dripstone 3D Falling Blocks (`TowerManager.java`), 2. Dripstone 3D Ground Hazards (`TowerManager.java`), 3. Turret Scatter Arrows Bouncing Inside Tower (`TowerManager.java`), 4. Beehive Targeting & Sounds (`TowerManager.java`), Tower Defense Adjustments & Fixes, Beehive I-Frames Fix, Dripstone Mechanics Fix (+6 more)
+
+### Community 28 - "World Unload Listener"
+Cohesion: 0.26
+Nodes (8): Listener, WorldUnloadListener, EventHandler, File, PlayerChangedWorldEvent, PlayerQuitEvent, TowerDefense, World
+
+### Community 29 - "Tower Type Materials"
+Cohesion: 0.22
+Nodes (9): ChatColor, Material, String, getBaseMaterial(), getBlockMaterial(), getColor(), getDisplayName(), getMiddleMaterial() (+1 more)
+
+### Community 30 - "Towers Reference Doc"
 Cohesion: 0.15
 Nodes (13): 1. Archer Tower (`archer`), 2. Fire Tower (`fire`), 3. Prismarine Tower (`prismarine`), 4. Chorus Tower (`chorus`), 5. Redstone Tower (`redstone`), 6. Poison Tower (`poison`), 7. Ice Tower (`ice`), Fire Tower (+5 more)
 
-### Community 39 - "Community 39"
+### Community 31 - "Branching Tower Paths"
+Cohesion: 0.18
+Nodes (11): Beehive Goliath Path, Beehive Swarm Path, Bombardier Bigger Bombs Path, Bombardier Landmines Path, Archer Tower, Beehive Tower, Bombardier Tower, Fire Tower (+3 more)
+
+### Community 32 - "Polish & Progression Fixes"
+Cohesion: 0.17
+Nodes (13): Tower Defense Polish Fixes, Tower Defense Progression Fixes, 1. Shift-Click Dequeue in Mob Spawning GUI, 2. Health Bar Symbol Stacking, 3. Giant's Zombie Spawning (Track Projection), 4. Add Attack Cooldown Tracking to TDMob, 5. Continuous Attack Logic at the Castle Door, Tower Defense Plugin: UI, Pathing, & Castle Siege Polish (+5 more)
+
+### Community 33 - "Mob AI & Velocity Fixes"
+Cohesion: 0.17
+Nodes (13): 1. Removing the Standalone Endermite from GUI, 1. Stop Disabling AI (`MobManager.java`), 2. Consolidate and Fix the Velocity Condition, 2. Updating Silverfish Lvl 4 & 5 Attributes, 3. Prevent Endermen Teleporting (`MobListener.java`), Analysis of the Harness Crash, Fix the Material Enum (`TowerManager` / `HappyGhast` initialization class), Part 1: Pathfinding System and Movement Fixes (+5 more)
+
+### Community 34 - "Update 3 Balancing"
 Cohesion: 0.15
 Nodes (12): 1. Global Speed Calibration & HP Normalization, 2. Golem Tower Target Acquisition Fix, 3. Happy Ghast Hover Targeting Adjustments, 4. Mob Level Reset & Session Cleanup, 5. Player Compass Inventory Allocation, Dynamic Range Offset, Global Speed Constant Reduction, Issue: Copper & Iron Golems Ignore Mobs (+4 more)
 
-### Community 41 - "Community 41"
+### Community 35 - "Config & Spell Settings"
+Cohesion: 0.15
+Nodes (12): Max Castle Health Setting, Players Per Match Setting, Starting Gold Setting, Damage Storm Spell, Freeze Spell, Haste Rush Spell, Overcharge Spell, Slow Shield Spell (+4 more)
+
+### Community 36 - "Multi-Map & Singleplayer Update"
+Cohesion: 0.17
+Nodes (12): 1. Concurrent Match Architecture, 2. Dynamic Map Template System, 3. Matchmaking & Voting System, 4. Single Player Wave Engine, 5. Streamlined Admin Tooling & Template Editing, 6. Map Creation Documentation, 7. Technical Integrity & Bug Fixes, Tower Defense: Multi-Map & Single Player Update Summary (+4 more)
+
+### Community 37 - "Project Description"
 Cohesion: 0.15
 Nodes (12): 1. Project Overview, 2. Architecture & File Structure, 3. Current Progress (Phase 1 Completed), 4. Immediate Next Steps (Phase 2), Package: `.core` (Game Engine & Commands), Package: `.data` (File Persistence), Package: `.listeners` (Event Handling), Package: `.setup` (Admin Setup State) (+4 more)
 
-### Community 42 - "Community 42"
+### Community 38 - "Claude V2 Update"
 Cohesion: 0.17
 Nodes (11): 10. CSV Adjustments (mob_upgrades_polymorphic.csv), 1. Queueing Mechanics & Mixed Mob Levels, 2. Universal Velocity Movement & Collision, 3. Spell Cooldowns & Dynamic Cost Scaling, 4. Spell Adjustments (Overcharge & Freeze), 5. Mob Immunities & Status Display Fixes, 6. Chorus Tower Teleportation & Visual Glitch Fix, 7. Tower Fixes (EMP) (+3 more)
 
-### Community 43 - "Community 43"
-Cohesion: 0.18
-Nodes (10): 1. Matchmaking Queue Timer & /td forcestart, 2. /td challenge "Game Ended" Screen Flash, 3. Chorus Tower Teleportation Fail, 4. Ice Tower Slowness Symbol Bug, 5. Witch Potion Drinking & Healing Mechanics, 6. Warden Aggression & Sonic Boom, 7. Giant Zombie Summoning Coordinates & Pathing, 8. Player Bow Does No Damage (+2 more)
+### Community 39 - "Project Structure"
+Cohesion: 0.26
+Nodes (11): TowerConfigManager.java, PresetMobType.java (Enum), SetupManager.java, TargetingMode.java (Enum), TDCommand.java, Tower.java (Instance Model), TowerManager.java, TowerType.java (Enum) (+3 more)
 
-### Community 44 - "Community 44"
-Cohesion: 0.18
-Nodes (10): 1. Chorus Tower Teleportation Fix, 2. Witch & Warden AI Fixes, 3. Mob Spawning GUI Overhaul, 4. Unlock Queue Bug, 5. Breeze Flying Fix, 6. Slow vs. Freeze Disambiguation, 7. Giant Zombie Summoning, 8. Invisible Spider Health Bars & Tower Targeting (+2 more)
+### Community 40 - "Preliminary Balancing"
+Cohesion: 0.17
+Nodes (11): 1. Mob Statistics, Costs, & Rewards, 2. Player Upgrades & Shops, 3. Tower Progression Balances, Melee Sword Upgrades, Mob Statistics & Rewards, Passive Gold Generator, Permanent Splash Potion Purchases, Player Upgrades (Sword/Bow/Gold Generator) (+3 more)
 
-### Community 45 - "Community 45"
+### Community 41 - "Waypoint Traversal"
 Cohesion: 0.31
-Nodes (9): TowerConfigManager.java, SetupManager.java, TargetingMode.java (Enum), TDCommand.java, Tower.java (Instance Model), TowerManager.java, TowerType.java (Enum), WandListener.java (+1 more)
+Nodes (4): TDWaypoint, List, Location, String
 
-### Community 47 - "Community 47"
+### Community 42 - "Mob Types"
 Cohesion: 0.20
-Nodes (9): 1. Wave GUI Enhancements ("Send Wave" Button), 2. Warden Behavior Adjustments, 3. Health-Based Speed Scaling, 4. Sequential Mob Level Unlocking, Feature: Display Queued Mobs and Total XP Payout, Feature: Remove Warden Blindness (Darkness Effect), Feature: Require Linear Progression (Level 1 -> 2 -> 3), Feature: Speed Inversely Proportional to Health (+1 more)
+Nodes (9): Blaze Mob, Creeper Mob, Ghast Mob, Zombie Pigman Mob, Silverfish Mob, Skeleton Mob, Slime/Magma Cube Mob, Spider Mob (+1 more)
 
-### Community 48 - "Community 48"
-Cohesion: 0.29
-Nodes (8): Arena, Map Template (GAME_WORLD_TEMPLATES), Plot (5x5 Tower Build Area), Match Class (Isolated Game State), QueueManager, WaveManager (Single Player Wave Engine), World Cloning System, PlotConfigManager.java
-
-### Community 49 - "Community 49"
+### Community 43 - "Architecture Overview"
 Cohesion: 0.20
 Nodes (10): 1. Main Entrypoint, 2. Core Game Loop & Orchestration (`core/`), 3. Data & Configuration Persistence (`data/`), 4. Custom Mobs & Traversal System (`entities/`), 5. Event Listeners (`listeners/`), 6. Map Construction/Setup (`setup/`), 7. Custom Towers & Summons (`towers/`), Class Breakdown & Descriptions (+2 more)
 
-### Community 50 - "Community 50"
+### Community 44 - "Wave GUI & Warden Fixes"
 Cohesion: 0.22
-Nodes (8): 1. `towers.yaml` Updates, 2. `TowerConfigManager.java` Updates, 3. GUI Updates in `TowerManager.java`, 4. Dripstone Mechanics in `TowerManager.java`, 5. Turret & Bombardier Fixes in `TowerManager.java`, 6. Beehive Mechanics in `TowerManager.java`, 7. 5x5 Tower Placement Validation in `TowerManager.java`, Tower Defense Final Adjustments & Fixes
+Nodes (9): 1. Wave GUI Enhancements ("Send Wave" Button), 2. Warden Behavior Adjustments, 3. Health-Based Speed Scaling, 4. Sequential Mob Level Unlocking, Feature: Display Queued Mobs and Total XP Payout, Feature: Remove Warden Blindness (Darkness Effect), Feature: Require Linear Progression (Level 1 -> 2 -> 3), Feature: Speed Inversely Proportional to Health (+1 more)
 
-### Community 51 - "Community 51"
+### Community 45 - "Polymorphic Mob Upgrades"
 Cohesion: 0.25
 Nodes (7): 1. The Data Structure, 2. Core Implementation Rules for AI Agents, Example Configuration Schema (Java/Paper), Implementing Polymorphic Mob Upgrades, Rule 1: Use a Variant State Engine, Rule 2: Dynamic Entity Replacement, Rule 3: Attribute and Equipment Injection
 
-### Community 52 - "Community 52"
-Cohesion: 0.25
-Nodes (7): 1. `towers.yaml` - Removing Level 4s, 2. General Tower Ticker & Placement (EMP Fixes), 3. Dripstone Mechanics (Syncing, Full Block Waves, & Upside-down fixes), 4. Turret Spread & Bombardier Arcs/Mines, 5. Beehive Updates, 6. Chain Lightning Damage Buff, Tower Defense Adjustments & Fixes
-
-### Community 53 - "Community 53"
+### Community 46 - "Core File Modifications"
 Cohesion: 0.25
 Nodes (8): 1. GameManager.java (`src/main/java/com/pauljang/towerDefense/core/GameManager.java`), 2. TDCommand.java (`src/main/java/com/pauljang/towerDefense/core/TDCommand.java`), 3. MobListener.java (`src/main/java/com/pauljang/towerDefense/listeners/MobListener.java`), 4. MobManager.java (`src/main/java/com/pauljang/towerDefense/entities/MobManager.java`), 5. TowerManager.java (`src/main/java/com/pauljang/towerDefense/towers/TowerManager.java`), 6. Tower.java & TowerType.java, 7. mob_upgrades_polymorphic.csv (`mob_upgrades_polymorphic.csv`), Tower Defense Plugin Update Instructions
 
-### Community 54 - "Community 54"
+### Community 47 - "Velocity Branch Fixes"
+Cohesion: 0.36
+Nodes (8): bug_fixing/tower_defense_code_fixes_batch6.md, Velocity Branch Fix (setAI removal), bug_fixing/tower_defense_fixes.md, GameManager.java, MobListener.java, MobManager.java, TDMob.java, Mob Movement Architecture (Velocity vs Pathfinder)
+
+### Community 48 - "Branching Path Towers"
 Cohesion: 0.46
 Nodes (8): bug_fixing/tower_defense_final_adjustments.md, Beehive Tower (Goliath/Swarm paths), Bombardier Tower (BiggerBombs/Landmines paths), Branching Path Tower System, Dripstone Tower, bug_fixing/tower_agent_specification.md, Thunder Tower, Turret Tower (Gatling/Scatter paths)
 
-### Community 55 - "Community 55"
-Cohesion: 0.25
-Nodes (8): 1. Concurrent Match Architecture, 2. Dynamic Map Template System, 3. Matchmaking & Voting System, 4. Single Player Wave Engine, 5. Streamlined Admin Tooling & Template Editing, 6. Map Creation Documentation, 7. Technical Integrity & Bug Fixes, Tower Defense: Multi-Map & Single Player Update Summary
+### Community 50 - "Map Setup Concepts"
+Cohesion: 0.36
+Nodes (7): Arena, Map Template (GAME_WORLD_TEMPLATES), Plot (5x5 Tower Build Area), Waypoint (Mob Path Node), PlotConfigManager.java, WaypointConfigManager.java, Chorus Tower (Teleport Back)
 
-### Community 56 - "Community 56"
+### Community 51 - "Final Polish Fixes"
 Cohesion: 0.29
 Nodes (6): 1. Chorus Tower Teleportation Rewrite, 2. Giant's Zombie Pathing Fix, 3. Health Bar Status Symbol Stacking & Coloring, 4. Witch Potion Drinking Prevention, 5. Mob Level GUI Dequeueing, Tower Defense Plugin: Advanced Bug Fixes & Polish (Batch 4)
 
-### Community 57 - "Community 57"
+### Community 52 - "Update 2 Fixes"
 Cohesion: 0.29
-Nodes (6): 1. Shift-Click Dequeue in Mob Spawning GUI, 2. Health Bar Symbol Stacking, 3. Giant's Zombie Spawning (Track Projection), 4. Add Attack Cooldown Tracking to TDMob, 5. Continuous Attack Logic at the Castle Door, Tower Defense Plugin: UI, Pathing, & Castle Siege Polish
+Nodes (7): Tower Defense Update 2, Golem Tower Target Acquisition Fix, Mob Level Reset Per Match, Wave GUI Enhancements, Golem Tower, Happy Ghast Tower, Wave System
 
-### Community 58 - "Community 58"
+### Community 53 - "Classpath Dependencies"
+Cohesion: 0.29
+Nodes (6): Classpath Dependencies, Kyori Adventure API 4.26.1, Google Guava 33.5.0, Paper API 26.1.2, SnakeYAML 2.2, TowerDefense Main Plugin Class
+
+### Community 54 - "Gemini Audit Directive"
 Cohesion: 0.29
 Nodes (6): CRITICAL CORE DIRECTIVE, [File Name] - [Class/Method Name], GRAPHIFY EXECUTION DIRECTIVE, STEP 1: GRAPH-BASED BUG HUNTING & STATE MANAGEMENT, STEP 2: PERFORMANCE & TICK-LOOP OPTIMIZATION, STEP 3: REFACTORING DELIVERY FORMAT
 
-### Community 59 - "Community 59"
-Cohesion: 0.33
-Nodes (5): 1. GUI Queue/Dequeue Logic Relocation & Shift-Click Support, 2. Health Bar Symbol Uncapping (Fixing the 3-Symbol Limit), 3. Giant Sudden Disappearance (Despawn Prevention), 4. Giant's Summoned Zombie Perfect Pathing, Tower Defense Plugin: Advanced UI, Pathing, and Entity Persistence Fixes
+### Community 55 - "Dripstone & Bombardier Mechanics"
+Cohesion: 0.40
+Nodes (6): Bombardier Arc & Landmine Triggers, Dripstone Strike Impact-Synced Damage (ArmorStand), Dripstone 3D BlockDisplay Rendering, Dripstone Hazards As Dynamic Landmines (Ticker), Bombardier Tower Config (Bombs/Landmines Paths), Dripstone Tower Config
 
-### Community 60 - "Community 60"
-Cohesion: 0.33
-Nodes (5): 1. Dripstone 3D Falling Blocks (`TowerManager.java`), 2. Dripstone 3D Ground Hazards (`TowerManager.java`), 3. Turret Scatter Arrows Bouncing Inside Tower (`TowerManager.java`), 4. Beehive Targeting & Sounds (`TowerManager.java`), Tower Defense Adjustments & Fixes
+### Community 56 - "Claude V2 Tower Fixes"
+Cohesion: 0.40
+Nodes (5): Tower Defense Claude V2 Update, Health-Based Speed Scaling, Universal Velocity Movement Fix, Tower EMP Spell, Chorus Tower
 
-### Community 61 - "Community 61"
-Cohesion: 0.33
+### Community 57 - "Tower Adjustments Batch"
+Cohesion: 0.40
 Nodes (5): 1. `towers.yaml` - Thunder Tower Tier 3 Global Strike, 2. Dripstone Hazards (Act like Landmines), 3. Turret Scatter Arrow Lifespan, 4. Beehive Slab Fixes & Timeout Safeties, Tower Defense Adjustments & Fixes
 
-### Community 63 - "Community 63"
+### Community 58 - "Progression Fixes"
 Cohesion: 0.40
 Nodes (4): 1. Remove Compass on Game Start, 2. Giant's Zombie Spawning & Pathing Fix, 3. Universal Castle Attacking (Waypoint Reach Logic), Tower Defense Plugin: Critical Progression & Mechanics Fixes
 
-### Community 65 - "Community 65"
+### Community 60 - "Architecture Audit Directives"
 Cohesion: 0.50
-Nodes (4): bug_fixing/tower_defense_final_polish.md, Happy Ghast Harness Fix (RED_HARNESS/BLUE_HARNESS), Velocity Branch Fix (setAI removal), Happy Ghast Tower (5x5)
+Nodes (4): God-Node / Betweenness-Centrality Audit, Graphify-Based Architecture Audit Directive, Tick-Loop Hot-Path & GC Pressure Optimization, Graphify PreToolUse Enforcement Hook
 
-### Community 66 - "Community 66"
+### Community 61 - "Targeting Mode Enum"
 Cohesion: 0.67
-Nodes (3): Bombardier Bigger Bombs Path, Bombardier Landmines Path, Bombardier Tower
+Nodes (3): String, getDisplayName(), TargetingMode()
+
+### Community 62 - "Beehive Tower Mechanics"
+Cohesion: 0.83
+Nodes (4): Beehive Swarm I-Frame Clearing, Beehive Unique-Target Assignment & Sounds, Beehive Slab-Stuck Timeout Safety, Beehive Tower Config (Goliath/Swarm Paths)
+
+### Community 63 - "Turret Scatter Mechanics"
+Cohesion: 0.83
+Nodes (4): Turret Scatter Spread Mechanics, Turret Scatter Forward Safe-Spawn Offset, Scatter Arrow Lifespan Despawn, Turret Tower Config (Gatling/Scatter Paths)
+
+### Community 64 - "State Desync Bugs"
+Cohesion: 0.67
+Nodes (3): Issue 1: Game Not Starting (Global vs Match State Desync), Issue 2: Player Can Queue During Transition Window, Issue 4: Template Plots/Waypoints Not Mapped To Match World
+
+### Community 65 - "World File Lock Bugs"
+Cohesion: 1.00
+Nodes (3): Issue 3: loadworld/unloadworld File Lock Failures, Issue 5: Match Worlds Nested In Lobby Dimensions Folder, Match World File Lock Cleanup Strategy
 
 ## Knowledge Gaps
-- **302 isolated node(s):** `MapData`, `Long`, `VotingSession`, `MapData`, `Override` (+297 more)
+- **307 isolated node(s):** `MapData`, `Long`, `VotingSession`, `MapData`, `Override` (+302 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `GameManager` connect `Game Manager Core` to `Tower Placement & Lifecycle`, `Mob Event Listeners`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
-- **Why does `Match` connect `Match State` to `Game Manager Core`, `Mob Event Listeners`, `Community 33`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
-- **Why does `MobListener` connect `Mob Event Listeners` to `Community 33`, `Game Manager Core`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `GameManager` connect `GameManager Cleanup & Lifecycle` to `Tower Placement & Mob Movement`, `Game State & Bukkit Events`, `Match State & Economy`, `Player Stats & Upgrades`, `TD Command Handling`, `GameManager GUI Items`, `Active Match Tracking`, `Match Lifecycle & Spells`?**
+  _High betweenness centrality (0.031) - this node is a cross-community bridge._
+- **Why does `Match` connect `Match State & Economy` to `Game State & Bukkit Events`, `Player Stats & Upgrades`, `Match Lifecycle & Spells`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `MobListener` connect `Game State & Bukkit Events` to `Tower Placement & Mob Movement`, `World Unload Listener`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **What connects `MapData`, `Long`, `VotingSession` to the rest of the system?**
-  _309 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Tower Placement & Lifecycle` be split into smaller, more focused modules?**
-  _Cohesion score 0.05325260052786834 - nodes in this community are weakly interconnected._
-- **Should `Game Manager Core` be split into smaller, more focused modules?**
-  _Cohesion score 0.059425145476988184 - nodes in this community are weakly interconnected._
-- **Should `Mob Spawning & Upgrades` be split into smaller, more focused modules?**
-  _Cohesion score 0.058823529411764705 - nodes in this community are weakly interconnected._
+  _319 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Tower Placement & Mob Movement` be split into smaller, more focused modules?**
+  _Cohesion score 0.05409523809523809 - nodes in this community are weakly interconnected._
+- **Should `Game State & Bukkit Events` be split into smaller, more focused modules?**
+  _Cohesion score 0.06491398896462187 - nodes in this community are weakly interconnected._
+- **Should `Plot Configuration Management` be split into smaller, more focused modules?**
+  _Cohesion score 0.0750925436277102 - nodes in this community are weakly interconnected._

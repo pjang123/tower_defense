@@ -128,8 +128,12 @@ public class WaypointConfigManager {
         Map<String, TDWaypoint> graph = getWaypointGraph(match, arena);
         if (graph.isEmpty()) return list;
 
+        // Walk the next-pointer chain from "0". Guard against cycles in the authored graph (a
+        // waypoint's next eventually pointing back to an already-visited node): without this, a
+        // cyclic track loops forever, growing the list until the server thread OOMs and hangs.
+        java.util.Set<String> visited = new java.util.HashSet<>();
         String currentId = "0";
-        while (currentId != null && graph.containsKey(currentId)) {
+        while (currentId != null && graph.containsKey(currentId) && visited.add(currentId)) {
             TDWaypoint wp = graph.get(currentId);
             list.add(wp.getLocation());
             currentId = wp.getNextIds().isEmpty() ? null : wp.getNextIds().get(0);
@@ -137,20 +141,50 @@ public class WaypointConfigManager {
         return list;
     }
 
+    /**
+     * The castle/end-of-track location for an arena: the waypoint with the highest numeric ID.
+     * The track can have Y-splits, so following next-pointers ({@link #getWaypoints}) is unreliable
+     * for locating the end (a short branch dead-ends before the castle). The authoring convention is
+     * that the highest-numbered waypoint is the castle. Reads from the per-match graph, so the
+     * returned Location carries the live match world. Returns null if the arena has no waypoints.
+     */
+    public Location getLastWaypoint(Match match, String arena) {
+        Map<String, TDWaypoint> graph = getWaypointGraph(match, arena);
+        TDWaypoint best = null;
+        int bestId = Integer.MIN_VALUE;
+        for (Map.Entry<String, TDWaypoint> e : graph.entrySet()) {
+            int id;
+            try {
+                id = Integer.parseInt(e.getKey());
+            } catch (NumberFormatException ex) {
+                continue;
+            }
+            if (id > bestId) {
+                bestId = id;
+                best = e.getValue();
+            }
+        }
+        return best != null ? best.getLocation() : null;
+    }
+
+    // Initialize the in-memory waypoint config. Waypoints live ONLY in each world's own waypoints.yml
+    // (template folder); the plugin data folder must not accumulate a global waypoints.yml. We keep a
+    // purely in-memory working set (mirrored from the active match/template on demand) and remove any
+    // stray plugin-folder file left over from older versions.
     private void setupConfig() {
         if (!plugin.getDataFolder().exists()) {
             plugin.getDataFolder().mkdirs();
         }
         file = new File(plugin.getDataFolder(), "waypoints.yml");
-        if (!file.exists()) {
-            try {
-                file.createNewFile();
-                plugin.getLogger().info("Successfully generated waypoints.yml!");
-            } catch (IOException e) {
-                plugin.getLogger().severe("Could not create waypoints.yml!");
+        if (file.exists()) {
+            // Preserve any legacy contents in memory for this session, then delete the stray file.
+            config = YamlConfiguration.loadConfiguration(file);
+            if (file.delete()) {
+                plugin.getLogger().info("Removed stray plugin-folder waypoints.yml; waypoints now live only in their world folders.");
             }
+        } else {
+            config = new YamlConfiguration();
         }
-        config = YamlConfiguration.loadConfiguration(file);
     }
 
     // Graph-based methods
@@ -194,11 +228,12 @@ public class WaypointConfigManager {
         targetConfig.set(path + ".next", nextIds);
 
         try {
-            targetConfig.save(targetFile);
             if (isTemplateWorld) {
-                // Also update in-memory config for consistency
-                config = targetConfig;
+                targetConfig.save(targetFile);   // the world's own waypoints.yml
+                config = targetConfig;           // keep the in-memory working set in sync
             }
+            // Non-template (legacy) edits remain in the in-memory config only and are written out to a
+            // world folder by /td saveconfig — never to the plugin data folder.
         } catch (IOException e) {
             plugin.getLogger().severe("Could not save waypoint to " + targetFile.getAbsolutePath());
             e.printStackTrace();
@@ -319,6 +354,60 @@ public class WaypointConfigManager {
         saveFile(); // Also save to global config for backwards compatibility
     }
 
+    /**
+     * Removes a waypoint node from an arena and severs any connections pointing at it (other waypoints'
+     * {@code next} lists). Mirrors {@link com.pauljang.towerDefense.data.PlotConfigManager#deletePlot}'s
+     * persistence: edits the in-memory global config (what {@link #getWaypointGraph(String)} reads, so the
+     * setup preview updates live) and, when the waypoints belong to a template world, also writes the
+     * world's own waypoints.yml so the deletion survives a reload.
+     */
+    public void deleteWaypoint(String arena, String id) {
+        String arenaPath = "waypoints." + arena;
+        if (config.getConfigurationSection(arenaPath) == null) return;
+
+        // Resolve the world before removing the node, for template-world persistence below.
+        String worldName = config.getString(arenaPath + "." + id + ".world");
+
+        // Remove the node, then strip it from every other waypoint's next list.
+        config.set(arenaPath + "." + id, null);
+        org.bukkit.configuration.ConfigurationSection section = config.getConfigurationSection(arenaPath);
+        if (section != null) {
+            for (String otherId : section.getKeys(false)) {
+                List<String> next = config.getStringList(arenaPath + "." + otherId + ".next");
+                if (next.remove(id)) {
+                    config.set(arenaPath + "." + otherId + ".next", next);
+                }
+            }
+        }
+
+        // If these waypoints belong to a template world, persist directly to its waypoints.yml too.
+        if (worldName != null) {
+            org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+            if (world != null) {
+                File worldFolder = world.getWorldFolder();
+                boolean isTemplateWorld = worldFolder.getAbsolutePath().contains("GAME_WORLD_TEMPLATES");
+                File templateSource = plugin.getCommand("td") != null ?
+                    ((com.pauljang.towerDefense.core.TDCommand) plugin.getCommand("td").getExecutor()).getTemplateSource(world.getName()) : null;
+                if (templateSource != null) {
+                    worldFolder = templateSource;
+                    isTemplateWorld = true;
+                }
+                if (isTemplateWorld) {
+                    File targetFile = new File(worldFolder, "waypoints.yml");
+                    try {
+                        config.save(targetFile);
+                        plugin.getLogger().info("Deleted waypoint " + id + " from template world: " + targetFile.getAbsolutePath());
+                    } catch (IOException e) {
+                        plugin.getLogger().severe("Could not delete waypoint from " + targetFile.getAbsolutePath());
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        saveFile(); // Also save to global config for backwards compatibility
+    }
+
     public List<Location> getWaypoints() {
         return getWaypoints("1");
     }
@@ -362,11 +451,10 @@ public class WaypointConfigManager {
         }
     }
 
+    // Intentionally a no-op. The plugin data folder must never hold a global waypoints.yml — waypoints
+    // are persisted to each world's own waypoints.yml (template folder) by addWaypoint/deleteWaypoint/
+    // clearAllWaypoints, and exported via /td saveconfig. The in-memory `config` is the live working set.
     private void saveFile() {
-        try {
-            config.save(file);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // no-op: see method comment
     }
 }

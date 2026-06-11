@@ -40,7 +40,7 @@ public class Match {
         this.plugin = plugin;
         this.mapData = mapData;
         
-        int maxHealth = plugin.getConfig().getInt("game.max-castle-health", 100);
+        int maxHealth = plugin.getConfig().getInt("game.max-castle-health", 1000);
         arenaHealth.put("1", maxHealth);
         arenaHealth.put("2", maxHealth);
     }
