@@ -190,8 +190,24 @@ public class TowerManager {
             }
             
             String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
-            java.util.List<Location> wps = plugin.getWaypointConfigManager().getWaypoints(towerArena);
-            Location spawnLoc = (!wps.isEmpty()) ? wps.get(0).clone().add(0, 1.0, 0) : center.clone().add(0, 1.5, 0);
+            // Spawn at the nearest path waypoint inside the tower's radius so the golem patrols its own lane.
+            java.util.List<Location> inRangeTrack = getTrackLocationsWithinRange(tower);
+            Location spawnLoc;
+            if (!inRangeTrack.isEmpty()) {
+                Location nearest = inRangeTrack.get(0);
+                double bestSq = nearest.distanceSquared(center);
+                for (Location l : inRangeTrack) {
+                    double dSq = l.distanceSquared(center);
+                    if (dSq < bestSq) {
+                        bestSq = dSq;
+                        nearest = l;
+                    }
+                }
+                spawnLoc = nearest.clone().add(0, 1.0, 0);
+            } else {
+                java.util.List<Location> wps = plugin.getWaypointConfigManager().getWaypoints(towerArena);
+                spawnLoc = (!wps.isEmpty()) ? wps.get(0).clone().add(0, 1.0, 0) : center.clone().add(0, 1.5, 0);
+            }
             
             org.bukkit.entity.LivingEntity golem = null;
             if (level == 1) {
@@ -651,41 +667,25 @@ public class TowerManager {
                             if (nearestTrackMob == null) {
                                 golemMob.setTarget(null);
 
-                                // Only pick a new random wander location every 60 ticks (3 seconds) to prevent pathing jitter
+                                // Patrol back and forth along the path, staying strictly inside the radius.
+                                // Every 60 ticks head for the in-range track point farthest from the golem so it
+                                // oscillates between the ends of its lane instead of wandering off the path.
                                 if (tick % 60 == 0) {
                                     java.util.List<Location> track = getTrackLocationsWithinRange(tower);
                                     if (!track.isEmpty()) {
-                                        // Pick a random waypoint inside the range
-                                        Location randomWp = track.get(new java.util.Random().nextInt(track.size()));
-                                        Location destination = randomWp.clone();
-
-                                        // Attempt to offset perpendicularly from the line of the track
-                                        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = plugin.getWaypointConfigManager().getWaypointGraph(golemArena);
-                                        org.bukkit.util.Vector offsetDir = new org.bukkit.util.Vector(1, 0, 0); // Default fallback direction
-
-                                        for (com.pauljang.towerDefense.data.TDWaypoint wp : graph.values()) {
-                                            if (wp.getLocation().distanceSquared(randomWp) < 0.2 && !wp.getNextIds().isEmpty()) {
-                                                com.pauljang.towerDefense.data.TDWaypoint nextWp = graph.get(wp.getNextIds().get(0));
-                                                if (nextWp != null) {
-                                                    // Get the vector between waypoints and find its perpendicular flat 2D vector
-                                                    org.bukkit.util.Vector pathLine = nextWp.getLocation().toVector().subtract(wp.getLocation().toVector()).normalize();
-                                                    offsetDir = new org.bukkit.util.Vector(-pathLine.getZ(), 0, pathLine.getX()).normalize();
-                                                }
-                                                break;
+                                        Location golemLoc = golem.getLocation();
+                                        Location destination = track.get(0);
+                                        double farthestSq = -1.0;
+                                        for (Location l : track) {
+                                            double dSq = l.distanceSquared(golemLoc);
+                                            if (dSq > farthestSq) {
+                                                farthestSq = dSq;
+                                                destination = l;
                                             }
                                         }
-
-                                        // Apply a random float offset up to 3 blocks on either side (-3 to +3 blocks)
-                                        double randomOffsetAmount = (Math.random() - 0.5) * 6.0;
-                                        destination.add(offsetDir.multiply(randomOffsetAmount));
-
-                                        // CAUTION BOUNDS CHECK: Only move to the destination if it doesn't break the tower's constraint radius
-                                        if (destination.distanceSquared(tower.getCenterLocation()) <= maxRangeSq) {
-                                            golemMob.getPathfinder().moveTo(destination, 1.0);
-                                        } else {
-                                            // Fallback back safely towards center if the offset overflows outside the circle range
-                                            golemMob.getPathfinder().moveTo(tower.getCenterLocation(), 1.0);
-                                        }
+                                        // Track points come from getTrackLocationsWithinRange, so they are
+                                        // already guaranteed to sit within the tower's radius.
+                                        golemMob.getPathfinder().moveTo(destination.clone(), 1.0);
                                     } else {
                                         golemMob.getPathfinder().moveTo(tower.getCenterLocation(), 1.0);
                                     }
@@ -727,7 +727,7 @@ public class TowerManager {
                     if (tick - tower.getLastAttackTick() >= cooldown) {
                         Mob target = findTarget(tower);
                         // For AoE towers, they attack if there is any target in range
-                        if (tower.getType() == TowerType.FIRE || tower.getType() == TowerType.PRISMARINE || tower.getType() == TowerType.POISON || tower.getType() == TowerType.ICE) {
+                        if (tower.getType() == TowerType.FIRE || tower.getType() == TowerType.PRISMARINE || tower.getType() == TowerType.POISON || tower.getType() == TowerType.ICE || tower.getType() == TowerType.THUNDER) {
                             java.util.List<Mob> inRadius = getMobsInRadius(tower.getCenterLocation(), tower.getRange(), towerArena);
                             if (!inRadius.isEmpty()) {
                                 shootTarget(tower, inRadius.get(0));
@@ -792,12 +792,17 @@ public class TowerManager {
 
         // 2. Spawn new hazards randomly over time (try one every 40 ticks / 2 seconds)
         if (tower.getHazardDisplays().size() < cap && tick % 40 == 0) {
-            java.util.List<Location> track = getTrackLocationsWithinRange(tower);
-            if (track.isEmpty()) return;
+            java.util.List<Location[]> segments = getTrackSegmentsWithinRange(tower);
+            if (segments.isEmpty()) return;
 
-            Location baseLoc = track.get(new java.util.Random().nextInt(track.size())).clone();
-            // Random offset within the tower's radius
-            baseLoc.add((Math.random() - 0.5) * 2.5, 0, (Math.random() - 0.5) * 2.5);
+            // Pick a random in-range segment and a random point along it, so hazards land anywhere
+            // between two waypoints instead of stacking on waypoint centers.
+            Location[] segment = segments.get(new java.util.Random().nextInt(segments.size()));
+            double t = Math.random();
+            Location baseLoc = segment[0].clone().add(
+                    segment[1].clone().subtract(segment[0]).toVector().multiply(t));
+            // Slight perpendicular jitter so hazards spread across the lane width
+            baseLoc.add((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);
 
             if (baseLoc.distanceSquared(tower.getCenterLocation()) <= tower.getRange() * tower.getRange()) {
                 org.bukkit.entity.BlockDisplay hazard = baseLoc.getWorld().spawn(baseLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
@@ -820,7 +825,8 @@ public class TowerManager {
         }
     }
 
-    // Bombardier landmines: detonate mines on mob contact every tick; deploy a new mine on cooldown (max 3)
+    // Bombardier landmines: detonate mines on mob contact every tick; deploy a new mine on cooldown
+    // up to a configurable cap, scattered randomly along the path segments inside the tower's radius.
     private void tickLandmines(Tower tower, long tick) {
         String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
 
@@ -843,16 +849,20 @@ public class TowerManager {
             }
         }
 
-        if (tower.getLandmines().size() >= 3) return;
-        if (tick - tower.getLastAttackTick() < getEffectiveCooldown(tower)) return;
+        int cap = plugin.getTowerConfigManager().getStat(TowerType.BOMBARDIER, tower.getPathId(), tower.getLevel(), "mine_count", 20);
+        if (tower.getLandmines().size() >= cap) return;
+        // Deploy mines on a short fixed interval (not the attack cooldown) so the field fills quickly.
+        if (tick - tower.getLastAttackTick() < 8L) return;
 
-        java.util.List<Location> track = getTrackLocationsWithinRange(tower);
-        if (track.isEmpty()) return;
+        // Pick a random in-range path segment and a random point along it, then scatter the mine a
+        // little off the path center so mines spread across the lane instead of stacking on waypoints.
+        java.util.List<Location[]> segments = getTrackSegmentsWithinRange(tower);
+        if (segments.isEmpty()) return;
 
-        // Pick a random in-range waypoint, then scatter the mine 1-2 blocks off the path center so
-        // mines spread out across the lane instead of stacking on waypoint centers.
-        Location wp1 = track.get(new Random().nextInt(track.size()));
-        Location mineLoc = wp1.clone();
+        Location[] segment = segments.get(new Random().nextInt(segments.size()));
+        double t = Math.random();
+        Location mineLoc = segment[0].clone().add(
+                segment[1].clone().subtract(segment[0]).toVector().multiply(t));
         mineLoc.add((Math.random() - 0.5) * 3.0, 0, (Math.random() - 0.5) * 3.0);
 
         // Ensure the offset mine is still inside the tower's shooting radius
@@ -1675,32 +1685,10 @@ public class TowerManager {
                 }
             }
             case THUNDER -> {
-                boolean global = plugin.getTowerConfigManager().getStat(TowerType.THUNDER, tower.getLevel(), "is_global", false);
-                if (global) {
-                    // T4 Global Strike: hit every valid mob in the arena (range is 999 in config)
-                    for (Mob mob : getMobsInRadius(tower.getCenterLocation(), range, towerArena)) {
-                        mob.getWorld().strikeLightningEffect(mob.getLocation());
-                        mob.damage(tower.getDamage());
-                    }
-                    return;
-                }
-                target.getWorld().strikeLightningEffect(target.getLocation());
-                target.damage(tower.getDamage());
-
-                // T2/T3 Chain Lightning: arc to nearby mobs for 50% damage
-                int chains = plugin.getTowerConfigManager().getStat(TowerType.THUNDER, tower.getLevel(), "chain_count", 0);
-                if (chains > 0) {
-                    Location targetLoc = target.getLocation();
-                    java.util.List<Mob> near = getMobsInRadius(targetLoc, 6.0, towerArena);
-                    near.remove(target);
-                    near.sort(java.util.Comparator.comparingDouble(m -> m.getLocation().distanceSquared(targetLoc)));
-                    // Chain lightning now deals full damage (was 50%).
-                    double chainDamage = tower.getDamage() * 1.0;
-                    for (int i = 0; i < Math.min(chains, near.size()); i++) {
-                        Mob chained = near.get(i);
-                        drawParticleLine(target.getEyeLocation(), chained.getEyeLocation(), org.bukkit.Particle.ELECTRIC_SPARK);
-                        chained.damage(chainDamage);
-                    }
+                // Thunder strikes every mob on the path within range at once for full damage.
+                for (Mob mob : getMobsInRadius(tower.getCenterLocation(), range, towerArena)) {
+                    mob.getWorld().strikeLightningEffect(mob.getLocation());
+                    mob.damage(tower.getDamage());
                 }
             }
             case TURRET -> {
@@ -1708,10 +1696,12 @@ public class TowerManager {
                     int arrows = plugin.getTowerConfigManager().getStat(TowerType.TURRET, tower.getPathId(), tower.getLevel(), "arrows", 5);
                     double damage = tower.getDamage();
 
-                    org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(start.toVector()).normalize();
+                    // Spawn arrows from above the top of the tower so they clear the build's collision
+                    // box instead of pushing the origin horizontally into adjacent blocks.
+                    double topHeight = (tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 3) + 0.5;
+                    Location safeStart = tower.getCenterLocation().clone().add(0, topHeight, 0);
 
-                    // Push the spawn point 1.5 blocks forward so arrows clear the tower's own collision box.
-                    Location safeStart = start.clone().add(dir.clone().multiply(1.5));
+                    org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(safeStart.toVector()).normalize();
 
                     for (int i = 0; i < arrows; i++) {
                         // Offset spawn locations slightly so the arrows don't instantly collide with each other.
@@ -1928,6 +1918,47 @@ public class TowerManager {
                 result.add(loc.clone());
             }
             queue.addAll(wp.getNextIds());
+        }
+        return result;
+    }
+
+    /**
+     * Returns the path segments (adjacent waypoint pairs) whose endpoints both sit within the
+     * tower's radius. Used to scatter hazards/mines anywhere along a segment, not just on waypoints.
+     * BFS with a visited set keeps this safe on cyclic waypoint graphs.
+     */
+    private java.util.List<Location[]> getTrackSegmentsWithinRange(Tower tower) {
+        java.util.List<Location[]> result = new java.util.ArrayList<>();
+        String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph =
+                plugin.getWaypointConfigManager().getWaypointGraph(arena);
+        if (graph == null || graph.isEmpty()) return result;
+
+        double rangeSq = tower.getRange() * tower.getRange();
+        Location center = tower.getCenterLocation();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<>();
+        queue.add("0");
+        while (!queue.isEmpty()) {
+            String id = queue.poll();
+            if (!visited.add(id)) continue;
+            com.pauljang.towerDefense.data.TDWaypoint wp = graph.get(id);
+            if (wp == null) continue;
+            Location loc = wp.getLocation();
+            for (String nextId : wp.getNextIds()) {
+                com.pauljang.towerDefense.data.TDWaypoint next = graph.get(nextId);
+                if (next != null && next.getLocation() != null && loc != null
+                        && loc.getWorld() != null
+                        && loc.getWorld().equals(center.getWorld())
+                        && loc.getWorld().equals(next.getLocation().getWorld())
+                        // Include the segment if EITHER endpoint is in range, so long segments that
+                        // only partly cross the radius still count. Callers range-check the final point.
+                        && (loc.distanceSquared(center) <= rangeSq
+                            || next.getLocation().distanceSquared(center) <= rangeSq)) {
+                    result.add(new Location[]{loc.clone(), next.getLocation().clone()});
+                }
+                queue.add(nextId);
+            }
         }
         return result;
     }

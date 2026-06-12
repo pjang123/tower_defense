@@ -312,16 +312,19 @@ bombardier:
         range: 12.0
         damage: 25.0
         cooldown: 80
+        mine_count: 20
       3:
         cost: 325
         range: 14.0
         damage: 35.0
         cooldown: 75
+        mine_count: 25
       4:
         cost: 450
         range: 16.0
         damage: 45.0
         cooldown: 70
+        mine_count: 30
 
 thunder:
   name: "Thunder Tower"
