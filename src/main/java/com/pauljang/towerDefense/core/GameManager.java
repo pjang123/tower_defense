@@ -39,12 +39,12 @@ public class GameManager {
     private GameState currentState = null;
     private long matchStartTime = 0L;
 
-    private int maxCastleHealth = 100;
+    private int maxCastleHealth = 1000;
     private int matchSize = 8;
     private final Map<String, Integer> arenaHealth = new HashMap<>();
     private final Map<String, Map<String, Long>> activeSpells = new HashMap<>();
     private final Map<Location, Material> originalFloorBlocks = new HashMap<>();
-    private final Map<String, ArmorStand> castleHolograms = new HashMap<>();
+    private final Map<String, java.util.List<ArmorStand>> castleHolograms = new HashMap<>();
     private BossBar castleBossBar = null;
 
     private java.util.UUID pendingChallenger = null;
@@ -214,7 +214,10 @@ public class GameManager {
             Player p = Bukkit.getPlayer(id);
             if (p == null) continue;
 
-            String arena = (i % 2 == 0) ? "1" : "2";
+            // Single-player maps author their track, plots and castle under arena "2" (the wave engine
+            // spawns mobs on "2"), so the lone player must be on "2" as well — otherwise they spawn on
+            // the empty arena "1", cannot damage the arena "2" mobs, and never see the arena "2" castle.
+            String arena = mapData.isSinglePlayer() ? "2" : ((i % 2 == 0) ? "1" : "2");
             match.addPlayer(p, arena);
             playerToMatch.put(id, match);
 
@@ -246,7 +249,7 @@ public class GameManager {
                     Player p = Bukkit.getPlayer(id);
                     if (p == null) continue;
 
-                    String arena = (i % 2 == 0) ? "1" : "2";
+                    String arena = mapData.isSinglePlayer() ? "2" : ((i % 2 == 0) ? "1" : "2");
 
                     // Teleport to arena start (Waypoint 0)
                     org.bukkit.Location spawn = plugin.getWaypointConfigManager().getWaypoint(match, arena, "0");
@@ -280,8 +283,8 @@ public class GameManager {
                 // called these (only the legacy handleGameStart did), so the boss bar and castle
                 // holograms never appeared — the "missing scoreboards" symptom.
                 showBossBar();
-                updateCastleHologram("1");
-                updateCastleHologram("2");
+                updateCastleHologram(match, "1");
+                updateCastleHologram(match, "2");
 
                 plugin.getLogger().info("Match " + match.getMatchId() + " is now ACTIVE");
             }
@@ -321,7 +324,7 @@ public class GameManager {
 
     public GameManager(TowerDefense plugin) {
         this.plugin = plugin;
-        this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 100);
+        this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 1000);
         this.matchSize = Math.max(2, plugin.getConfig().getInt("game.players-per-match", 8));
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
@@ -355,6 +358,14 @@ public class GameManager {
                         player.sendMessage(sb.toString());
                     }
                 }
+            }
+            // Keep the castle HP holograms alive and current. They live at the far end of each track,
+            // whose chunks unload when no one is near (keepSpawnInMemory=false), removing the stands;
+            // refreshing here recreates them whenever a player is back in range to see them.
+            if (isActive) {
+                updateBossBar();
+                updateCastleHologram("1");
+                updateCastleHologram("2");
             }
             updateTabNames();
         }, 0L, 20L);
@@ -1112,71 +1123,102 @@ public class GameManager {
     }
 
     public void updateCastleHologram(String arena) {
-        ArmorStand stand = castleHolograms.get(arena);
-        if (stand == null || !stand.isValid()) {
-            if (currentState == GameState.ACTIVE || currentState == GameState.STARTING) {
-                java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
-                if (!waypoints.isEmpty()) {
-                    Location lastWp = waypoints.get(waypoints.size() - 1);
-                    Location spawnLoc = lastWp.clone().add(0, 3.0, 0);
-                    
-                    // Clean up any existing armor stands at the spawn location first to prevent stacking/ghost holograms
-                    spawnLoc.getWorld().getNearbyEntities(spawnLoc, 2.0, 2.0, 2.0).stream()
-                        .filter(e -> e instanceof ArmorStand)
-                        .filter(as -> !castleHolograms.containsValue(as))
-                        .forEach(org.bukkit.entity.Entity::remove);
+        updateCastleHologram(null, arena);
+    }
 
-                    stand = spawnLoc.getWorld().spawn(spawnLoc, ArmorStand.class, as -> {
-                        as.setVisible(false);
-                        as.setGravity(false);
-                        as.setMarker(true);
-                        as.setInvulnerable(true);
-                        as.setPersistent(false);
-                        as.setCustomName("");
-                        as.setCustomNameVisible(true);
-                    });
-                    castleHolograms.put(arena, stand);
-                }
+    public void updateCastleHologram(Match match, String arena) {
+        if (currentState != GameState.ACTIVE && currentState != GameState.STARTING) return;
+
+        // The castle sits at the highest-numbered waypoint. The track has Y-splits, so the
+        // next-pointer chain can dead-end on a short branch before reaching the castle — the
+        // authoring convention is that the max waypoint ID is the end. Pull it from the per-match
+        // graph so the Location carries the live match world; fall back to the legacy numeric-sorted
+        // list (last element = highest ID) when there's no match (e.g. the periodic HUD ticker).
+        Location lastWp;
+        if (match != null) {
+            lastWp = plugin.getWaypointConfigManager().getLastWaypoint(match, arena);
+        } else {
+            java.util.List<Location> wps = plugin.getWaypointConfigManager().getWaypoints(arena);
+            lastWp = wps.isEmpty() ? null : wps.get(wps.size() - 1);
+        }
+        if (lastWp == null || lastWp.getWorld() == null) return;
+
+        int health = arenaHealth.getOrDefault(arena, maxCastleHealth);
+        double ratio = Math.max(0.0, Math.min(1.0, (double) health / maxCastleHealth));
+        int totalBars = 20;
+        int filledBars = (int) Math.round(ratio * totalBars);
+
+        ChatColor barColor = ratio >= 0.6 ? ChatColor.GREEN : (ratio >= 0.25 ? ChatColor.YELLOW : ChatColor.RED);
+        StringBuilder bar = new StringBuilder();
+        bar.append(barColor);
+        for (int i = 0; i < filledBars; i++) bar.append("■");
+        bar.append(ChatColor.GRAY);
+        for (int i = filledBars; i < totalBars; i++) bar.append("■");
+
+        boolean blue = "1".equals(arena);
+        ChatColor teamColor = blue ? ChatColor.BLUE : ChatColor.RED;
+        String teamName = blue ? "BLUE" : "RED";
+
+        // Two-line, tower-style floating display: a coloured title and a health bar with the count.
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        lines.add(teamColor.toString() + ChatColor.BOLD + "⚔ " + teamName + " CASTLE");
+        lines.add(ChatColor.RED + "❤ " + bar + ChatColor.GRAY + " ("
+                + ChatColor.WHITE + health + ChatColor.GRAY + "/" + maxCastleHealth + ")");
+
+        // Render the lines as a stack of floating ArmorStands, mirroring TowerManager.updateHologram so
+        // the display survives chunk reloads: reuse/teleport existing stands, spawn missing ones, trim
+        // extras. The periodic game-loop ticker calls this every second, so a stand that unloaded while
+        // no player was near the castle is recreated as soon as a player returns and the chunk loads.
+        Location base = lastWp.clone().add(0, 3.0, 0);
+        java.util.List<ArmorStand> stands = castleHolograms.computeIfAbsent(arena, k -> new java.util.ArrayList<>());
+
+        // Remove any stray castle-hologram stands at this spot that we are NOT tracking — ghosts left
+        // by a chunk reload or an earlier render. Without this they stack and the text becomes an
+        // unreadable blur. Restricted to invisible marker stands with a custom name so it never touches
+        // tower holograms or other entities; the tracked stands below are reused, not removed.
+        for (org.bukkit.entity.Entity e : base.getWorld().getNearbyEntities(base, 1.5, 3.0, 1.5)) {
+            if (e instanceof ArmorStand as && as.isMarker() && !as.isVisible()
+                    && as.getCustomName() != null && !stands.contains(as)) {
+                as.remove();
             }
         }
 
-        if (stand != null && stand.isValid()) {
-            int health = arenaHealth.getOrDefault(arena, maxCastleHealth);
-            double ratio = (double) health / maxCastleHealth;
-            int totalBars = 20;
-            int greenBars = (int) Math.round(ratio * totalBars);
-            int grayBars = totalBars - greenBars;
-
-            ChatColor color;
-            if (ratio >= 0.6) {
-                color = ChatColor.GREEN;
-            } else if (ratio >= 0.25) {
-                color = ChatColor.YELLOW;
+        double spacing = 0.28;
+        for (int i = 0; i < lines.size(); i++) {
+            String text = lines.get(i);
+            Location lineLoc = base.clone().add(0, -i * spacing, 0);
+            if (i < stands.size() && stands.get(i) != null && stands.get(i).isValid()) {
+                ArmorStand as = stands.get(i);
+                as.teleport(lineLoc);
+                as.setCustomName(text);
+                as.setCustomNameVisible(true);
             } else {
-                color = ChatColor.RED;
+                final String nameText = text;
+                ArmorStand newAs = lineLoc.getWorld().spawn(lineLoc, ArmorStand.class, as -> {
+                    as.setVisible(false);
+                    as.setGravity(false);
+                    as.setMarker(true);
+                    as.setInvulnerable(true);
+                    as.setPersistent(false);
+                    as.setCustomName(nameText);
+                    as.setCustomNameVisible(true);
+                });
+                if (i < stands.size()) stands.set(i, newAs);
+                else stands.add(newAs);
             }
-
-            StringBuilder bar = new StringBuilder();
-            bar.append(ChatColor.GOLD).append(ChatColor.BOLD).append("CASTLE HP: ");
-            bar.append(color);
-            for (int i = 0; i < greenBars; i++) {
-                bar.append("■");
-            }
-            bar.append(ChatColor.GRAY);
-            for (int i = 0; i < grayBars; i++) {
-                bar.append("■");
-            }
-            bar.append(ChatColor.GRAY).append(" (").append(health).append("/").append(maxCastleHealth).append(")");
-
-            stand.setCustomName(bar.toString());
-            stand.setCustomNameVisible(true);
+        }
+        while (stands.size() > lines.size()) {
+            ArmorStand extra = stands.remove(stands.size() - 1);
+            if (extra != null && extra.isValid()) extra.remove();
         }
     }
 
     public void cleanupCastleHolograms() {
-        for (ArmorStand stand : castleHolograms.values()) {
-            if (stand != null && stand.isValid()) {
-                stand.remove();
+        for (java.util.List<ArmorStand> stands : castleHolograms.values()) {
+            for (ArmorStand stand : stands) {
+                if (stand != null && stand.isValid()) {
+                    stand.remove();
+                }
             }
         }
         castleHolograms.clear();
@@ -1216,7 +1258,7 @@ public class GameManager {
         // (Only one match is live at a time for these HUD elements.)
         arenaHealth.put(arena, updated);
         updateBossBar();
-        updateCastleHologram(arena);
+        updateCastleHologram(match, arena);
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (arena.equals(getPlayerArena(player.getUniqueId()))) {
@@ -1683,6 +1725,13 @@ public class GameManager {
 
     public void setPlayerArena(java.util.UUID uuid, String arena) {
         playerArenas.put(uuid, arena);
+        // If the player is already in a match, getPlayerArena() reads the match's own arena map and
+        // ignores the global one, so mirror the assignment there too — otherwise /td setarena has no
+        // effect on a player who is already in a game.
+        Match match = playerToMatch.get(uuid);
+        if (match != null) {
+            match.getPlayerArenas().put(uuid, arena);
+        }
     }
 
     public int getPlayerIncomeRate(java.util.UUID uuid) {
@@ -2089,8 +2138,11 @@ public class GameManager {
         UUID uuid = player.getUniqueId();
         Match match = playerToMatch.get(uuid);
 
-        // Not in a match: tear down any sidebar we gave them and restore the main scoreboard.
-        if (match == null) {
+        // Not in a match, or registered to a match but not yet physically in its world (e.g. still in
+        // the lobby during the pre-teleport countdown): tear down any sidebar we gave them and restore
+        // the main scoreboard. Players join playerToMatch ~5s before they are teleported in, so gating
+        // on world membership keeps the sidebar hidden until they actually arrive in the game world.
+        if (match == null || match.getWorld() == null || !player.getWorld().equals(match.getWorld())) {
             if (playerScoreboards.remove(uuid) != null) {
                 player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
             }
@@ -2202,8 +2254,47 @@ public class GameManager {
     }
 
     public void updateTabNames() {
-        // This method can be implemented later for tab list updates
-        // For now it's a no-op to prevent compilation errors
+        // Show each player's team in the tab player list and group the names by team. The vanilla tab
+        // list orders players by their scoreboard team's registered name, so we use "td_team_1" (Blue)
+        // and "td_team_2" (Red) to make Blue sort above Red. The coloured prefix labels which team each
+        // player is on. Teams live on each viewer's own sidebar board, since that is the scoreboard the
+        // client uses to render and sort the tab list.
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            UUID vid = viewer.getUniqueId();
+            Match match = playerToMatch.get(vid);
+            org.bukkit.scoreboard.Scoreboard board = playerScoreboards.get(vid);
+            if (match == null || board == null || viewer.getScoreboard() != board) {
+                continue;
+            }
+
+            org.bukkit.scoreboard.Team blue = getOrCreateTabTeam(board, "td_team_1",
+                    ChatColor.BLUE, ChatColor.BLUE + "" + ChatColor.BOLD + "[BLUE] " + ChatColor.RESET);
+            org.bukkit.scoreboard.Team red = getOrCreateTabTeam(board, "td_team_2",
+                    ChatColor.RED, ChatColor.RED + "" + ChatColor.BOLD + "[RED] " + ChatColor.RESET);
+
+            for (UUID id : match.getPlayers()) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null) continue;
+                String arena = match.getPlayerArenas().getOrDefault(id, "1");
+                org.bukkit.scoreboard.Team team = "1".equals(arena) ? blue : red;
+                // addEntry moves the player off any other team on this board, so a re-assigned
+                // player (e.g. via /td setarena) lands in the right group on the next tick.
+                if (!team.hasEntry(p.getName())) {
+                    team.addEntry(p.getName());
+                }
+            }
+        }
+    }
+
+    private org.bukkit.scoreboard.Team getOrCreateTabTeam(org.bukkit.scoreboard.Scoreboard board,
+            String id, ChatColor color, String prefix) {
+        org.bukkit.scoreboard.Team team = board.getTeam(id);
+        if (team == null) {
+            team = board.registerNewTeam(id);
+        }
+        team.setColor(color);
+        team.setPrefix(prefix);
+        return team;
     }
 
     public void cancelLobbyQueueCountdown(String reason) {

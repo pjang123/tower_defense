@@ -35,6 +35,20 @@ public final class TowerDefense extends JavaPlugin {
         // Save default config.yml
         saveDefaultConfig();
 
+        // One-time config migration. saveDefaultConfig() never overwrites an existing config.yml, so a
+        // server first created when max-castle-health defaulted to 100 keeps that stale value even though
+        // the bundled default is now 1000 — leaving every castle-HP display reading 100. Bump the legacy
+        // value once, version-gated so a deliberate custom value set later is never clobbered. Runs before
+        // GameManager/Match are constructed so they read the migrated value.
+        if (getConfig().getInt("config-version", 0) < 1) {
+            if (getConfig().getInt("game.max-castle-health", 1000) == 100) {
+                getConfig().set("game.max-castle-health", 1000);
+                getLogger().info("Config migration: bumped game.max-castle-health 100 -> 1000");
+            }
+            getConfig().set("config-version", 1);
+            saveConfig();
+        }
+
         // Build the shared NamespacedKeys before any manager spawns mobs or reads PDC data.
         TDKeys.init(this);
 

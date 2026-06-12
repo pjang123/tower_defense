@@ -58,6 +58,7 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td plotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Setup mode for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td deleteplotmode [arena] " + ChatColor.WHITE + "- Toggle Plot Deletion mode for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td waypointmode [arena] " + ChatColor.WHITE + "- Toggle Waypoint Setup mode for an arena");
+                player.sendMessage(ChatColor.YELLOW + "  ↳ Delete waypoint " + ChatColor.WHITE + "- In Waypoint mode, Sneak + click a node to delete it");
                 player.sendMessage(ChatColor.YELLOW + "/td clearwaypoints [arena] " + ChatColor.WHITE + "- Wipe waypoints for an arena");
                 player.sendMessage(ChatColor.YELLOW + "/td loadworld <name> " + ChatColor.WHITE + "- Load a template world for editing");
                 player.sendMessage(ChatColor.YELLOW + "/td unloadworld <name> " + ChatColor.WHITE + "- Unload and delete a template world copy");
@@ -107,7 +108,7 @@ public class TDCommand implements CommandExecutor {
                     plugin.getSetupManager().setEditingArena(player.getUniqueId(), arena);
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.DELETING_PLOT);
                     player.sendMessage(ChatColor.AQUA + "--- Delete Plot Mode: ENABLED (Arena " + arena + ") ---");
-                    player.sendMessage(ChatColor.YELLOW + "Right-click any block within a plot to delete it");
+                    player.sendMessage(ChatColor.YELLOW + "All plots are outlined; the one under your cursor turns white. Left-click it to delete.");
                 } else {
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.IDLE);
                     player.sendMessage(ChatColor.RED + "--- Delete Plot Mode: DISABLED ---");
@@ -125,6 +126,7 @@ public class TDCommand implements CommandExecutor {
                     plugin.getSetupManager().setEditingArena(player.getUniqueId(), arena);
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.WAYPOINT_MODE);
                     player.sendMessage(ChatColor.AQUA + "--- Waypoint Mode: ENABLED (Arena " + arena + ") ---");
+                    player.sendMessage(ChatColor.YELLOW + "Left-click: select/create  |  Right-click a node: connect  |  Sneak+click a node: delete");
                 } else {
                     plugin.getSetupManager().setState(player.getUniqueId(), SetupManager.SetupState.IDLE);
                     player.sendMessage(ChatColor.RED + "--- Waypoint Mode: DISABLED ---");

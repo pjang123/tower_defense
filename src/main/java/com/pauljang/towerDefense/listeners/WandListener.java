@@ -49,12 +49,15 @@ public class WandListener implements Listener {
                                 drawPlotHighlight(blockLoc, size);
                             }
                         } else if (state == SetupState.DELETING_PLOT) {
+                            // Show every plot in this world so the admin can see the full layout; the
+                            // plot currently under the cursor (the click-to-delete target) is drawn
+                            // bright white, all others red.
                             org.bukkit.block.Block targetBlock = player.getTargetBlockExact(15);
-                            if (targetBlock != null && targetBlock.getType() != Material.AIR) {
-                                String plotId = plugin.getPlotConfigManager().getPlotAt(targetBlock.getLocation());
-                                if (plotId != null) {
-                                    drawTargetedPlotHighlight(plotId);
-                                }
+                            String targetedPlotId = (targetBlock != null && targetBlock.getType() != Material.AIR)
+                                ? plugin.getPlotConfigManager().getPlotAt(targetBlock.getLocation()) : null;
+                            for (String plotId : plugin.getPlotConfigManager().getPlotIdsInWorld(player.getWorld())) {
+                                boolean targeted = plotId.equals(targetedPlotId);
+                                drawPlotBoundsHighlight(plotId, targeted ? org.bukkit.Color.WHITE : org.bukkit.Color.RED);
                             }
                         } else if (state == SetupState.WAYPOINT_MODE) {
                             String arena = sm.getEditingArena(player.getUniqueId());
@@ -89,21 +92,21 @@ public class WandListener implements Listener {
         }
     }
 
-    private void drawTargetedPlotHighlight(String plotId) {
+    private void drawPlotBoundsHighlight(String plotId, org.bukkit.Color color) {
         Location[] bounds = plugin.getPlotConfigManager().getPlotBounds(plotId);
         if (bounds == null) return;
         Location minLoc = bounds[0];
         Location maxLoc = bounds[1];
-        
+
         double minX = minLoc.getX();
         double maxX = maxLoc.getX() + 1.0;
         double minZ = minLoc.getZ();
         double maxZ = maxLoc.getZ() + 1.0;
         double y = minLoc.getY() + 1.02; // slightly above block
-        
+
         org.bukkit.World world = minLoc.getWorld();
-        org.bukkit.Particle.DustOptions dust = new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.0f);
-        
+        org.bukkit.Particle.DustOptions dust = new org.bukkit.Particle.DustOptions(color, 1.0f);
+
         for (double x = minX; x <= maxX; x += 0.5) {
             world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, minZ), 1, 0, 0, 0, 0, dust);
             world.spawnParticle(org.bukkit.Particle.DUST, new Location(world, x, y, maxZ), 1, 0, 0, 0, 0, dust);
@@ -263,7 +266,22 @@ public class WandListener implements Listener {
         // D. Split Waypoint graph creation flow
         else if (state == SetupState.WAYPOINT_MODE) {
             TDWaypoint clickedWp = findWaypointAt(arena, clickedLoc);
-            
+
+            // Sneak + click an existing waypoint to delete it. Removes the node and severs any
+            // connections pointing at it. Sneaking distinguishes delete from the normal
+            // select/create/connect clicks.
+            if (player.isSneaking() && clickedWp != null
+                    && (action == Action.LEFT_CLICK_BLOCK || action == Action.RIGHT_CLICK_BLOCK)) {
+                String deletedId = clickedWp.getId();
+                plugin.getWaypointConfigManager().deleteWaypoint(arena, deletedId);
+                if (deletedId.equals(setupManager.getSelectedWaypointId(uuid))) {
+                    setupManager.clearSelectedWaypointId(uuid);
+                }
+                player.sendMessage(ChatColor.RED + "Deleted waypoint " + ChatColor.GOLD + "WP " + deletedId);
+                player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_BREAK, 0.8f, 1.0f);
+                return;
+            }
+
             if (action == Action.LEFT_CLICK_BLOCK) {
                 if (clickedWp != null) {
                     // Selected existing waypoint

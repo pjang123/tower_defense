@@ -1,7 +1,11 @@
+# Bumped when a shipped default changes so existing servers pick up the new value once.
+# (Bukkit never overwrites an existing config.yml, so the plugin migrates on enable.)
+config-version: 1
+
 # Global game settings
 game:
   starting-gold: 150
-  max-castle-health: 100
+  max-castle-health: 1000
   challenge-timeout-seconds: 30
   # Number of players required to fill a match queue and start a game.
   # Players are alternated between Blue (Arena 1) and Red (Arena 2) teams,

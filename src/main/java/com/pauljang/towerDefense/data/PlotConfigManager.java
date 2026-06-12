@@ -92,21 +92,24 @@ public class PlotConfigManager {
         return getPlots(match).get(plotId);
     }
 
-    // Initialize the plots.yml file
+    // Initialize the in-memory plot config. Plots live ONLY in each world's own plots.yml (template
+    // folder); the plugin data folder must not accumulate a global plots.yml. We keep a purely
+    // in-memory working set (mirrored from the active match/template on demand) and remove any stray
+    // plugin-folder file left over from older versions.
     private void setupConfig() {
         if (!plugin.getDataFolder().exists()) {
             plugin.getDataFolder().mkdirs();
         }
         file = new File(plugin.getDataFolder(), "plots.yml");
-        if (!file.exists()) {
-            try {
-                file.createNewFile();
-                plugin.getLogger().info("Successfully generated a new plots.yml file!");
-            } catch (IOException e) {
-                plugin.getLogger().severe("Could not create plots.yml!");
+        if (file.exists()) {
+            // Preserve any legacy contents in memory for this session, then delete the stray file.
+            config = YamlConfiguration.loadConfiguration(file);
+            if (file.delete()) {
+                plugin.getLogger().info("Removed stray plugin-folder plots.yml; plots now live only in their world folders.");
             }
+        } else {
+            config = new YamlConfiguration();
         }
-        config = YamlConfiguration.loadConfiguration(file);
     }
 
     // Save a new plot
@@ -157,11 +160,12 @@ public class PlotConfigManager {
         targetConfig.set(path + "pos2.z", pos2.getBlockZ());
 
         try {
-            targetConfig.save(targetFile);
             if (isTemplateWorld) {
-                // Also update in-memory config for overlap detection
-                config = targetConfig;
+                targetConfig.save(targetFile);   // the world's own plots.yml
+                config = targetConfig;           // keep the in-memory working set in sync for overlap detection
             }
+            // Non-template (legacy) edits remain in the in-memory config only and are written out to a
+            // world folder by /td saveconfig — never to the plugin data folder.
         } catch (IOException e) {
             plugin.getLogger().severe("Could not save plot to " + targetFile.getAbsolutePath());
             e.printStackTrace();
@@ -317,6 +321,24 @@ public class PlotConfigManager {
         saveFile(); // Also save to global config for backwards compatibility
     }
 
+    /**
+     * All plot IDs whose pos1 world matches the given world (normalized). Used by the setup wand's
+     * delete-plot mode to render every existing plot so the admin can see the full layout at once.
+     */
+    public java.util.List<String> getPlotIdsInWorld(org.bukkit.World world) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        org.bukkit.configuration.ConfigurationSection section = config.getConfigurationSection("plots");
+        if (section == null || world == null) return result;
+        String target = normalizeWorldName(world.getName());
+        for (String plotId : section.getKeys(false)) {
+            String savedWorld = normalizeWorldName(config.getString("plots." + plotId + ".pos1.world"));
+            if (target.equals(savedWorld)) {
+                result.add(plotId);
+            }
+        }
+        return result;
+    }
+
     // Get the bounding box/corners of a plot
     public Location[] getPlotBounds(String plotId) {
         String path = "plots." + plotId + ".";
@@ -362,11 +384,10 @@ public class PlotConfigManager {
         }
     }
 
+    // Intentionally a no-op. The plugin data folder must never hold a global plots.yml — plots are
+    // persisted to each world's own plots.yml (template folder) by savePlot/deletePlot, and exported
+    // via /td saveconfig. The in-memory `config` is the live working set.
     private void saveFile() {
-        try {
-            config.save(file);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Could not save to plots.yml!");
-        }
+        // no-op: see method comment
     }
 }
