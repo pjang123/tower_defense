@@ -995,9 +995,43 @@ public class MobManager {
         return match.getActiveMobs();
     }
 
+    /**
+     * Returns a combined list of all active mobs across all currently active matches.
+     * Note: Modifications to this returned list (like .add() or .remove()) will NOT 
+     * affect the underlying Match state. Use addActiveMob or removeActiveMob instead.
+     */
     public List<TDMob> getActiveMobs() {
-        // Warning: This returns an empty list or needs to be refactored elsewhere
-        return new ArrayList<>();
+        List<TDMob> allMobs = new ArrayList<>();
+        for (Match match : plugin.getGameManager().getActiveMatches()) {
+            allMobs.addAll(match.getActiveMobs());
+        }
+        return allMobs;
+    }
+
+    /**
+     * Removes a TDMob from whichever Match it currently belongs to.
+     */
+    public boolean removeActiveMob(TDMob mob) {
+        for (Match match : plugin.getGameManager().getActiveMatches()) {
+            if (match.getActiveMobs().remove(mob)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Re-adds a TDMob to the Match corresponding to its current world.
+     */
+    public void addActiveMob(TDMob mob) {
+        if (mob.getEntity() == null) return;
+        org.bukkit.World world = mob.getEntity().getWorld();
+        for (Match match : plugin.getGameManager().getActiveMatches()) {
+            if (match.getWorld().equals(world)) {
+                if (!match.getActiveMobs().contains(mob)) {
+                    match.getActiveMobs().add(mob);
+                }
+                return;
+            }
+        }
     }
 
     // --- GUI & Queue System ---
@@ -1121,7 +1155,10 @@ public class MobManager {
     }
 
     public void openMobSpawnerGUI(Player player) {
-        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 54, ChatColor.DARK_RED + "TD Mob Spawner");
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.MOB_SPAWNER);
+        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(holder, 54, ChatColor.DARK_RED + "TD Mob Spawner");
+        holder.setInventory(gui);
         Map<String, Map<Integer, Integer>> queue = getQueueByTier(player.getUniqueId());
 
         // Border: top row, bottom row, left and right columns
@@ -1254,8 +1291,13 @@ public class MobManager {
 
     public void openMobTierGUI(Player player, String chain) {
         String displayName = getChainDisplayName(chain);
-        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(null, 27,
+        // Carry the canonical chain key on the holder so the click handler no longer has to
+        // reverse it from the localized display name in the title.
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.MOB_TIER, chain);
+        org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(holder, 27,
                 ChatColor.DARK_PURPLE + "Mob Tier: " + displayName);
+        holder.setInventory(gui);
 
         org.bukkit.inventory.ItemStack border = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         org.bukkit.inventory.ItemStack filler = createGUIItem(Material.BLACK_STAINED_GLASS_PANE, " ");

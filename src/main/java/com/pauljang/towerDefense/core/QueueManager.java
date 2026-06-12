@@ -129,6 +129,8 @@ public class QueueManager {
         private final boolean singlePlayer;
         private final Map<UUID, Integer> votes = new HashMap<>();
         private int timeLeft = 15;
+        private BukkitRunnable timerTask;
+        private boolean finished = false;
 
         public VotingSession(List<UUID> participants, List<MapManager.MapData> options, boolean singlePlayer) {
             this.participants = participants;
@@ -138,6 +140,13 @@ public class QueueManager {
 
         public void castVote(UUID uuid, int mapIndex) {
             votes.put(uuid, mapIndex);
+            // Single player: there's no one else to wait for, so skip the countdown and start the match
+            // immediately once the lone player has voted.
+            if (singlePlayer) {
+                if (timerTask != null) timerTask.cancel();
+                finishVoting();
+                return;
+            }
             for (UUID id : participants) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) openGUI(p);
@@ -145,7 +154,10 @@ public class QueueManager {
         }
 
         public void openGUI(Player player) {
-            Inventory gui = Bukkit.createInventory(null, 27, ChatColor.BLUE + "Vote for a Map! (" + timeLeft + "s)");
+            com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                    new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.VOTE_MAP);
+            Inventory gui = Bukkit.createInventory(holder, 27, ChatColor.BLUE + "Vote for a Map! (" + timeLeft + "s)");
+            holder.setInventory(gui);
 
             for (int i = 0; i < options.size(); i++) {
                 MapManager.MapData map = options.get(i);
@@ -167,7 +179,7 @@ public class QueueManager {
         }
 
         public void startTimer() {
-            new BukkitRunnable() {
+            timerTask = new BukkitRunnable() {
                 @Override
                 public void run() {
                     timeLeft--;
@@ -183,10 +195,14 @@ public class QueueManager {
                         }
                     }
                 }
-            }.runTaskTimer(plugin, 20L, 20L);
+            };
+            timerTask.runTaskTimer(plugin, 20L, 20L);
         }
 
         private void finishVoting() {
+            // Guard against running twice (e.g. a single-player vote firing right as the timer expires).
+            if (finished) return;
+            finished = true;
             int[] voteCounts = new int[options.size()];
             for (Integer v : votes.values()) voteCounts[v]++;
 

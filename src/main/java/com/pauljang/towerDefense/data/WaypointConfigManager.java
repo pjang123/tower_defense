@@ -246,7 +246,44 @@ public class WaypointConfigManager {
         if (!next.contains(toId)) {
             next.add(toId);
             config.set(path, next);
-            saveFile();
+            // Persist to the template world's waypoints.yml. addWaypoint writes nodes to disk; the
+            // connections between them must be written the same way or they are silently lost: not only
+            // do they never reach disk (saveFile() is a no-op), the very next addWaypoint reloads config
+            // FROM disk and clobbers the in-memory connection too. The net effect was tracks whose
+            // waypoints all had empty "next" lists, which breaks mob pathing and match initialization.
+            persistArenaToTemplateWorld(arena, fromId);
+        }
+    }
+
+    /**
+     * If the given arena's waypoints belong to a loaded template world (direct edit, or a working copy
+     * loaded via {@code /td loadworld}), write the in-memory config out to that world's waypoints.yml so
+     * node/connection edits survive a reload. Resolves the world from the anchor waypoint's stored world
+     * name. Mirrors the persistence already done by {@link #addWaypoint} and {@link #deleteWaypoint}.
+     */
+    private void persistArenaToTemplateWorld(String arena, String anchorWpId) {
+        String worldName = config.getString("waypoints." + arena + "." + anchorWpId + ".world");
+        if (worldName == null) return;
+        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+        if (world == null) return;
+
+        File worldFolder = world.getWorldFolder();
+        boolean isTemplateWorld = worldFolder.getAbsolutePath().contains("GAME_WORLD_TEMPLATES");
+        File templateSource = plugin.getCommand("td") != null ?
+            ((com.pauljang.towerDefense.core.TDCommand) plugin.getCommand("td").getExecutor()).getTemplateSource(world.getName()) : null;
+        if (templateSource != null) {
+            worldFolder = templateSource;
+            isTemplateWorld = true;
+        }
+        if (!isTemplateWorld) return;
+
+        File targetFile = new File(worldFolder, "waypoints.yml");
+        try {
+            config.save(targetFile);
+            plugin.getLogger().info("Persisted waypoint connections for arena " + arena + " to template world: " + targetFile.getAbsolutePath());
+        } catch (IOException e) {
+            plugin.getLogger().severe("Could not persist waypoint connections to " + targetFile.getAbsolutePath());
+            e.printStackTrace();
         }
     }
 

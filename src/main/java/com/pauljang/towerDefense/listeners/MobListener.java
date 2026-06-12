@@ -2,6 +2,8 @@ package com.pauljang.towerDefense.listeners;
 
 import com.pauljang.towerDefense.TowerDefense;
 import com.pauljang.towerDefense.TDKeys;
+import com.pauljang.towerDefense.ui.TDMenuHolder;
+import com.pauljang.towerDefense.ui.TDMenuHolder.MenuType;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
@@ -506,8 +508,11 @@ public class MobListener implements Listener {
             }
         }
 
-        String title = event.getView().getTitle();
-        if (title.equals(org.bukkit.ChatColor.DARK_BLUE + "Open Games")) {
+        // Dispatch on a stable holder type rather than the (display-only) inventory title, so
+        // re-theming a menu's title can never silently break its click handling.
+        if (!(event.getInventory().getHolder() instanceof TDMenuHolder holder)) return;
+        MenuType menuType = holder.getType();
+        if (menuType == MenuType.OPEN_GAMES) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 
@@ -527,7 +532,7 @@ public class MobListener implements Listener {
         }
 
         // Voting GUI
-        if (title.startsWith(org.bukkit.ChatColor.BLUE + "Vote for a Map!")) {
+        if (menuType == MenuType.VOTE_MAP) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
@@ -546,7 +551,7 @@ public class MobListener implements Listener {
             return;
         }
 
-        if (title.equals(org.bukkit.ChatColor.DARK_RED + "TD Mob Spawner")) {
+        if (menuType == MenuType.MOB_SPAWNER) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
@@ -590,14 +595,13 @@ public class MobListener implements Listener {
                 }, 1L);
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 0.8f, 1.2f);
             }
-        } else if (title.startsWith(org.bukkit.ChatColor.DARK_PURPLE + "Mob Tier: ")) {
+        } else if (menuType == MenuType.MOB_TIER) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
-            // Extract chain key (lowercase) from title
-            String rawName = title.substring((org.bukkit.ChatColor.DARK_PURPLE + "Mob Tier: ").length());
-            String chainKey = rawName.toLowerCase();
+            // Canonical chain key carried on the holder (no longer derived from the display title).
+            String chainKey = holder.getData();
 
             int slot = event.getRawSlot();
 
@@ -704,13 +708,13 @@ public class MobListener implements Listener {
                     plugin.getMobManager().openMobSpawnerGUI(player);
                 }, 1L);
             }
-        } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ")) {
+        } else if (menuType == MenuType.BUY_TOWER) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
-            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Buy Tower: ").length());
+            String plotId = holder.getData();
             int slot = event.getRawSlot();
 
             com.pauljang.towerDefense.towers.TowerType type = null;
@@ -766,12 +770,12 @@ public class MobListener implements Listener {
                     player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
                 }
             }
-        } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Choose Path: ")) {
+        } else if (menuType == MenuType.CHOOSE_PATH) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
-            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Choose Path: ").length());
+            String plotId = holder.getData();
             com.pauljang.towerDefense.towers.TowerType type =
                     plugin.getTowerManager().getPendingPathChoice(player.getUniqueId());
             if (type == null) {
@@ -813,14 +817,13 @@ public class MobListener implements Listener {
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
             }
             player.closeInventory();
-        } else if (title.startsWith(org.bukkit.ChatColor.DARK_BLUE + "Manage Tower: ")) {
+        } else if (menuType == MenuType.MANAGE_TOWER) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
-            // Extract plot ID from title
-            String plotId = title.substring((org.bukkit.ChatColor.DARK_BLUE + "Manage Tower: ").length());
+            String plotId = holder.getData();
             com.pauljang.towerDefense.towers.Tower tower = plugin.getTowerManager().getTower(plotId);
             if (tower == null) {
                 player.closeInventory();
@@ -908,7 +911,7 @@ public class MobListener implements Listener {
                     player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_BREAK, 0.8f, 1.0f);
                 }
             }
-        } else if (title.equals(org.bukkit.ChatColor.DARK_BLUE + "Player Upgrades")) {
+        } else if (menuType == MenuType.PLAYER_UPGRADES) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
 

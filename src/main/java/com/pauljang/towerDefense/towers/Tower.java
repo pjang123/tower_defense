@@ -23,7 +23,9 @@ public class Tower {
     private boolean empDisplayed = false;
     private final java.util.List<org.bukkit.entity.Bee> spawnedBees = new java.util.ArrayList<>();
     private final java.util.List<ArmorStand> landmines = new java.util.ArrayList<>();
-    private final java.util.List<Location> hazardTiles = new java.util.ArrayList<>();
+    // Direct references to the spawned Dripstone hazard displays so the ticker never has to scan
+    // the world (getNearbyEntities) to find them.
+    private final java.util.List<org.bukkit.entity.BlockDisplay> hazardDisplays = new java.util.ArrayList<>();
 
     public Tower(String plotId, Location centerLocation, TowerType type) {
         this.plotId = plotId;
@@ -136,5 +138,5 @@ public class Tower {
 
     public java.util.List<org.bukkit.entity.Bee> getSpawnedBees() { return spawnedBees; }
     public java.util.List<ArmorStand> getLandmines() { return landmines; }
-    public java.util.List<Location> getHazardTiles() { return hazardTiles; }
+    public java.util.List<org.bukkit.entity.BlockDisplay> getHazardDisplays() { return hazardDisplays; }
 }

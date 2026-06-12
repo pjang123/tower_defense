@@ -146,7 +146,7 @@ public class WaveManager {
                             return;
                         }
 
-                        plugin.getMobManager().spawnMobByChain(match, "2", finalType.name().toLowerCase(), finalTier);
+                        plugin.getMobManager().spawnMobByChain(match, GameManager.SINGLE_PLAYER_ARENA, finalType.name().toLowerCase(), finalTier);
                         spawned++;
 
                         if (spawned >= count) {

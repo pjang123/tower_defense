@@ -59,6 +59,11 @@ public class GameManager {
     private final java.util.Map<java.util.UUID, Integer> bowLevels = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, String> playerArenas = new java.util.HashMap<>();
     private final java.util.List<java.util.UUID> matchQueue = new java.util.ArrayList<>();
+
+    // The single arena a lone player occupies in single-player mode. The player and the wave engine
+    // (WaveManager) MUST agree on this, or the player spawns on an empty lane and cannot fight the
+    // mobs. Single-player maps must author their track/plots/castle under this arena.
+    public static final String SINGLE_PLAYER_ARENA = "1";
     private org.bukkit.scheduler.BukkitTask lobbyQueueTask = null;
     private int lobbyQueueSecondsLeft = 0;
 
@@ -126,48 +131,68 @@ public class GameManager {
         plugin.getLogger().info("Template directory: " + mapData.getDirectory().getAbsolutePath());
 
         // Clone world
-        String worldName = "match_" + match.getMatchId().toString().substring(0, 8);
-        File templateDir = mapData.getDirectory();
-        File targetDir = new File(Bukkit.getWorldContainer(), worldName);
+        final String worldName = "match_" + match.getMatchId().toString().substring(0, 8);
+        final File templateDir = mapData.getDirectory();
+        final File targetDir = new File(Bukkit.getWorldContainer(), worldName);
 
         plugin.getLogger().info("Cloning world from " + templateDir.getAbsolutePath() + " to " + targetDir.getAbsolutePath());
 
-        try {
-            copyDirectory(templateDir, targetDir);
-            // Remove uid.dat to avoid world conflicts
-            File uidFile = new File(targetDir, "uid.dat");
-            if (uidFile.exists()) uidFile.delete();
+        // Region files can be tens of megabytes; copying them on the main thread freezes the whole
+        // server (a hard TPS spike) every time a match starts. Do the blocking file I/O on an async
+        // worker, then hop back to the main thread for the Bukkit world/player calls, which are NOT
+        // thread-safe.
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                copyDirectory(templateDir, targetDir);
+                // Remove uid.dat to avoid world conflicts
+                File uidFile = new File(targetDir, "uid.dat");
+                if (uidFile.exists()) uidFile.delete();
 
-            // Verify critical world files were copied
-            File regionDir = new File(targetDir, "region");
-            File levelDat = new File(targetDir, "level.dat");
+                // Verify critical world files were copied
+                File regionDir = new File(targetDir, "region");
+                File levelDat = new File(targetDir, "level.dat");
 
-            if (!levelDat.exists()) {
-                plugin.getLogger().severe("level.dat not found in cloned world! Path: " + levelDat.getAbsolutePath());
-            }
-            if (!regionDir.exists() || !regionDir.isDirectory()) {
-                plugin.getLogger().severe("Region folder not found at world root! Path: " + regionDir.getAbsolutePath());
+                if (!levelDat.exists()) {
+                    plugin.getLogger().severe("level.dat not found in cloned world! Path: " + levelDat.getAbsolutePath());
+                }
+                if (!regionDir.exists() || !regionDir.isDirectory()) {
+                    plugin.getLogger().severe("Region folder not found at world root! Path: " + regionDir.getAbsolutePath());
 
-                // Check for nested structure
-                File nestedRegion = new File(targetDir, "dimensions/minecraft/overworld/region");
-                if (nestedRegion.exists()) {
-                    plugin.getLogger().severe("Found region data in nested structure: dimensions/minecraft/overworld/region/");
-                    plugin.getLogger().severe("This structure causes migration issues! Please move .mca files to region/ at world root.");
+                    // Check for nested structure
+                    File nestedRegion = new File(targetDir, "dimensions/minecraft/overworld/region");
+                    if (nestedRegion.exists()) {
+                        plugin.getLogger().severe("Found region data in nested structure: dimensions/minecraft/overworld/region/");
+                        plugin.getLogger().severe("This structure causes migration issues! Please move .mca files to region/ at world root.");
+                    }
+
+                    plugin.getLogger().severe("World will generate new terrain instead of using template!");
+                } else {
+                    String[] regionFiles = regionDir.list();
+                    plugin.getLogger().info("Region folder found with " + (regionFiles != null ? regionFiles.length : 0) + " chunk files");
                 }
 
-                plugin.getLogger().severe("World will generate new terrain instead of using template!");
-            } else {
-                String[] regionFiles = regionDir.list();
-                plugin.getLogger().info("Region folder found with " + (regionFiles != null ? regionFiles.length : 0) + " chunk files");
+                plugin.getLogger().info("Successfully cloned world directory");
+            } catch (java.io.IOException e) {
+                plugin.getLogger().severe("Failed to clone world for match " + match.getMatchId());
+                e.printStackTrace();
+                // Roll back the match registration done up front, back on the main thread.
+                Bukkit.getScheduler().runTask(plugin, () -> activeMatches.remove(match.getMatchId()));
+                return;
             }
 
-            plugin.getLogger().info("Successfully cloned world directory");
-        } catch (java.io.IOException e) {
-            plugin.getLogger().severe("Failed to clone world for match " + match.getMatchId());
-            e.printStackTrace();
-            return;
-        }
+            // Files are on disk; finish world load, teleports and tickers on the main thread.
+            Bukkit.getScheduler().runTask(plugin, () ->
+                    finishMatchStartup(match, worldName, templateDir, playerIds, mapData));
+        });
+    }
 
+    /**
+     * Main-thread continuation of {@link #startMatch}, invoked once the world folder has been
+     * cloned off-thread. Everything here touches the Bukkit API (world creation, players,
+     * schedulers) and therefore must run on the main server thread.
+     */
+    private void finishMatchStartup(Match match, String worldName, File templateDir,
+                                    List<UUID> playerIds, com.pauljang.towerDefense.data.MapManager.MapData mapData) {
         // Create world with proper settings
         org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator(worldName);
         creator.environment(org.bukkit.World.Environment.NORMAL);
@@ -176,6 +201,7 @@ public class GameManager {
         World world = creator.createWorld();
         if (world == null) {
             plugin.getLogger().severe("Failed to load world " + worldName);
+            activeMatches.remove(match.getMatchId());
             return;
         }
 
@@ -217,7 +243,7 @@ public class GameManager {
             // Single-player maps author their track, plots and castle under arena "2" (the wave engine
             // spawns mobs on "2"), so the lone player must be on "2" as well — otherwise they spawn on
             // the empty arena "1", cannot damage the arena "2" mobs, and never see the arena "2" castle.
-            String arena = mapData.isSinglePlayer() ? "2" : ((i % 2 == 0) ? "1" : "2");
+            String arena = mapData.isSinglePlayer() ? SINGLE_PLAYER_ARENA : ((i % 2 == 0) ? "1" : "2");
             match.addPlayer(p, arena);
             playerToMatch.put(id, match);
 
@@ -249,7 +275,7 @@ public class GameManager {
                     Player p = Bukkit.getPlayer(id);
                     if (p == null) continue;
 
-                    String arena = mapData.isSinglePlayer() ? "2" : ((i % 2 == 0) ? "1" : "2");
+                    String arena = mapData.isSinglePlayer() ? SINGLE_PLAYER_ARENA : ((i % 2 == 0) ? "1" : "2");
 
                     // Teleport to arena start (Waypoint 0)
                     org.bukkit.Location spawn = plugin.getWaypointConfigManager().getWaypoint(match, arena, "0");
@@ -852,7 +878,10 @@ public class GameManager {
     }
 
     public void openGamesGUI(Player player) {
-        org.bukkit.inventory.Inventory gui = Bukkit.createInventory(null, 27, ChatColor.DARK_BLUE + "Open Games");
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.OPEN_GAMES);
+        org.bukkit.inventory.Inventory gui = Bukkit.createInventory(holder, 27, ChatColor.DARK_BLUE + "Open Games");
+        holder.setInventory(gui);
 
         // Fill background with gray glass panes
         org.bukkit.inventory.ItemStack filler = new org.bukkit.inventory.ItemStack(org.bukkit.Material.GRAY_STAINED_GLASS_PANE);
@@ -1293,6 +1322,10 @@ public class GameManager {
 
         activeMatches.remove(match.getMatchId());
         plugin.getWaveManager().stopWaves(match);
+
+        // --- NEW: Clean up match-specific towers and mobs before unloading the world ---
+        plugin.getTowerManager().cleanup(match);
+        plugin.getMobManager().cleanup(match);
 
         org.bukkit.World lobby = Bukkit.getWorld("lobby_world");
         Location lobbySpawn = lobby != null ? lobby.getSpawnLocation() : Bukkit.getWorlds().get(0).getSpawnLocation();
@@ -1884,7 +1917,10 @@ public class GameManager {
     }
 
     public void openUpgradesGUI(Player player) {
-        org.bukkit.inventory.Inventory gui = Bukkit.createInventory(null, 54, ChatColor.DARK_BLUE + "Player Upgrades");
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.PLAYER_UPGRADES);
+        org.bukkit.inventory.Inventory gui = Bukkit.createInventory(holder, 54, ChatColor.DARK_BLUE + "Player Upgrades");
+        holder.setInventory(gui);
         java.util.UUID uuid = player.getUniqueId();
         
         org.bukkit.inventory.ItemStack border = createGUIItem(Material.BLACK_STAINED_GLASS_PANE, " ");

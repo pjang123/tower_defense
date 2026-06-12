@@ -1,6 +1,7 @@
 package com.pauljang.towerDefense.towers;
 
 import com.pauljang.towerDefense.TowerDefense;
+import com.pauljang.towerDefense.core.Match;
 import com.pauljang.towerDefense.TDKeys;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -31,6 +32,18 @@ public class TowerManager {
     private final Map<String, Tower> placedTowers = new HashMap<>();
     // Tower type a player is choosing an upgrade path for (set when the path picker GUI opens)
     private final Map<java.util.UUID, TowerType> pendingPathChoice = new HashMap<>();
+
+    // HappyGhast#setHarnessed(boolean) (Paper 1.21.5+) resolved once at class load instead of on
+    // every ghast-tower placement. Null when the running server predates the API.
+    private static final java.lang.reflect.Method SET_HARNESSED_METHOD = resolveSetHarnessed();
+
+    private static java.lang.reflect.Method resolveSetHarnessed() {
+        try {
+            return org.bukkit.entity.HappyGhast.class.getMethod("setHarnessed", boolean.class);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
 
     public TowerManager(TowerDefense plugin) {
         this.plugin = plugin;
@@ -154,13 +167,10 @@ public class TowerManager {
 
         // Dripstone T2+ hazards are now spawned dynamically by the ticker (tickDripstoneHazards),
         // landmine-style. Here we only clear any previously-spawned hazard displays on rebuild.
-        for (Location loc : tower.getHazardTiles()) {
-            if (loc.getWorld() == null) continue;
-            loc.getWorld().getNearbyEntities(loc, 1.0, 2.0, 1.0).stream()
-                .filter(e -> e.getScoreboardTags().contains("td_hazard"))
-                .forEach(org.bukkit.entity.Entity::remove);
+        for (org.bukkit.entity.BlockDisplay display : tower.getHazardDisplays()) {
+            if (display != null && display.isValid()) display.remove();
         }
-        tower.getHazardTiles().clear();
+        tower.getHazardDisplays().clear();
         tower.getLandmines().removeIf(s -> s == null || !s.isValid());
 
         // Owner-name prefix applied to spawned Golems/Ghasts (e.g. "Steve's Iron Golem").
@@ -246,19 +256,21 @@ public class TowerManager {
             tower.setSpawnedGhast(ghast);
 
             // Equip harness so the Happy Ghast can be ridden.
-            // Approach 1: setHarnessed(boolean) direct API (Paper 1.21.5+)
+            // Approach 1: setHarnessed(boolean) direct API (Paper 1.21.5+), via the Method cached once
+            // at class load (SET_HARNESSED_METHOD).
             boolean harnessApplied = false;
-            try {
-                java.lang.reflect.Method m = ghast.getClass().getMethod("setHarnessed", boolean.class);
-                m.invoke(ghast, true);
-                harnessApplied = true;
-                plugin.getLogger().info("[HappyGhast] Harness applied via setHarnessed()");
-            } catch (NoSuchMethodException e) {
+            if (SET_HARNESSED_METHOD == null) {
                 plugin.getLogger().info("[HappyGhast] setHarnessed() not found, trying item equip");
-            } catch (java.lang.reflect.InvocationTargetException e) {
-                plugin.getLogger().warning("[HappyGhast] setHarnessed() threw: " + e.getCause());
-            } catch (Exception e) {
-                plugin.getLogger().warning("[HappyGhast] setHarnessed() reflection error: " + e);
+            } else {
+                try {
+                    SET_HARNESSED_METHOD.invoke(ghast, true);
+                    harnessApplied = true;
+                    plugin.getLogger().info("[HappyGhast] Harness applied via setHarnessed()");
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    plugin.getLogger().warning("[HappyGhast] setHarnessed() threw: " + e.getCause());
+                } catch (Exception e) {
+                    plugin.getLogger().warning("[HappyGhast] setHarnessed() reflection error: " + e);
+                }
             }
 
             // Approach 2: equip a colored harness item in the BODY slot (Happy Ghast wears it like
@@ -504,15 +516,11 @@ public class TowerManager {
             }
             tower.getLandmines().clear();
 
-            // Clean up Dripstone hazard BlockDisplays (tracked only by location now).
-            for (Location loc : tower.getHazardTiles()) {
-                if (loc.getWorld() != null) {
-                    loc.getWorld().getNearbyEntities(loc, 1.0, 2.0, 1.0).stream()
-                        .filter(e -> e.getScoreboardTags().contains("td_hazard"))
-                        .forEach(org.bukkit.entity.Entity::remove);
-                }
+            // Clean up Dripstone hazard BlockDisplays via their tracked references.
+            for (org.bukkit.entity.BlockDisplay display : tower.getHazardDisplays()) {
+                if (display != null && display.isValid()) display.remove();
             }
-            tower.getHazardTiles().clear();
+            tower.getHazardDisplays().clear();
 
             // Clean up hologram ArmorStands
             for (ArmorStand hologram : tower.getHolograms()) {
@@ -756,24 +764,14 @@ public class TowerManager {
         int cap = plugin.getTowerConfigManager().getStat(TowerType.DRIPSTONE, tower.getLevel(), "hazard_count", 6);
 
         // 1. Clean up invalid hazards and check for mob triggers
-        java.util.Iterator<Location> it = tower.getHazardTiles().iterator();
+        java.util.Iterator<org.bukkit.entity.BlockDisplay> it = tower.getHazardDisplays().iterator();
         while (it.hasNext()) {
-            Location loc = it.next();
-            org.bukkit.entity.BlockDisplay display = null;
-
-            if (loc.getWorld() != null) {
-                for (org.bukkit.entity.Entity e : loc.getWorld().getNearbyEntities(loc, 0.5, 1.0, 0.5)) {
-                    if (e instanceof org.bukkit.entity.BlockDisplay && e.getScoreboardTags().contains("td_hazard")) {
-                        display = (org.bukkit.entity.BlockDisplay) e;
-                        break;
-                    }
-                }
-            }
-
+            org.bukkit.entity.BlockDisplay display = it.next();
             if (display == null || !display.isValid()) {
                 it.remove();
                 continue;
             }
+            Location loc = display.getLocation();
 
             // Check for mobs stepping on the hazard (checking slightly above ground)
             java.util.List<Mob> hit = getMobsInRadius(loc.clone().add(0, 1.0, 0), 1.5, arena);
@@ -793,7 +791,7 @@ public class TowerManager {
         }
 
         // 2. Spawn new hazards randomly over time (try one every 40 ticks / 2 seconds)
-        if (tower.getHazardTiles().size() < cap && tick % 40 == 0) {
+        if (tower.getHazardDisplays().size() < cap && tick % 40 == 0) {
             java.util.List<Location> track = getTrackLocationsWithinRange(tower);
             if (track.isEmpty()) return;
 
@@ -802,7 +800,7 @@ public class TowerManager {
             baseLoc.add((Math.random() - 0.5) * 2.5, 0, (Math.random() - 0.5) * 2.5);
 
             if (baseLoc.distanceSquared(tower.getCenterLocation()) <= tower.getRange() * tower.getRange()) {
-                baseLoc.getWorld().spawn(baseLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
+                org.bukkit.entity.BlockDisplay hazard = baseLoc.getWorld().spawn(baseLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
                     org.bukkit.block.data.type.PointedDripstone data =
                             (org.bukkit.block.data.type.PointedDripstone) Material.POINTED_DRIPSTONE.createBlockData();
                     data.setVerticalDirection(org.bukkit.block.BlockFace.UP);
@@ -816,7 +814,7 @@ public class TowerManager {
                             new org.joml.Quaternionf()
                     ));
                 });
-                tower.getHazardTiles().add(baseLoc);
+                tower.getHazardDisplays().add(hazard);
                 // Cleanup on tower removal is handled by removeTower()'s hazard-location scan.
             }
         }
@@ -1354,7 +1352,7 @@ public class TowerManager {
                         }
 
                         // Check that TDMob is in activeMobs before removing
-                        boolean wasInList = plugin.getMobManager().getActiveMobs().remove(finalTDMob);
+                        boolean wasInList = plugin.getMobManager().removeActiveMob(finalTDMob);
                         if (!wasInList) {
                             plugin.getLogger().warning("[CHORUS DEBUG] TDMob was not in activeMobs list!");
                         }
@@ -1513,12 +1511,8 @@ public class TowerManager {
                         plugin.getLogger().info("[CHORUS DEBUG] Updated waypoint state - target: " + finalNewTargetWpId + ", history size: " + newHistory.size());
 
                         // Re-add to active mobs - CRITICAL for mob to continue existing
-                        if (!plugin.getMobManager().getActiveMobs().contains(finalTDMob)) {
-                            plugin.getMobManager().getActiveMobs().add(finalTDMob);
-                            plugin.getLogger().info("[CHORUS DEBUG] Re-added TDMob to activeMobs list");
-                        } else {
-                            plugin.getLogger().warning("[CHORUS DEBUG] TDMob already in activeMobs list!");
-                        }
+                        plugin.getMobManager().addActiveMob(finalTDMob);
+                        plugin.getLogger().info("[CHORUS DEBUG] Re-added TDMob to activeMobs list");
 
                         // Update health bar
                         plugin.getMobManager().updateHealthBar(newEntity);
@@ -1983,7 +1977,10 @@ public class TowerManager {
         Tower tower = getTower(plotId);
         if (tower == null) return;
 
-        Inventory gui = org.bukkit.Bukkit.createInventory(null, 54, ChatColor.DARK_BLUE + "Manage Tower: " + plotId);
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.MANAGE_TOWER, plotId);
+        Inventory gui = org.bukkit.Bukkit.createInventory(holder, 54, ChatColor.DARK_BLUE + "Manage Tower: " + plotId);
+        holder.setInventory(gui);
 
         // Fill background with gray stained glass pane
         ItemStack filler = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
@@ -2129,7 +2126,10 @@ public class TowerManager {
     }
 
     public void openBuyTowerGUI(Player player, String plotId) {
-        Inventory gui = org.bukkit.Bukkit.createInventory(null, 54, ChatColor.DARK_BLUE + "Buy Tower: " + plotId);
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.BUY_TOWER, plotId);
+        Inventory gui = org.bukkit.Bukkit.createInventory(holder, 54, ChatColor.DARK_BLUE + "Buy Tower: " + plotId);
+        holder.setInventory(gui);
 
         // Background filler, with a coloured border around the perimeter for a cleaner, larger look.
         ItemStack filler = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
@@ -2418,7 +2418,10 @@ public class TowerManager {
         int targetLevel = existing != null ? existing.getLevel() + 1 : 2;
 
         pendingPathChoice.put(player.getUniqueId(), type);
-        Inventory gui = org.bukkit.Bukkit.createInventory(null, 27, ChatColor.DARK_BLUE + "Choose Path: " + plotId);
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.CHOOSE_PATH, plotId);
+        Inventory gui = org.bukkit.Bukkit.createInventory(holder, 27, ChatColor.DARK_BLUE + "Choose Path: " + plotId);
+        holder.setInventory(gui);
 
         ItemStack filler = createGUIItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < 27; i++) {
@@ -2511,6 +2514,19 @@ public class TowerManager {
                     .forEach(org.bukkit.entity.Entity::remove);
             }
         }, 1L);
+    }
+
+    public void cleanup(Match match) {
+        if (match == null || match.getWorld() == null) return;
+        org.bukkit.World matchWorld = match.getWorld();
+
+        java.util.List<String> plotIds = new java.util.ArrayList<>(placedTowers.keySet());
+        for (String plotId : plotIds) {
+            Tower tower = placedTowers.get(plotId);
+            if (tower != null && tower.getCenterLocation().getWorld().equals(matchWorld)) {
+                removeTower(plotId);
+            }
+        }
     }
 
     public void cleanup() {
