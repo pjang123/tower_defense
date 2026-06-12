@@ -451,136 +451,144 @@ public class TDCommand implements CommandExecutor {
     private void loadWorld(Player player, String worldName) {
         plugin.getLogger().info("loadWorld called for: " + worldName);
 
-        // Check if world is already loaded. Bukkit.getWorld(name) can miss a world that Paper migrated
-        // into another world's dimensions/ folder or registered under a namespaced key, which made the
-        // check report "not loaded" for a world that actually was — and then re-copy/re-create it. Scan
-        // every loaded world by name as an authoritative fallback.
-        org.bukkit.World existingWorld = findLoadedWorld(worldName);
-        plugin.getLogger().info("Loaded-world lookup for '" + worldName + "': " + (existingWorld != null ? existingWorld.getName() : "null"));
-        if (existingWorld == null) {
-            StringBuilder loaded = new StringBuilder();
-            for (org.bukkit.World w : org.bukkit.Bukkit.getWorlds()) loaded.append(w.getName()).append(" ");
-            plugin.getLogger().info("Currently loaded worlds: " + loaded.toString().trim());
-        }
-
-        if (existingWorld != null) {
-            player.sendMessage(ChatColor.YELLOW + "World '" + worldName + "' is already loaded!");
-
-            // If it's tracked as a template, remind them
-            if (loadedTemplates.containsKey(worldName)) {
-                player.sendMessage(ChatColor.GRAY + "This is a template copy. Changes save automatically.");
-            }
-
-            org.bukkit.Location spawnLoc = existingWorld.getSpawnLocation();
-            player.sendMessage(ChatColor.GRAY + "Teleporting to spawn: " + spawnLoc.getBlockX() + ", " + spawnLoc.getBlockY() + ", " + spawnLoc.getBlockZ());
-            player.teleport(spawnLoc);
-            return;
-        }
-
-        plugin.getLogger().info("World not loaded, proceeding with template search...");
-
-        // Search for the template in GAME_WORLD_TEMPLATES
+        // The server root IS Bukkit's world container (two levels up from <root>/plugins/TowerDefense).
+        // We stage the world here and let Bukkit.createWorld load it; Paper then migrates the live world
+        // into <primary>/dimensions/minecraft/<name> on its own. We deliberately DO NOT pre-copy into the
+        // dimensions folder — doing so makes Paper fail with "failed to migrate legacy world <name>".
         File serverRoot = plugin.getDataFolder().getParentFile().getParentFile();
-        File templatesRoot = new File(serverRoot, "GAME_WORLD_TEMPLATES");
+        File rootCopy = new File(serverRoot, worldName);
 
-        File templateWorld = null;
-
-        // Check SINGLE_PLAYER folder
-        File singlePlayerTemplate = new File(templatesRoot, "SINGLE_PLAYER" + File.separator + worldName);
-        if (singlePlayerTemplate.exists() && singlePlayerTemplate.isDirectory()) {
-            templateWorld = singlePlayerTemplate;
-        }
-
-        // Check MULTI_PLAYER folder
-        File multiPlayerTemplate = new File(templatesRoot, "MULTI_PLAYER" + File.separator + worldName);
-        if (multiPlayerTemplate.exists() && multiPlayerTemplate.isDirectory()) {
-            templateWorld = multiPlayerTemplate;
-        }
-
-        if (templateWorld == null) {
-            player.sendMessage(ChatColor.RED + "Template world '" + worldName + "' not found in GAME_WORLD_TEMPLATES!");
-            player.sendMessage(ChatColor.GRAY + "Looking in: " + templatesRoot.getAbsolutePath());
+        // Already loaded? createWorld would just hand back the existing instance, so short-circuit.
+        org.bukkit.World existing = org.bukkit.Bukkit.getWorld(worldName);
+        if (existing != null) {
+            player.sendMessage(ChatColor.YELLOW + "World '" + worldName + "' is already loaded. Teleporting to spawn...");
+            player.teleport(existing.getSpawnLocation());
             return;
         }
 
-        // Verify world structure
-        File regionFolder = new File(templateWorld, "region");
-        File levelDat = new File(templateWorld, "level.dat");
-        File dimensionsFolder = new File(templateWorld, "dimensions");
+        // Resolve the source: SINGLE_PLAYER/ or MULTI_PLAYER/ template, else a world installed directly at
+        // the server root. Tracked in loadedTemplates so edits sync back on unload.
+        File templateWorld = resolveTemplateDir(serverRoot, worldName);
+        boolean rootResident = isRootSource(serverRoot, worldName, templateWorld);
 
-        if (!levelDat.exists()) {
-            player.sendMessage(ChatColor.RED + "Invalid world: level.dat not found!");
-            player.sendMessage(ChatColor.GRAY + "Expected: " + levelDat.getAbsolutePath());
-            return;
-        }
-
-        if (!regionFolder.exists() || !regionFolder.isDirectory()) {
-            player.sendMessage(ChatColor.RED + "Invalid world: region/ folder not found at world root!");
-
-            // Check if using nested structure
-            File nestedRegion = new File(templateWorld, "dimensions/minecraft/overworld/region");
-            if (nestedRegion.exists()) {
-                player.sendMessage(ChatColor.YELLOW + "Found region data in nested structure: dimensions/minecraft/overworld/region/");
-                player.sendMessage(ChatColor.YELLOW + "Please move .mca files from there to region/ at world root and delete dimensions/ folder");
-                player.sendMessage(ChatColor.GRAY + "See MAP_SETUP_GUIDE.md for correct structure");
-            } else {
-                player.sendMessage(ChatColor.GRAY + "Expected: " + regionFolder.getAbsolutePath());
+        // Stage a working copy at the server root unless one is already present (a root-resident world, or
+        // a leftover staging copy from a previous load).
+        if (!rootCopy.exists()) {
+            if (templateWorld == null) {
+                player.sendMessage(ChatColor.RED + "World '" + worldName + "' not found!");
+                player.sendMessage(ChatColor.GRAY + "Looked in GAME_WORLD_TEMPLATES/{SINGLE_PLAYER,MULTI_PLAYER}/ and the server root "
+                        + serverRoot.getAbsolutePath());
+                return;
             }
-            return;
-        }
-
-        if (dimensionsFolder.exists()) {
-            player.sendMessage(ChatColor.YELLOW + "WARNING: dimensions/ folder detected - this may cause migration issues!");
-            player.sendMessage(ChatColor.YELLOW + "Consider removing it if region/ already contains your world data");
-        }
-
-        player.sendMessage(ChatColor.YELLOW + "Found template at: " + templateWorld.getAbsolutePath());
-        player.sendMessage(ChatColor.YELLOW + "Copying to server root...");
-
-        // Copy the template to server root
-        File targetWorld = new File(serverRoot, worldName);
-
-        if (targetWorld.exists()) {
-            player.sendMessage(ChatColor.YELLOW + "World folder already exists at server root. Loading existing world...");
-            player.sendMessage(ChatColor.GRAY + "Note: This may be leftover from a previous session. Consider deleting it first.");
-        } else {
+            File levelDat = new File(templateWorld, "level.dat");
+            if (!levelDat.exists()) {
+                player.sendMessage(ChatColor.RED + "Invalid world: level.dat not found!");
+                player.sendMessage(ChatColor.GRAY + "Expected: " + levelDat.getAbsolutePath());
+                return;
+            }
+            player.sendMessage(ChatColor.YELLOW + "Copying template '" + worldName + "' to server root...");
             try {
-                plugin.getGameManager().copyDirectory(templateWorld, targetWorld);
-                player.sendMessage(ChatColor.GREEN + "Successfully copied world template!");
-            } catch (Exception e) {
-                player.sendMessage(ChatColor.RED + "Failed to copy template: " + e.getMessage());
+                copyDirectoryNIO(templateWorld.toPath(), rootCopy.toPath());
+                player.sendMessage(ChatColor.GREEN + "Copied template to server root.");
+            } catch (java.io.IOException e) {
+                player.sendMessage(ChatColor.RED + "Failed to copy template to server root: " + e.getMessage());
+                plugin.getLogger().severe("Template copy failed for " + worldName + ": " + e.getMessage());
                 e.printStackTrace();
                 return;
             }
+        } else if (rootResident) {
+            player.sendMessage(ChatColor.YELLOW + "Loading server-root world '" + worldName + "' in place.");
+        } else {
+            player.sendMessage(ChatColor.YELLOW + "Existing copy found at server root. Reusing it.");
         }
 
-        // Load the world
+        // Strip uid.dat so a stale world UUID can't collide with another loaded world (matches the proven
+        // match-clone flow in GameManager).
+        File uidFile = new File(rootCopy, "uid.dat");
+        if (uidFile.exists() && uidFile.delete()) {
+            plugin.getLogger().info("Removed stale uid.dat from " + rootCopy.getName());
+        }
+
+        // Clear any leftover Paper-migrated copy from a previous (possibly failed) load. If a stale folder
+        // sits at <primary>/dimensions/minecraft/<name>, createWorld tries to migrate a legacy world into
+        // an occupied path and fails ("failed to migrate legacy world").
+        String primaryWorldName = org.bukkit.Bukkit.getWorlds().isEmpty()
+                ? "lobby_world" : org.bukkit.Bukkit.getWorlds().get(0).getName();
+        File staleDim = new File(serverRoot, primaryWorldName + "/dimensions/minecraft/" + worldName);
+        if (staleDim.exists()) {
+            try {
+                deleteDirectoryNIO(staleDim.toPath());
+                plugin.getLogger().info("Cleared stale migrated copy: " + staleDim.getAbsolutePath());
+            } catch (java.io.IOException e) {
+                player.sendMessage(ChatColor.YELLOW + "Warning: could not clear a stale migrated copy at "
+                        + staleDim.getAbsolutePath() + " - load may fail. " + e.getMessage());
+                plugin.getLogger().warning("Could not clear stale migrated copy for " + worldName + ": " + e.getMessage());
+            }
+        }
+
+        // Load. Bukkit reads from the server-root copy; Paper migrates it into the dimensions folder.
         player.sendMessage(ChatColor.YELLOW + "Loading world: " + worldName + "...");
         try {
-            org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator(worldName);
-            org.bukkit.World world = creator.createWorld();
-
-            if (world != null) {
-                plugin.getLogger().info("World created successfully: " + world.getName());
-
-                // Track this as a template copy (do this AFTER world is created)
-                loadedTemplates.put(worldName, templateWorld);
-                plugin.getLogger().info("Tracking template copy. Loaded templates: " + loadedTemplates.keySet());
-
-                player.sendMessage(ChatColor.GREEN + "Successfully loaded world: " + worldName);
-                player.sendMessage(ChatColor.YELLOW + "This is a temporary copy. Changes save to the template. Auto-unloads when empty.");
-
-                org.bukkit.Location spawnLoc = world.getSpawnLocation();
-                player.sendMessage(ChatColor.GRAY + "World spawn: " + spawnLoc.getBlockX() + ", " + spawnLoc.getBlockY() + ", " + spawnLoc.getBlockZ());
-
-                player.teleport(spawnLoc);
-            } else {
+            org.bukkit.World world = new org.bukkit.WorldCreator(worldName)
+                    .environment(org.bukkit.World.Environment.NORMAL)
+                    .generateStructures(false)
+                    .createWorld();
+            if (world == null) {
                 player.sendMessage(ChatColor.RED + "Failed to load world. Check server logs.");
+                return;
             }
+
+            // Track the source AFTER the world is registered so unload can sync changes back to it.
+            if (templateWorld != null) {
+                loadedTemplates.put(worldName, templateWorld);
+            }
+            plugin.getLogger().info("World loaded: " + world.getName() + " | tracked: " + loadedTemplates.keySet());
+
+            player.sendMessage(ChatColor.GREEN + "Loaded world: " + worldName);
+            player.sendMessage(ChatColor.YELLOW + "Edits sync back to its source on unload; auto-unloads when empty.");
+
+            org.bukkit.Location spawnLoc = world.getSpawnLocation();
+            player.sendMessage(ChatColor.GRAY + "World spawn: " + spawnLoc.getBlockX() + ", " + spawnLoc.getBlockY() + ", " + spawnLoc.getBlockZ());
+            player.teleport(spawnLoc);
         } catch (Exception e) {
             player.sendMessage(ChatColor.RED + "Error loading world: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Locate a template world directory by name, checking SINGLE_PLAYER first then MULTI_PLAYER under
+     * GAME_WORLD_TEMPLATES. Returns null if neither exists.
+     */
+    private File resolveTemplateDir(File serverRoot, String worldName) {
+        File templatesRoot = new File(serverRoot, "GAME_WORLD_TEMPLATES");
+        File single = new File(templatesRoot, "SINGLE_PLAYER" + File.separator + worldName);
+        if (single.isDirectory()) return single;
+        File multi = new File(templatesRoot, "MULTI_PLAYER" + File.separator + worldName);
+        if (multi.isDirectory()) return multi;
+        // Fallback: a world folder installed directly at the server root (next to lobby_world), outside
+        // GAME_WORLD_TEMPLATES. Only accept it if it actually looks like a world (has level.dat) so a
+        // stray/temp folder is never mistaken for a map. Such a folder is its own permanent home, so the
+        // load/unload flow must NOT delete it (see isRootSource guards).
+        File rootResident = new File(serverRoot, worldName);
+        if (rootResident.isDirectory() && new File(rootResident, "level.dat").exists()) return rootResident;
+        return null;
+    }
+
+    /**
+     * True when the resolved source folder IS the world's home directly at the server root (rather than a
+     * temporary staging copy created during load). When true, neither the load-time root cleanup nor the
+     * unload-time post-check may delete it — it's the authoritative copy we sync changes back into.
+     */
+    private boolean isRootSource(File serverRoot, String worldName, File source) {
+        if (source == null) return false;
+        File rootFolder = new File(serverRoot, worldName);
+        return source.getAbsoluteFile().equals(rootFolder.getAbsoluteFile());
+    }
+
+    /** True if both files resolve to the same absolute path (used to avoid copying a folder onto itself). */
+    private boolean sameFolder(File a, File b) {
+        return a != null && b != null && a.getAbsoluteFile().equals(b.getAbsoluteFile());
     }
 
     private void unloadWorld(Player player, String worldName) {
@@ -591,29 +599,41 @@ public class TDCommand implements CommandExecutor {
             return;
         }
 
-        // Save level.dat back to template if this is a template copy
+        player.sendMessage(ChatColor.YELLOW + "Unloading world: " + worldName + "...");
+        unloadTemplateWorld(world, player);
+    }
+
+    /**
+     * Shared teardown for a loaded template world, used by both {@code /td unloadworld} (pass the issuing
+     * player for chat feedback) and the auto-unload listener (pass {@code null} for log-only feedback):
+     *  1. evacuate remaining players to lobby, then {@link org.bukkit.Bukkit#unloadWorld} with save=true;
+     *  2. NIO sync-back of the live world data (Paper's migrated dimensions copy, else the server-root
+     *     copy) into the resolved source (template or root-resident home);
+     *  3. delete Paper's migrated copy at &lt;primaryWorld&gt;/dimensions/minecraft/&lt;name&gt;;
+     *  4. post-check + force-delete any leftover staging copy of &lt;name&gt; at the server root (but keep a
+     *     root-resident world that is its own permanent home).
+     * The disk phase (2-4) runs ~2s later so Paper releases its file handles (Windows locking).
+     *
+     * @return true if the world was unloaded from Bukkit.
+     */
+    public boolean unloadTemplateWorld(org.bukkit.World world, Player feedback) {
+        final String worldName = world.getName();
+        File serverRoot = plugin.getDataFolder().getParentFile().getParentFile();
+        // Paper migrates a loaded world into <primaryWorld>/dimensions/minecraft/<name> (usually lobby_world).
+        String primaryWorldName = org.bukkit.Bukkit.getWorlds().isEmpty()
+                ? "lobby_world" : org.bukkit.Bukkit.getWorlds().get(0).getName();
+        File dimensionsFolder = new File(serverRoot, primaryWorldName + "/dimensions/minecraft/" + worldName);
+        File rootFolder = new File(serverRoot, worldName);
+
+        // Resolve the template to sync changes back into: prefer the tracked source, otherwise fall back
+        // to searching GAME_WORLD_TEMPLATES so a manually-loaded world can still round-trip.
         File templateSource = loadedTemplates.get(worldName);
-        if (templateSource != null) {
-            File serverRoot = plugin.getDataFolder().getParentFile().getParentFile();
-            File worldFolder = new File(serverRoot, worldName);
-            File levelDatCopy = new File(worldFolder, "level.dat");
-            File levelDatTemplate = new File(templateSource, "level.dat");
+        if (templateSource == null) templateSource = resolveTemplateDir(serverRoot, worldName);
 
-            if (levelDatCopy.exists()) {
-                try {
-                    java.nio.file.Files.copy(levelDatCopy.toPath(), levelDatTemplate.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    player.sendMessage(ChatColor.GREEN + "Saved level.dat changes (spawn point, gamerules) back to template");
-                } catch (Exception e) {
-                    player.sendMessage(ChatColor.YELLOW + "Warning: Could not save level.dat to template: " + e.getMessage());
-                }
-            }
-        }
-
-        // Remove from tracking BEFORE teleporting players (so listener won't try to unload)
+        // Untrack BEFORE we touch players so the auto-unload listener can't race this teardown.
         loadedTemplates.remove(worldName);
 
-        // Teleport all players out of this world
+        // --- Step 1: Bukkit unload (evacuate players, then flush to disk) ---
         org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
         if (lobbyWorld == null) lobbyWorld = org.bukkit.Bukkit.getWorlds().get(0); // Fallback to first world
 
@@ -622,116 +642,143 @@ public class TDCommand implements CommandExecutor {
             p.sendMessage(ChatColor.YELLOW + "World " + worldName + " is being unloaded.");
         }
 
-        // Unload the world
-        player.sendMessage(ChatColor.YELLOW + "Unloading world: " + worldName + "...");
-        boolean unloaded = org.bukkit.Bukkit.unloadWorld(world, true); // Save before unloading to write level.dat
-
+        boolean unloaded = org.bukkit.Bukkit.unloadWorld(world, true); // save=true flushes level.dat/region to disk
         if (!unloaded) {
-            player.sendMessage(ChatColor.RED + "Failed to unload world. Check server logs.");
-            return;
+            // Re-track so the world isn't orphaned from the listener's perspective.
+            if (templateSource != null) loadedTemplates.put(worldName, templateSource);
+            plugin.getLogger().warning("Failed to unload world: " + worldName);
+            if (feedback != null) feedback.sendMessage(ChatColor.RED + "Failed to unload world. Check server logs.");
+            return false;
         }
 
-        // Delete the world folder after a delay (to avoid file locking issues)
-        File serverRoot = plugin.getDataFolder().getParentFile().getParentFile();
-        File worldFolder = new File(serverRoot, worldName);
-        // Paper migrates worlds to lobby_world/dimensions/minecraft/<worldname>
-        File migratedFolder = new File(serverRoot, "lobby_world/dimensions/minecraft/" + worldName);
+        if (feedback != null) {
+            feedback.sendMessage(ChatColor.YELLOW + "World unloaded. Syncing back to template and cleaning up in 2 seconds...");
+        }
+        plugin.getLogger().info("Scheduled teardown for: " + worldName
+                + " | dimensions=" + dimensionsFolder.getAbsolutePath() + " | root=" + rootFolder.getAbsolutePath());
 
-        player.sendMessage(ChatColor.YELLOW + "World unloaded. Deleting folders in 2 seconds...");
-        plugin.getLogger().info("Scheduled deletion for: " + worldFolder.getAbsolutePath());
-        plugin.getLogger().info("Also checking migrated location: " + migratedFolder.getAbsolutePath());
-
+        final File fTemplate = templateSource;
+        final Player fFeedback = feedback;
+        // Defer the disk phase so Paper releases its file handles (Windows locking).
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            plugin.getLogger().info("Deletion task running for: " + worldName);
-            int deletedCount = 0;
-
-            // Delete original world folder
-            if (worldFolder.exists()) {
-                plugin.getLogger().info("Attempting to delete original: " + worldFolder.getAbsolutePath());
+            // --- Step 2: Sync edits back to the source ---
+            // After unloadWorld(save=true) the live, post-edit data lives in Paper's migrated dimensions
+            // copy; fall back to the server-root copy if Paper didn't migrate. Copy that into the resolved
+            // source, unless they're the same directory (e.g. a root-resident world with no separate
+            // dimensions copy — nothing to sync).
+            File syncSource = dimensionsFolder.exists() ? dimensionsFolder : rootFolder;
+            if (fTemplate != null && syncSource.exists() && !sameFolder(syncSource, fTemplate)) {
                 try {
-                    deleteDirectory(worldFolder);
-                    plugin.getLogger().info("Successfully deleted original world folder");
-                    deletedCount++;
-                } catch (Exception e) {
-                    plugin.getLogger().severe("Could not delete original world folder: " + e.getMessage());
+                    copyDirectoryNIO(syncSource.toPath(), fTemplate.toPath());
+                    plugin.getLogger().info("Synced world changes back to source: " + fTemplate.getAbsolutePath());
+                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.GREEN + "Synced world changes back to: " + fTemplate.getName());
+                } catch (java.io.IOException e) {
+                    plugin.getLogger().warning("Sync-back failed for " + worldName + ": " + e.getMessage());
+                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.YELLOW + "Warning: could not sync world back to source: " + e.getMessage());
                     e.printStackTrace();
                 }
+            } else if (fTemplate == null) {
+                plugin.getLogger().info("No source resolved for " + worldName + "; skipping sync-back.");
             } else {
-                plugin.getLogger().info("Original world folder does not exist: " + worldFolder.getAbsolutePath());
+                plugin.getLogger().info("Source is the live folder for " + worldName + "; no sync-back needed.");
             }
 
-            // Delete migrated world folder (Paper puts it here)
-            if (migratedFolder.exists()) {
-                plugin.getLogger().info("Attempting to delete migrated: " + migratedFolder.getAbsolutePath());
-                try {
-                    deleteDirectory(migratedFolder);
-                    plugin.getLogger().info("Successfully deleted migrated world folder");
-                    deletedCount++;
-                } catch (Exception e) {
-                    plugin.getLogger().severe("Could not delete migrated world folder: " + e.getMessage());
-                    e.printStackTrace();
-                }
-            } else {
-                plugin.getLogger().info("Migrated world folder does not exist: " + migratedFolder.getAbsolutePath());
-            }
-
-            if (deletedCount > 0) {
-                player.sendMessage(ChatColor.GREEN + "Successfully deleted world data (" + deletedCount + " location(s))");
-            } else {
-                player.sendMessage(ChatColor.YELLOW + "No world folders found to delete.");
-            }
-        }, 40L); // Wait 2 seconds (40 ticks)
-    }
-
-    private void deleteDirectory(File directory) throws java.io.IOException {
-        if (!directory.exists()) return;
-
-        if (directory.isDirectory()) {
-            File[] files = directory.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    deleteDirectory(file);
-                }
-            }
-        }
-
-        // Try multiple times (Windows can have file locking delays)
-        int attempts = 0;
-        while (directory.exists() && attempts < 5) {
-            if (directory.delete()) {
-                return; // Success
-            }
-            attempts++;
+            // --- Step 3: Dimensions cleanup (delete lobby_world/dimensions/minecraft/<name>) ---
             try {
-                Thread.sleep(100); // Wait 100ms between attempts
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                deleteDirectoryNIO(dimensionsFolder.toPath());
+                plugin.getLogger().info("Deleted dimensions folder for " + worldName);
+            } catch (java.io.IOException e) {
+                plugin.getLogger().warning("Dimensions cleanup failed for " + worldName + ": " + e.getMessage());
+                if (fFeedback != null) fFeedback.sendMessage(ChatColor.YELLOW + "Warning: could not delete dimensions folder: " + e.getMessage());
+                e.printStackTrace();
             }
-        }
 
-        if (directory.exists()) {
-            throw new java.io.IOException("Failed to delete after " + attempts + " attempts: " + directory.getAbsolutePath());
-        }
+            // --- Post-Check Validation: aggressively ensure no leftover at server root ---
+            // Skip when the root folder IS the map's permanent home (a server-root-resident world we just
+            // synced changes back into) — only temp staging copies get force-deleted here.
+            if (isRootSource(serverRoot, worldName, fTemplate)) {
+                plugin.getLogger().info("Server-root world '" + worldName + "' kept at root (its permanent home).");
+            } else {
+                try {
+                    if (rootFolder.exists()) {
+                        plugin.getLogger().info("Leftover root folder detected for " + worldName
+                                + ", force-deleting: " + rootFolder.getAbsolutePath());
+                        deleteDirectoryNIO(rootFolder.toPath());
+                    }
+                } catch (java.io.IOException e) {
+                    plugin.getLogger().warning("Root post-check cleanup failed for " + worldName + ": " + e.getMessage());
+                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.YELLOW + "Warning: leftover root folder could not be removed: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+            plugin.getLogger().info("World '" + worldName + "' fully unloaded and cleaned up.");
+            if (fFeedback != null) fFeedback.sendMessage(ChatColor.GREEN + "World '" + worldName + "' fully unloaded and cleaned up.");
+        }, 40L); // Wait 2 seconds (40 ticks)
+        return true;
     }
 
     /**
-     * Authoritative "is this world loaded" check. Bukkit.getWorld(name) only matches the legacy world
-     * name and can return null for worlds Paper migrated into a dimensions/ folder or registered under a
-     * namespaced key, so we fall back to scanning every loaded world and matching by name (case-
-     * insensitively, and tolerating namespaced/path-suffixed names).
+     * Recursively copy a directory tree using NIO. Existing destination files are replaced. {@code uid.dat}
+     * is intentionally skipped so cloned/synced worlds never collide on Bukkit's world UUID. Robust against
+     * Windows file-locking via {@link java.nio.file.Files#copy}.
      */
-    private org.bukkit.World findLoadedWorld(String worldName) {
-        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
-        if (world != null) return world;
-        for (org.bukkit.World loaded : org.bukkit.Bukkit.getWorlds()) {
-            String name = loaded.getName();
-            if (name.equalsIgnoreCase(worldName)
-                    || name.endsWith("/" + worldName)
-                    || name.endsWith(":" + worldName)) {
-                return loaded;
+    private void copyDirectoryNIO(java.nio.file.Path source, java.nio.file.Path target) throws java.io.IOException {
+        java.nio.file.Files.walkFileTree(source, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+            @Override
+            public java.nio.file.FileVisitResult preVisitDirectory(java.nio.file.Path dir,
+                    java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                java.nio.file.Files.createDirectories(target.resolve(source.relativize(dir).toString()));
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public java.nio.file.FileVisitResult visitFile(java.nio.file.Path file,
+                    java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                if (file.getFileName().toString().equals("uid.dat")) {
+                    return java.nio.file.FileVisitResult.CONTINUE; // avoid duplicate-world-UUID conflicts
+                }
+                java.nio.file.Path dest = target.resolve(source.relativize(file).toString());
+                java.nio.file.Files.copy(file, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
+    /**
+     * Recursively delete a directory tree using NIO, deepest paths first. Retries a few times to ride out
+     * transient Windows file locks; throws only if the root still exists after all attempts.
+     */
+    private void deleteDirectoryNIO(java.nio.file.Path path) throws java.io.IOException {
+        if (path == null || !java.nio.file.Files.exists(path)) return;
+
+        java.io.IOException lastError = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(path)) {
+                java.util.List<java.nio.file.Path> paths =
+                        walk.sorted(java.util.Comparator.reverseOrder()).collect(java.util.stream.Collectors.toList());
+                lastError = null;
+                for (java.nio.file.Path p : paths) {
+                    try {
+                        java.nio.file.Files.deleteIfExists(p);
+                    } catch (java.io.IOException e) {
+                        lastError = e;
+                    }
+                }
+            }
+            if (!java.nio.file.Files.exists(path)) return;
+            try {
+                Thread.sleep(100); // brief pause before retrying for Windows file-lock release
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
             }
         }
-        return null;
+
+        if (java.nio.file.Files.exists(path)) {
+            throw new java.io.IOException("Failed to delete after retries: " + path
+                    + (lastError != null ? " (" + lastError.getMessage() + ")" : ""));
+        }
     }
 
     public File getTemplateSource(String worldName) {
