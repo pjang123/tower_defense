@@ -35,6 +35,15 @@ public class Match {
     private final List<TDMob> activeMobs = new ArrayList<>();
     private final Map<String, Tower> placedTowers = new HashMap<>(); // PlotID -> Tower
 
+    // Match timing + per-player end-of-game stats
+    private long startTimeMillis = 0L;
+    private long endTimeMillis = 0L;
+    private final Map<UUID, Integer> mobsSpawned = new HashMap<>();
+    private final Map<UUID, Integer> mobsKilled = new HashMap<>();
+    private final Map<UUID, Double> damageDealt = new HashMap<>();
+    private final Map<UUID, Integer> totalGoldEarned = new HashMap<>();
+    private final Map<UUID, Integer> totalExpEarned = new HashMap<>();
+
     public Match(TowerDefense plugin, MapManager.MapData mapData) {
         this.matchId = UUID.randomUUID();
         this.plugin = plugin;
@@ -65,6 +74,17 @@ public class Match {
     
     public BossBar getCastleBossBar() { return castleBossBar; }
     public void setCastleBossBar(BossBar castleBossBar) { this.castleBossBar = castleBossBar; }
+
+    public long getStartTimeMillis() { return startTimeMillis; }
+    public void setStartTimeMillis(long startTimeMillis) { this.startTimeMillis = startTimeMillis; }
+    public long getEndTimeMillis() { return endTimeMillis; }
+    public void setEndTimeMillis(long endTimeMillis) { this.endTimeMillis = endTimeMillis; }
+
+    public Map<UUID, Integer> getMobsSpawned() { return mobsSpawned; }
+    public Map<UUID, Integer> getMobsKilled() { return mobsKilled; }
+    public Map<UUID, Double> getDamageDealt() { return damageDealt; }
+    public Map<UUID, Integer> getTotalGoldEarned() { return totalGoldEarned; }
+    public Map<UUID, Integer> getTotalExpEarned() { return totalExpEarned; }
 
     public void addPlayer(Player player, String arena) {
         players.add(player.getUniqueId());

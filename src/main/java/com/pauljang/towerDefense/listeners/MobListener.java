@@ -320,6 +320,8 @@ public class MobListener implements Listener {
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
                     if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(mobArena)) {
                         plugin.getGameManager().addGold(player.getUniqueId(), reward, false);
+                        // Credit the defender(s) of this track with the kill (end-of-game stats).
+                        plugin.getGameManager().recordMobKilled(player.getUniqueId());
                     }
                 }
             }
@@ -586,7 +588,6 @@ public class MobListener implements Listener {
             } else if (slot == 40) { // Send Wave
                 plugin.getMobManager().sendQueue(player.getUniqueId());
                 player.closeInventory();
-                player.playSound(player.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 0.8f, 1.2f);
                 player.sendMessage(org.bukkit.ChatColor.GREEN + "Sending the mob wave!");
             } else if (slot == 42) { // Open upgrades screen
                 player.closeInventory();
@@ -1112,7 +1113,20 @@ public class MobListener implements Listener {
             if (event.getHand() == org.bukkit.inventory.EquipmentSlot.OFF_HAND) return;
             org.bukkit.event.block.Action action = event.getAction();
             String worldName = player.getWorld().getName();
-            
+
+            // Post-match return compass: once a player's match has ENDED, the only compass they hold is
+            // the "Return to Lobby" compass — any click sends them back to the lobby instead of tearing
+            // them out of the world automatically. Guarded on match state so an active player holding the
+            // matchmaking compass is never affected.
+            com.pauljang.towerDefense.core.Match playerMatch =
+                    plugin.getGameManager().getPlayerMatch(player.getUniqueId());
+            if (!worldName.equals("lobby_world") && isLobbyCompass(item) && playerMatch != null
+                    && playerMatch.getCurrentState() == com.pauljang.towerDefense.core.GameState.ENDED) {
+                event.setCancelled(true);
+                plugin.getGameManager().returnToLobbyFromMatch(player);
+                return;
+            }
+
             // Lobby World Behavior: either click opens the games/matchmaking GUI (no teleport forward)
             if (worldName.equals("lobby_world")) {
                 event.setCancelled(true);
@@ -1221,8 +1235,6 @@ public class MobListener implements Listener {
                     default -> 4.0;
                 };
                 arrow.setDamage(arrowDamage);
-                plugin.getLogger().info("ARROW SPAWNED - Player: " + player.getName() +
-                    ", Bow level: " + bowLevel + ", Arrow damage set to: " + arrow.getDamage());
 
                 if (item.getType() == org.bukkit.Material.CROSSBOW) {
                     player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
@@ -1277,15 +1289,6 @@ public class MobListener implements Listener {
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
     public void onEntityDamageByEntity(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         org.bukkit.entity.Entity victim = event.getEntity();
-
-        // DEBUG: Log all arrow hits
-        if (event.getDamager() instanceof org.bukkit.entity.Arrow arrow) {
-            plugin.getLogger().info("ARROW HIT - Shooter: " + arrow.getShooter() +
-                ", Victim: " + victim.getType() +
-                ", Damage: " + event.getDamage() +
-                ", Arrow damage: " + arrow.getDamage() +
-                ", Event cancelled: " + event.isCancelled());
-        }
 
         // Wardens are velocity-driven track mobs; cancel any damage they deal (notably the sonic
         // boom) so they never blast allied mobs walking the same path.
@@ -1367,6 +1370,9 @@ public class MobListener implements Listener {
             // Cancel if trying to hit a mob on the OPPONENT's track (where they sent the mobs)
             if (!mobArena.equals(playerArena)) {
                 event.setCancelled(true);
+            } else {
+                // Credit the player with the weapon damage they land (end-of-game stats).
+                plugin.getGameManager().recordDamageDealt(attacker.getUniqueId(), event.getFinalDamage());
             }
         }
     }
@@ -1414,30 +1420,32 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onPlayerDamage(org.bukkit.event.entity.EntityDamageEvent event) {
-        if (event.getEntity() instanceof org.bukkit.entity.Player player) {
-            String worldName = player.getWorld().getName();
+        if (!(event.getEntity() instanceof org.bukkit.entity.Player player)) return;
+        String worldName = player.getWorld().getName();
+        org.bukkit.event.entity.EntityDamageEvent.DamageCause cause = event.getCause();
+
+        // The void never damages players; it bounces them back to safety instead.
+        if (cause == org.bukkit.event.entity.EntityDamageEvent.DamageCause.VOID) {
+            event.setCancelled(true);
             if (worldName.equals("lobby_world")) {
-                event.setCancelled(true);
-                if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.VOID) {
-                    org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
-                    if (lobbyWorld != null) {
-                        player.teleport(lobbyWorld.getSpawnLocation());
-                    }
+                org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
+                if (lobbyWorld != null) player.teleport(lobbyWorld.getSpawnLocation());
+            } else {
+                String arena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
+                java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
+                if (waypoints != null && !waypoints.isEmpty()) {
+                    player.teleport(waypoints.get(0).clone().add(0, 1, 0));
+                } else {
+                    player.teleport(player.getWorld().getSpawnLocation());
                 }
-            } else if (worldName.equals("game_world")) {
-                event.setCancelled(true);
-                if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.VOID) {
-                    String arena = plugin.getGameManager().getPlayerArena(player.getUniqueId());
-                    java.util.List<Location> waypoints = plugin.getWaypointConfigManager().getWaypoints(arena);
-                    if (waypoints != null && !waypoints.isEmpty()) {
-                        player.teleport(waypoints.get(0).clone().add(0, 1, 0));
-                    } else {
-                        player.teleport(player.getWorld().getSpawnLocation());
-                    }
-                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
-                }
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
             }
+            return;
         }
+
+        // Players are fully invulnerable to everything (other than the void bounce above), in every
+        // world — no fire, no mob melee, no fall damage, nothing.
+        event.setCancelled(true);
     }
 
     @EventHandler
@@ -1559,6 +1567,14 @@ public class MobListener implements Listener {
 
     @EventHandler
     public void onProjectileHit(org.bukkit.event.entity.ProjectileHitEvent event) {
+        // Spent player/tower arrows that land on the ground should disappear quickly instead of
+        // littering the track. Remove shortly after a block hit (entity hits already despawn arrows).
+        if (event.getEntity() instanceof org.bukkit.entity.Arrow landedArrow && event.getHitBlock() != null) {
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (landedArrow.isValid()) landedArrow.remove();
+            }, 20L);
+        }
+
         if (event.getEntity() instanceof org.bukkit.entity.LargeFireball fireball) {
             if (fireball.hasMetadata("td_happy_fireball")) {
                 if (event.getHitEntity() instanceof org.bukkit.entity.Player) {

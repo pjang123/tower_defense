@@ -3672,7 +3672,7 @@
       "label": ".summonZombieAt()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L455",
+      "source_location": "L442",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_summonzombieat",
       "community": 6,
@@ -3682,7 +3682,7 @@
       "label": "TDMob",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L455",
+      "source_location": "L442",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_tdmob",
       "community": 9,
@@ -3692,7 +3692,7 @@
       "label": ".updateHealthBar()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L550",
+      "source_location": "L537",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_updatehealthbar",
       "community": 9,
@@ -3702,7 +3702,7 @@
       "label": ".startMobTicker()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L643",
+      "source_location": "L630",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_startmobticker",
       "community": 9,
@@ -3712,7 +3712,7 @@
       "label": ".isVelocityDriven()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L740",
+      "source_location": "L746",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_isvelocitydriven",
       "community": 9,
@@ -3722,7 +3722,7 @@
       "label": ".handleMobMovement()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L746",
+      "source_location": "L752",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_handlemobmovement",
       "community": 6,
@@ -3732,7 +3732,7 @@
       "label": "Iterator",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L746",
+      "source_location": "L752",
       "_origin": "ast",
       "id": "iterator",
       "community": 0,
@@ -3742,7 +3742,7 @@
       "label": ".getCastleDamage()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L990",
+      "source_location": "L996",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_getcastledamage",
       "community": 9,
@@ -3752,7 +3752,7 @@
       "label": ".cleanup()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1001",
+      "source_location": "L1007",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_cleanup",
       "community": 9,
@@ -3762,7 +3762,7 @@
       "label": ".getActiveMobs()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1020",
+      "source_location": "L1026",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_getactivemobs",
       "community": 9,
@@ -3772,7 +3772,7 @@
       "label": ".removeActiveMob()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1040",
+      "source_location": "L1046",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_removeactivemob",
       "community": 9,
@@ -3782,7 +3782,7 @@
       "label": ".addActiveMob()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1050",
+      "source_location": "L1056",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_addactivemob",
       "community": 9,
@@ -3792,7 +3792,7 @@
       "label": ".getQueueByTier()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1069",
+      "source_location": "L1075",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_getqueuebytier",
       "community": 9,
@@ -3802,7 +3802,7 @@
       "label": "UUID",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1069",
+      "source_location": "L1075",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_uuid",
       "community": 9,
@@ -3812,7 +3812,7 @@
       "label": "Map",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1069",
+      "source_location": "L1075",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_map",
       "community": 9,
@@ -3822,7 +3822,7 @@
       "label": "Integer",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1069",
+      "source_location": "L1075",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_integer",
       "community": 9,
@@ -3832,7 +3832,7 @@
       "label": ".getQueueTotal()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1074",
+      "source_location": "L1080",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_getqueuetotal",
       "community": 9,
@@ -3842,7 +3842,7 @@
       "label": ".addToQueue()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1083",
+      "source_location": "L1089",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_addtoqueue",
       "community": 9,
@@ -3852,7 +3852,7 @@
       "label": ".removeOneFromQueue()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1093",
+      "source_location": "L1099",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_removeonefromqueue",
       "community": 9,
@@ -3862,7 +3862,7 @@
       "label": ".removeFromQueue()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1110",
+      "source_location": "L1116",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_removefromqueue",
       "community": 9,
@@ -3872,7 +3872,7 @@
       "label": "PresetMobType",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1124",
+      "source_location": "L1130",
       "_origin": "ast",
       "id": "presetmobtype",
       "community": 9,
@@ -3882,7 +3882,7 @@
       "label": ".clearQueue()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1133",
+      "source_location": "L1139",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_clearqueue",
       "community": 9,
@@ -3892,7 +3892,7 @@
       "label": ".clearAllQueues()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1137",
+      "source_location": "L1143",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_clearallqueues",
       "community": 9,
@@ -3902,7 +3902,7 @@
       "label": ".sendQueue()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1141",
+      "source_location": "L1147",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_sendqueue",
       "community": 9,
@@ -3912,7 +3912,7 @@
       "label": ".openMobSpawnerGUI()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1186",
+      "source_location": "L1192",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_openmobspawnergui",
       "community": 9,
@@ -3922,7 +3922,7 @@
       "label": "Player",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1186",
+      "source_location": "L1192",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_player",
       "community": 9,
@@ -3932,7 +3932,7 @@
       "label": ".createChainGUIItem()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1258",
+      "source_location": "L1264",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_createchainguiitem",
       "community": 9,
@@ -3942,7 +3942,7 @@
       "label": "ItemStack",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1258",
+      "source_location": "L1264",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_itemstack",
       "community": 9,
@@ -3952,7 +3952,7 @@
       "label": ".getTierColor()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1299",
+      "source_location": "L1305",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_gettiercolor",
       "community": 9,
@@ -3962,7 +3962,7 @@
       "label": "ChatColor",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1299",
+      "source_location": "L1305",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_chatcolor",
       "community": 9,
@@ -3972,7 +3972,7 @@
       "label": ".getTierUnlockCost()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1311",
+      "source_location": "L1317",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_gettierunlockcost",
       "community": 9,
@@ -3982,7 +3982,7 @@
       "label": ".openMobTierGUI()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1321",
+      "source_location": "L1327",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_openmobtiergui",
       "community": 9,
@@ -3992,7 +3992,7 @@
       "label": ".createTierItem()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1360",
+      "source_location": "L1366",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_createtieritem",
       "community": 9,
@@ -4002,7 +4002,7 @@
       "label": "MobStateProfile",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1360",
+      "source_location": "L1366",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_mobstateprofile",
       "community": 9,
@@ -4012,7 +4012,7 @@
       "label": ".createGUIItem()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
-      "source_location": "L1436",
+      "source_location": "L1442",
       "_origin": "ast",
       "id": "entities_mobmanager_mobmanager_createguiitem",
       "community": 9,
@@ -5362,7 +5362,7 @@
       "label": ".onFoodLevelChange()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1451",
+      "source_location": "L1465",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onfoodlevelchange",
       "community": 1,
@@ -5372,7 +5372,7 @@
       "label": "FoodLevelChangeEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1451",
+      "source_location": "L1465",
       "_origin": "ast",
       "id": "foodlevelchangeevent",
       "community": 1,
@@ -5382,7 +5382,7 @@
       "label": ".onPlayerRideGhast()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1458",
+      "source_location": "L1472",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onplayerrideghast",
       "community": 0,
@@ -5392,7 +5392,7 @@
       "label": ".onPlayerLeftClick()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1489",
+      "source_location": "L1503",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onplayerleftclick",
       "community": 0,
@@ -5402,7 +5402,7 @@
       "label": "PlayerAnimationEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1489",
+      "source_location": "L1503",
       "_origin": "ast",
       "id": "playeranimationevent",
       "community": 0,
@@ -5412,7 +5412,7 @@
       "label": ".onWorldChange()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1520",
+      "source_location": "L1534",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onworldchange",
       "community": 8,
@@ -5422,7 +5422,7 @@
       "label": "PlayerChangedWorldEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1520",
+      "source_location": "L1534",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_listeners_moblistener_java_playerchangedworldevent",
       "community": 8,
@@ -5432,7 +5432,7 @@
       "label": ".onPlayerSwapHandItems()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1547",
+      "source_location": "L1561",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onplayerswaphanditems",
       "community": 1,
@@ -5442,7 +5442,7 @@
       "label": "PlayerSwapHandItemsEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1547",
+      "source_location": "L1561",
       "_origin": "ast",
       "id": "playerswaphanditemsevent",
       "community": 1,
@@ -5452,7 +5452,7 @@
       "label": ".onInventoryDrag()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1552",
+      "source_location": "L1566",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_oninventorydrag",
       "community": 1,
@@ -5462,7 +5462,7 @@
       "label": "InventoryDragEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1552",
+      "source_location": "L1566",
       "_origin": "ast",
       "id": "inventorydragevent",
       "community": 1,
@@ -5472,7 +5472,7 @@
       "label": ".onEntityExplode()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1561",
+      "source_location": "L1575",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onentityexplode",
       "community": 1,
@@ -5482,7 +5482,7 @@
       "label": "EntityExplodeEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1561",
+      "source_location": "L1575",
       "_origin": "ast",
       "id": "entityexplodeevent",
       "community": 1,
@@ -5492,7 +5492,7 @@
       "label": ".onProjectileHit()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1568",
+      "source_location": "L1582",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onprojectilehit",
       "community": 0,
@@ -5502,7 +5502,7 @@
       "label": "ProjectileHitEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1568",
+      "source_location": "L1582",
       "_origin": "ast",
       "id": "projectilehitevent",
       "community": 0,
@@ -5512,7 +5512,7 @@
       "label": ".onEntityDismount()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1607",
+      "source_location": "L1621",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onentitydismount",
       "community": 1,
@@ -5522,7 +5522,7 @@
       "label": "EntityDismountEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1607",
+      "source_location": "L1621",
       "_origin": "ast",
       "id": "entitydismountevent",
       "community": 1,
@@ -5532,7 +5532,7 @@
       "label": ".onBlockFade()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1623",
+      "source_location": "L1637",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_onblockfade",
       "community": 1,
@@ -5542,7 +5542,7 @@
       "label": "BlockFadeEvent",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1623",
+      "source_location": "L1637",
       "_origin": "ast",
       "id": "blockfadeevent",
       "community": 1,
@@ -5552,7 +5552,7 @@
       "label": ".respawnBeesOnUpgrade()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1633",
+      "source_location": "L1647",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_respawnbeesonupgrade",
       "community": 0,
@@ -5562,7 +5562,7 @@
       "label": "Tower",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1633",
+      "source_location": "L1647",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_listeners_moblistener_java_tower",
       "community": 0,
@@ -5572,7 +5572,7 @@
       "label": ".isLobbyCompass()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1641",
+      "source_location": "L1655",
       "_origin": "ast",
       "id": "listeners_moblistener_moblistener_islobbycompass",
       "community": 0,
@@ -5582,7 +5582,7 @@
       "label": "ItemStack",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
-      "source_location": "L1641",
+      "source_location": "L1655",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_listeners_moblistener_java_itemstack",
       "community": 0,
@@ -7372,7 +7372,7 @@
       "label": ".playDripstoneStrike()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1785",
+      "source_location": "L1796",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_playdripstonestrike",
       "community": 0,
@@ -7382,7 +7382,7 @@
       "label": ".setEntityScale()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1851",
+      "source_location": "L1862",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_setentityscale",
       "community": 0,
@@ -7392,7 +7392,7 @@
       "label": "LivingEntity",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1851",
+      "source_location": "L1862",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_livingentity",
       "community": 0,
@@ -7402,7 +7402,7 @@
       "label": ".getMobsInRadius()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1883",
+      "source_location": "L1894",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_getmobsinradius",
       "community": 0,
@@ -7412,7 +7412,7 @@
       "label": "List",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1883",
+      "source_location": "L1894",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_list",
       "community": 0,
@@ -7422,7 +7422,7 @@
       "label": ".getTrackLocationsWithinRange()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1909",
+      "source_location": "L1920",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_gettracklocationswithinrange",
       "community": 0,
@@ -7432,7 +7432,7 @@
       "label": ".getTrackSegmentsWithinRange()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1941",
+      "source_location": "L1952",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_gettracksegmentswithinrange",
       "community": 0,
@@ -7442,7 +7442,7 @@
       "label": ".isMobImmuneToTower()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1981",
+      "source_location": "L1992",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_ismobimmunetotower",
       "community": 0,
@@ -7452,7 +7452,7 @@
       "label": ".isRedstoneBoosted()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L1989",
+      "source_location": "L2000",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_isredstoneboosted",
       "community": 0,
@@ -7462,7 +7462,7 @@
       "label": ".drawParticleLine()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2008",
+      "source_location": "L2019",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_drawparticleline",
       "community": 0,
@@ -7472,7 +7472,7 @@
       "label": "Particle",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2008",
+      "source_location": "L2019",
       "_origin": "ast",
       "id": "particle",
       "community": 0,
@@ -7482,7 +7482,7 @@
       "label": ".openManageTowerGUI()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2018",
+      "source_location": "L2029",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_openmanagetowergui",
       "community": 0,
@@ -7492,7 +7492,7 @@
       "label": "Player",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2018",
+      "source_location": "L2029",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_player",
       "community": 0,
@@ -7502,7 +7502,7 @@
       "label": ".openBuyTowerGUI()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2170",
+      "source_location": "L2181",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_openbuytowergui",
       "community": 0,
@@ -7512,7 +7512,7 @@
       "label": ".getPendingPathChoice()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2431",
+      "source_location": "L2442",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_getpendingpathchoice",
       "community": 0,
@@ -7522,7 +7522,7 @@
       "label": ".clearPendingPathChoice()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2435",
+      "source_location": "L2446",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_clearpendingpathchoice",
       "community": 0,
@@ -7532,7 +7532,7 @@
       "label": ".getPathNamesInOrder()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2443",
+      "source_location": "L2454",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_getpathnamesinorder",
       "community": 0,
@@ -7542,7 +7542,7 @@
       "label": ".isBranchingType()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2450",
+      "source_location": "L2461",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_isbranchingtype",
       "community": 0,
@@ -7552,7 +7552,7 @@
       "label": ".openPathPickerGUI()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2454",
+      "source_location": "L2465",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_openpathpickergui",
       "community": 0,
@@ -7562,7 +7562,7 @@
       "label": ".formatPathName()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2504",
+      "source_location": "L2515",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_formatpathname",
       "community": 0,
@@ -7572,7 +7572,7 @@
       "label": ".pathIcon()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2514",
+      "source_location": "L2525",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_pathicon",
       "community": 0,
@@ -7582,7 +7582,7 @@
       "label": "Material",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2514",
+      "source_location": "L2525",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_material",
       "community": 0,
@@ -7592,7 +7592,7 @@
       "label": ".appendPathSpecialStat()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2526",
+      "source_location": "L2537",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_appendpathspecialstat",
       "community": 0,
@@ -7602,7 +7602,7 @@
       "label": ".createGUIItem()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2540",
+      "source_location": "L2551",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_createguiitem",
       "community": 0,
@@ -7612,7 +7612,7 @@
       "label": "ItemStack",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2540",
+      "source_location": "L2551",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_itemstack",
       "community": 0,
@@ -7622,7 +7622,7 @@
       "label": ".clearNearbyDroppedItemsLater()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2551",
+      "source_location": "L2562",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_clearnearbydroppeditemslater",
       "community": 0,
@@ -7632,7 +7632,7 @@
       "label": ".cleanup()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2561",
+      "source_location": "L2572",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_cleanup",
       "community": 0,
@@ -7642,7 +7642,7 @@
       "label": "Match",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2561",
+      "source_location": "L2572",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_match",
       "community": 0,
@@ -7652,7 +7652,7 @@
       "label": ".getPlacedTowers()",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2582",
+      "source_location": "L2593",
       "_origin": "ast",
       "id": "towers_towermanager_towermanager_getplacedtowers",
       "community": 0,
@@ -7662,7 +7662,7 @@
       "label": "Map",
       "file_type": "code",
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
-      "source_location": "L2582",
+      "source_location": "L2593",
       "_origin": "ast",
       "id": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_map",
       "community": 0,
@@ -8595,7 +8595,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "project_summary",
-      "community": 39,
+      "community": 20,
       "norm_label": "project_summary.md"
     },
     {
@@ -8905,7 +8905,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "towers",
-      "community": 30,
+      "community": 41,
       "norm_label": "towers.md"
     },
     {
@@ -11748,7 +11748,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 39,
+      "community": 20,
       "norm_label": "golem tower (5x5)",
       "id": "project_summary_golem_tower"
     },
@@ -11761,7 +11761,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 39,
+      "community": 20,
       "norm_label": "happy ghast tower (5x5)",
       "id": "project_summary_happy_ghast_tower"
     },
@@ -11813,7 +11813,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 39,
+      "community": 41,
       "norm_label": "archer tower",
       "id": "towers_archer"
     },
@@ -11826,7 +11826,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 30,
+      "community": 41,
       "norm_label": "fire tower",
       "id": "towers_fire"
     },
@@ -11839,7 +11839,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 30,
+      "community": 41,
       "norm_label": "prismarine tower (slow)",
       "id": "towers_prismarine"
     },
@@ -11865,7 +11865,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 30,
+      "community": 41,
       "norm_label": "redstone tower (speed boost)",
       "id": "towers_redstone"
     },
@@ -11878,7 +11878,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 30,
+      "community": 41,
       "norm_label": "poison tower",
       "id": "towers_poison"
     },
@@ -11891,7 +11891,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 30,
+      "community": 41,
       "norm_label": "ice tower (freeze)",
       "id": "towers_ice"
     },
@@ -12086,7 +12086,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 39,
+      "community": 48,
       "norm_label": "towerconfigmanager.java",
       "id": "bugfix_final_adj_towerconfigmanager"
     },
@@ -15488,9 +15488,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L16",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_chatcolor"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_chatcolor",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -15734,9 +15734,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1431",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_createreturntolobbycompass"
+      "target": "core_gamemanager_gamemanager_createreturntolobbycompass",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -15814,9 +15814,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L198",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_finishmatchstartup"
+      "target": "core_gamemanager_gamemanager_finishmatchstartup",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -15844,9 +15844,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2466",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_formatduration"
+      "target": "core_gamemanager_gamemanager_formatduration",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -15964,9 +15964,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2459",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_getmatchelapsedseconds"
+      "target": "core_gamemanager_gamemanager_getmatchelapsedseconds",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -16014,9 +16014,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2526",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_getorcreatetabteam"
+      "target": "core_gamemanager_gamemanager_getorcreatetabteam",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -16224,9 +16224,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2488",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_recorddamagedealt"
+      "target": "core_gamemanager_gamemanager_recorddamagedealt",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -16234,9 +16234,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2483",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_recordmobkilled"
+      "target": "core_gamemanager_gamemanager_recordmobkilled",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -16244,9 +16244,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2478",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_recordmobspawned"
+      "target": "core_gamemanager_gamemanager_recordmobspawned",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -16334,9 +16334,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1448",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_returntolobbyfrommatch"
+      "target": "core_gamemanager_gamemanager_returntolobbyfrommatch",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -16601,9 +16601,9 @@
       "source_location": "L198",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -16766,9 +16766,9 @@
       "source_location": "L2488",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_recorddamagedealt",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -16777,9 +16777,9 @@
       "source_location": "L2483",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_recordmobkilled",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -16788,9 +16788,9 @@
       "source_location": "L2478",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_recordmobspawned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -16997,9 +16997,9 @@
       "source_location": "L198",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -17008,9 +17008,9 @@
       "source_location": "L2466",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_formatduration",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -17041,9 +17041,9 @@
       "source_location": "L2526",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_getorcreatetabteam",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -17272,9 +17272,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L189",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_startmatch",
-      "target": "core_gamemanager_gamemanager_finishmatchstartup"
+      "target": "core_gamemanager_gamemanager_finishmatchstartup",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17503,9 +17503,9 @@
       "source_location": "L198",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_list"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_list",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -17536,9 +17536,9 @@
       "source_location": "L198",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_mapdata"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_mapdata",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17547,9 +17547,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L302",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "core_gamemanager_gamemanager_givestarterweapons"
+      "target": "core_gamemanager_gamemanager_givestarterweapons",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17558,9 +17558,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L301",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "core_gamemanager_gamemanager_resetplayerformatch"
+      "target": "core_gamemanager_gamemanager_resetplayerformatch",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17569,9 +17569,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L316",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "core_gamemanager_gamemanager_showbossbar"
+      "target": "core_gamemanager_gamemanager_showbossbar",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17580,9 +17580,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L317",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "core_gamemanager_gamemanager_updatecastlehologram"
+      "target": "core_gamemanager_gamemanager_updatecastlehologram",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17690,9 +17690,9 @@
       "source_location": "L198",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_file"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_file",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -17701,9 +17701,9 @@
       "source_location": "L198",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_finishmatchstartup",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_match"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_match",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -17767,9 +17767,9 @@
       "source_location": "L2459",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_getmatchelapsedseconds",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_match"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_match",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -17811,9 +17811,9 @@
       "source_location": "L1179",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_updatecastlehologram",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_match"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_match",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -18031,9 +18031,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L397",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_updatebossbar"
+      "target": "core_gamemanager_gamemanager_updatebossbar",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -18042,9 +18042,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L398",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_gamemanager",
-      "target": "core_gamemanager_gamemanager_updatecastlehologram"
+      "target": "core_gamemanager_gamemanager_updatecastlehologram",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -18295,9 +18295,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1341",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_handlematchend",
-      "target": "core_gamemanager_gamemanager_getarenahealth"
+      "target": "core_gamemanager_gamemanager_getarenahealth",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -18966,9 +18966,9 @@
       "source_location": "L1448",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_returntolobbyfrommatch",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_player"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_player",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -19230,9 +19230,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1459",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_returntolobbyfrommatch",
-      "target": "core_gamemanager_gamemanager_givelobbyitems"
+      "target": "core_gamemanager_gamemanager_givelobbyitems",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -19351,9 +19351,9 @@
       "source_location": "L1431",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_createreturntolobbycompass",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_itemstack"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_itemstack",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -19868,9 +19868,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1418",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_handlematchend",
-      "target": "core_gamemanager_gamemanager_createreturntolobbycompass"
+      "target": "core_gamemanager_gamemanager_createreturntolobbycompass",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -19890,9 +19890,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1385",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_handlematchend",
-      "target": "core_gamemanager_gamemanager_formatduration"
+      "target": "core_gamemanager_gamemanager_formatduration",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -19901,9 +19901,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1336",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_handlematchend",
-      "target": "core_gamemanager_gamemanager_getmatchelapsedseconds"
+      "target": "core_gamemanager_gamemanager_getmatchelapsedseconds",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -20088,9 +20088,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L1472",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_returntolobbyfrommatch",
-      "target": "core_gamemanager_gamemanager_endmatch"
+      "target": "core_gamemanager_gamemanager_endmatch",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -21551,9 +21551,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2384",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_updatescoreboard",
-      "target": "core_gamemanager_gamemanager_formatduration"
+      "target": "core_gamemanager_gamemanager_formatduration",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -21562,9 +21562,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2384",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_updatescoreboard",
-      "target": "core_gamemanager_gamemanager_getmatchelapsedseconds"
+      "target": "core_gamemanager_gamemanager_getmatchelapsedseconds",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -21661,9 +21661,9 @@
       "source_location": "L2526",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_getorcreatetabteam",
-      "target": "scoreboard"
+      "target": "scoreboard",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -21760,9 +21760,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/GameManager.java",
       "source_location": "L2507",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_updatetabnames",
-      "target": "core_gamemanager_gamemanager_getorcreatetabteam"
+      "target": "core_gamemanager_gamemanager_getorcreatetabteam",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -21826,9 +21826,9 @@
       "source_location": "L2526",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_getorcreatetabteam",
-      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_chatcolor"
+      "target": "src_main_java_com_pauljang_towerdefense_core_gamemanager_java_chatcolor",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -21837,9 +21837,9 @@
       "source_location": "L2526",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_gamemanager_gamemanager_getorcreatetabteam",
-      "target": "team"
+      "target": "team",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -22015,9 +22015,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L85",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_getdamagedealt"
+      "target": "core_match_match_getdamagedealt",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22025,9 +22025,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L80",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_getendtimemillis"
+      "target": "core_match_match_getendtimemillis",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22055,9 +22055,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L84",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_getmobskilled"
+      "target": "core_match_match_getmobskilled",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22065,9 +22065,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L83",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_getmobsspawned"
+      "target": "core_match_match_getmobsspawned",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22125,9 +22125,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L78",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_getstarttimemillis"
+      "target": "core_match_match_getstarttimemillis",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22135,9 +22135,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L87",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_gettotalexpearned"
+      "target": "core_match_match_gettotalexpearned",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22145,9 +22145,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L86",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_gettotalgoldearned"
+      "target": "core_match_match_gettotalgoldearned",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22195,9 +22195,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L81",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_setendtimemillis"
+      "target": "core_match_match_setendtimemillis",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22205,9 +22205,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/Match.java",
       "source_location": "L79",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_match_match",
-      "target": "core_match_match_setstarttimemillis"
+      "target": "core_match_match_setstarttimemillis",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -22325,9 +22325,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_getdamagedealt",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -22336,9 +22336,9 @@
       "source_location": "L84",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_getmobskilled",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -22347,9 +22347,9 @@
       "source_location": "L83",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_getmobsspawned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -22402,9 +22402,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_gettotalexpearned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -22413,9 +22413,9 @@
       "source_location": "L86",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_gettotalgoldearned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_uuid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23282,9 +23282,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_match_match_getdamagedealt",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23293,9 +23293,9 @@
       "source_location": "L84",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_match_match_getmobskilled",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23304,9 +23304,9 @@
       "source_location": "L83",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_match_match_getmobsspawned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23348,9 +23348,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_match_match_gettotalexpearned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23359,9 +23359,9 @@
       "source_location": "L86",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_match_match_gettotalgoldearned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_map",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23447,9 +23447,9 @@
       "source_location": "L84",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_getmobskilled",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23458,9 +23458,9 @@
       "source_location": "L83",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_getmobsspawned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23480,9 +23480,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_gettotalexpearned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23491,9 +23491,9 @@
       "source_location": "L86",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_gettotalgoldearned",
-      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer"
+      "target": "src_main_java_com_pauljang_towerdefense_core_match_java_integer",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23568,9 +23568,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "core_match_match_getdamagedealt",
-      "target": "double"
+      "target": "double",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -23632,9 +23632,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/QueueManager.java",
       "source_location": "L9",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_queuemanager",
-      "target": "inventory"
+      "target": "inventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -24017,9 +24017,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/QueueManager.java",
       "source_location": "L147",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_queuemanager_votingsession_castvote",
-      "target": "core_queuemanager_votingsession_finishvoting"
+      "target": "core_queuemanager_votingsession_finishvoting",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24157,9 +24157,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L726",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand",
-      "target": "core_tdcommand_tdcommand_copydirectorynio"
+      "target": "core_tdcommand_tdcommand_copydirectorynio",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -24167,9 +24167,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L752",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand",
-      "target": "core_tdcommand_tdcommand_deletedirectorynio"
+      "target": "core_tdcommand_tdcommand_deletedirectorynio",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -24197,9 +24197,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L583",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand",
-      "target": "core_tdcommand_tdcommand_isrootsource"
+      "target": "core_tdcommand_tdcommand_isrootsource",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -24237,9 +24237,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L563",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand",
-      "target": "core_tdcommand_tdcommand_resolvetemplatedir"
+      "target": "core_tdcommand_tdcommand_resolvetemplatedir",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -24247,9 +24247,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L590",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand",
-      "target": "core_tdcommand_tdcommand_samefolder"
+      "target": "core_tdcommand_tdcommand_samefolder",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -24277,9 +24277,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L619",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand",
-      "target": "core_tdcommand_tdcommand_unloadtemplateworld"
+      "target": "core_tdcommand_tdcommand_unloadtemplateworld",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -24518,9 +24518,9 @@
       "source_location": "L583",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_isrootsource",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24551,9 +24551,9 @@
       "source_location": "L563",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_resolvetemplatedir",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24617,9 +24617,9 @@
       "source_location": "L619",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_player"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_player",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24639,9 +24639,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L491",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_loadworld",
-      "target": "core_tdcommand_tdcommand_copydirectorynio"
+      "target": "core_tdcommand_tdcommand_copydirectorynio",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24650,9 +24650,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L520",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_loadworld",
-      "target": "core_tdcommand_tdcommand_deletedirectorynio"
+      "target": "core_tdcommand_tdcommand_deletedirectorynio",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24661,9 +24661,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L472",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_loadworld",
-      "target": "core_tdcommand_tdcommand_isrootsource"
+      "target": "core_tdcommand_tdcommand_isrootsource",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24672,9 +24672,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L471",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_loadworld",
-      "target": "core_tdcommand_tdcommand_resolvetemplatedir"
+      "target": "core_tdcommand_tdcommand_resolvetemplatedir",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24694,9 +24694,9 @@
       "source_location": "L563",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_resolvetemplatedir",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_file"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_file",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24705,9 +24705,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L631",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "core_tdcommand_tdcommand_resolvetemplatedir"
+      "target": "core_tdcommand_tdcommand_resolvetemplatedir",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24727,9 +24727,9 @@
       "source_location": "L583",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_isrootsource",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_file"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_file",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24738,9 +24738,9 @@
       "source_location": "L590",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_samefolder",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_file"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_file",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24749,9 +24749,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L699",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "core_tdcommand_tdcommand_isrootsource"
+      "target": "core_tdcommand_tdcommand_isrootsource",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24760,9 +24760,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L670",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "core_tdcommand_tdcommand_samefolder"
+      "target": "core_tdcommand_tdcommand_samefolder",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24771,9 +24771,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L645",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "core_tdcommand_tdcommand_unloadworld"
+      "target": "core_tdcommand_tdcommand_unloadworld",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24793,9 +24793,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L672",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "core_tdcommand_tdcommand_copydirectorynio"
+      "target": "core_tdcommand_tdcommand_copydirectorynio",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24804,9 +24804,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/core/TDCommand.java",
       "source_location": "L688",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "core_tdcommand_tdcommand_deletedirectorynio"
+      "target": "core_tdcommand_tdcommand_deletedirectorynio",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24815,9 +24815,9 @@
       "source_location": "L619",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_unloadtemplateworld",
-      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_world"
+      "target": "src_main_java_com_pauljang_towerdefense_core_tdcommand_java_world",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -24848,9 +24848,9 @@
       "source_location": "L726",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_copydirectorynio",
-      "target": "path"
+      "target": "path",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -24859,9 +24859,9 @@
       "source_location": "L752",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "core_tdcommand_tdcommand_deletedirectorynio",
-      "target": "path"
+      "target": "path",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -25767,9 +25767,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/PlotConfigManager.java",
       "source_location": "L328",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_plotconfigmanager_plotconfigmanager",
-      "target": "data_plotconfigmanager_plotconfigmanager_getplotidsinworld"
+      "target": "data_plotconfigmanager_plotconfigmanager_getplotidsinworld",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -26043,9 +26043,9 @@
       "source_location": "L328",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "data_plotconfigmanager_plotconfigmanager_getplotidsinworld",
-      "target": "src_main_java_com_pauljang_towerdefense_data_plotconfigmanager_java_world"
+      "target": "src_main_java_com_pauljang_towerdefense_data_plotconfigmanager_java_world",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -26164,9 +26164,9 @@
       "source_location": "L328",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "data_plotconfigmanager_plotconfigmanager_getplotidsinworld",
-      "target": "src_main_java_com_pauljang_towerdefense_data_plotconfigmanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_data_plotconfigmanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -26692,9 +26692,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/PlotConfigManager.java",
       "source_location": "L332",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_plotconfigmanager_plotconfigmanager_getplotidsinworld",
-      "target": "data_plotconfigmanager_plotconfigmanager_normalizeworldname"
+      "target": "data_plotconfigmanager_plotconfigmanager_normalizeworldname",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -26703,9 +26703,9 @@
       "source_location": "L328",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "data_plotconfigmanager_plotconfigmanager_getplotidsinworld",
-      "target": "src_main_java_com_pauljang_towerdefense_data_plotconfigmanager_java_list"
+      "target": "src_main_java_com_pauljang_towerdefense_data_plotconfigmanager_java_list",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -27495,9 +27495,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java",
       "source_location": "L401",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager",
-      "target": "data_waypointconfigmanager_waypointconfigmanager_deletewaypoint"
+      "target": "data_waypointconfigmanager_waypointconfigmanager_deletewaypoint",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -27515,9 +27515,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java",
       "source_location": "L151",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager",
-      "target": "data_waypointconfigmanager_waypointconfigmanager_getlastwaypoint"
+      "target": "data_waypointconfigmanager_waypointconfigmanager_getlastwaypoint",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -27575,9 +27575,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java",
       "source_location": "L264",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager",
-      "target": "data_waypointconfigmanager_waypointconfigmanager_persistarenatotemplateworld"
+      "target": "data_waypointconfigmanager_waypointconfigmanager_persistarenatotemplateworld",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -27692,9 +27692,9 @@
       "source_location": "L151",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_getlastwaypoint",
-      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_match"
+      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_match",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -27813,9 +27813,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java",
       "source_location": "L152",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_getlastwaypoint",
-      "target": "data_waypointconfigmanager_waypointconfigmanager_getwaypointgraph"
+      "target": "data_waypointconfigmanager_waypointconfigmanager_getwaypointgraph",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -27978,9 +27978,9 @@
       "source_location": "L401",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_deletewaypoint",
-      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -27989,9 +27989,9 @@
       "source_location": "L151",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_getlastwaypoint",
-      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -28022,9 +28022,9 @@
       "source_location": "L264",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_persistarenatotemplateworld",
-      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -28055,9 +28055,9 @@
       "source_location": "L151",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_getlastwaypoint",
-      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_location"
+      "target": "src_main_java_com_pauljang_towerdefense_data_waypointconfigmanager_java_location",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -28165,9 +28165,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java",
       "source_location": "L254",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_addconnection",
-      "target": "data_waypointconfigmanager_waypointconfigmanager_persistarenatotemplateworld"
+      "target": "data_waypointconfigmanager_waypointconfigmanager_persistarenatotemplateworld",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -28220,9 +28220,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/data/WaypointConfigManager.java",
       "source_location": "L445",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "data_waypointconfigmanager_waypointconfigmanager_deletewaypoint",
-      "target": "data_waypointconfigmanager_waypointconfigmanager_savefile"
+      "target": "data_waypointconfigmanager_waypointconfigmanager_savefile",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -28427,9 +28427,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
       "source_location": "L1056",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "entities_mobmanager_mobmanager",
-      "target": "entities_mobmanager_mobmanager_addactivemob"
+      "target": "entities_mobmanager_mobmanager_addactivemob",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -28667,9 +28667,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
       "source_location": "L1046",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "entities_mobmanager_mobmanager",
-      "target": "entities_mobmanager_mobmanager_removeactivemob"
+      "target": "entities_mobmanager_mobmanager_removeactivemob",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -29550,9 +29550,9 @@
       "source_location": "L1056",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "entities_mobmanager_mobmanager_addactivemob",
-      "target": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_tdmob"
+      "target": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_tdmob",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -29583,9 +29583,9 @@
       "source_location": "L1046",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "entities_mobmanager_mobmanager_removeactivemob",
-      "target": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_tdmob"
+      "target": "src_main_java_com_pauljang_towerdefense_entities_mobmanager_java_tdmob",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -29913,9 +29913,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
       "source_location": "L1061",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "entities_mobmanager_mobmanager_addactivemob",
-      "target": "entities_mobmanager_mobmanager_getactivemobs"
+      "target": "entities_mobmanager_mobmanager_getactivemobs",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -29924,9 +29924,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/entities/MobManager.java",
       "source_location": "L1048",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "entities_mobmanager_mobmanager_removeactivemob",
-      "target": "entities_mobmanager_mobmanager_getactivemobs"
+      "target": "entities_mobmanager_mobmanager_getactivemobs",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -32523,9 +32523,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "listeners_moblistener",
-      "target": "menutype"
+      "target": "menutype",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -33936,9 +33936,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/MobListener.java",
       "source_location": "L1123",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "listeners_moblistener_moblistener_oncompassinteract",
-      "target": "listeners_moblistener_moblistener_islobbycompass"
+      "target": "listeners_moblistener_moblistener_islobbycompass",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -34494,9 +34494,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/WandListener.java",
       "source_location": "L95",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "listeners_wandlistener_wandlistener",
-      "target": "listeners_wandlistener_wandlistener_drawplotboundshighlight"
+      "target": "listeners_wandlistener_wandlistener_drawplotboundshighlight",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -34597,9 +34597,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/listeners/WandListener.java",
       "source_location": "L60",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "listeners_wandlistener_wandlistener_startpreviewtask",
-      "target": "listeners_wandlistener_wandlistener_drawplotboundshighlight"
+      "target": "listeners_wandlistener_wandlistener_drawplotboundshighlight",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -34718,9 +34718,9 @@
       "source_location": "L95",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "listeners_wandlistener_wandlistener_drawplotboundshighlight",
-      "target": "color"
+      "target": "color",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -34729,9 +34729,9 @@
       "source_location": "L95",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "listeners_wandlistener_wandlistener_drawplotboundshighlight",
-      "target": "src_main_java_com_pauljang_towerdefense_listeners_wandlistener_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_listeners_wandlistener_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -35639,9 +35639,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/Tower.java",
       "source_location": "L141",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_tower_tower",
-      "target": "towers_tower_tower_gethazarddisplays"
+      "target": "towers_tower_tower_gethazarddisplays",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -36704,9 +36704,9 @@
       "source_location": "L141",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "towers_tower_tower_gethazarddisplays",
-      "target": "src_main_java_com_pauljang_towerdefense_towers_tower_java_list"
+      "target": "src_main_java_com_pauljang_towerdefense_towers_tower_java_list",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -37287,9 +37287,9 @@
       "source_location": "L141",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "towers_tower_tower_gethazarddisplays",
-      "target": "blockdisplay"
+      "target": "blockdisplay",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -38632,9 +38632,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
       "source_location": "L13",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_towermanager",
-      "target": "inventory"
+      "target": "inventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -38687,9 +38687,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_towermanager",
-      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_match"
+      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_match",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -38931,9 +38931,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
       "source_location": "L1952",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager",
-      "target": "towers_towermanager_towermanager_gettracksegmentswithinrange"
+      "target": "towers_towermanager_towermanager_gettracksegmentswithinrange",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -39061,9 +39061,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
       "source_location": "L40",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager",
-      "target": "towers_towermanager_towermanager_resolvesetharnessed"
+      "target": "towers_towermanager_towermanager_resolvesetharnessed",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -39162,9 +39162,9 @@
       "source_location": "L40",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_resolvesetharnessed",
-      "target": "method"
+      "target": "method",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -39690,9 +39690,9 @@
       "source_location": "L1952",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_gettracksegmentswithinrange",
-      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_tower"
+      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_tower",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -39844,9 +39844,9 @@
       "source_location": "L1952",
       "weight": 1.0,
       "context": "generic_arg",
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_gettracksegmentswithinrange",
-      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_location"
+      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_location",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40009,9 +40009,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
       "source_location": "L795",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_tickdripstonehazards",
-      "target": "towers_towermanager_towermanager_gettracksegmentswithinrange"
+      "target": "towers_towermanager_towermanager_gettracksegmentswithinrange",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -40042,9 +40042,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/towers/TowerManager.java",
       "source_location": "L859",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_ticklandmines",
-      "target": "towers_towermanager_towermanager_gettracksegmentswithinrange"
+      "target": "towers_towermanager_towermanager_gettracksegmentswithinrange",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -40251,9 +40251,9 @@
       "source_location": "L1952",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_gettracksegmentswithinrange",
-      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_list"
+      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_list",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40471,9 +40471,9 @@
       "source_location": "L2572",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "towers_towermanager_towermanager_cleanup",
-      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_match"
+      "target": "src_main_java_com_pauljang_towerdefense_towers_towermanager_java_match",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40703,9 +40703,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L3",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder",
-      "target": "inventory"
+      "target": "inventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -40714,9 +40714,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder",
-      "target": "inventoryholder"
+      "target": "inventoryholder",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -40724,9 +40724,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L12",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder",
-      "target": "ui_tdmenuholder_tdmenuholder"
+      "target": "ui_tdmenuholder_tdmenuholder",
+      "confidence_score": 1.0
     },
     {
       "relation": "implements",
@@ -40734,9 +40734,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L12",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder",
-      "target": "inventoryholder"
+      "target": "inventoryholder",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -40744,9 +40744,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L43",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder",
-      "target": "ui_tdmenuholder_tdmenuholder_getdata"
+      "target": "ui_tdmenuholder_tdmenuholder_getdata",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -40754,9 +40754,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L55",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder",
-      "target": "ui_tdmenuholder_tdmenuholder_getinventory"
+      "target": "ui_tdmenuholder_tdmenuholder_getinventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -40764,9 +40764,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L38",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder",
-      "target": "ui_tdmenuholder_tdmenuholder_gettype"
+      "target": "ui_tdmenuholder_tdmenuholder_gettype",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -40774,9 +40774,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L51",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder",
-      "target": "ui_tdmenuholder_tdmenuholder_setinventory"
+      "target": "ui_tdmenuholder_tdmenuholder_setinventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -40784,9 +40784,9 @@
       "source_file": "src/main/java/com/pauljang/towerDefense/ui/TDMenuHolder.java",
       "source_location": "L33",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder",
-      "target": "ui_tdmenuholder_tdmenuholder_tdmenuholder"
+      "target": "ui_tdmenuholder_tdmenuholder_tdmenuholder",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40795,9 +40795,9 @@
       "source_location": "L33",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_tdmenuholder",
-      "target": "menutype"
+      "target": "menutype",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40806,9 +40806,9 @@
       "source_location": "L33",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_tdmenuholder",
-      "target": "src_main_java_com_pauljang_towerdefense_ui_tdmenuholder_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_ui_tdmenuholder_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40817,9 +40817,9 @@
       "source_location": "L38",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_gettype",
-      "target": "menutype"
+      "target": "menutype",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40828,9 +40828,9 @@
       "source_location": "L43",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_getdata",
-      "target": "src_main_java_com_pauljang_towerdefense_ui_tdmenuholder_java_string"
+      "target": "src_main_java_com_pauljang_towerdefense_ui_tdmenuholder_java_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40839,9 +40839,9 @@
       "source_location": "L51",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_setinventory",
-      "target": "inventory"
+      "target": "inventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40850,9 +40850,9 @@
       "source_location": "L55",
       "weight": 1.0,
       "context": "return_type",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_getinventory",
-      "target": "inventory"
+      "target": "inventory",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -40861,9 +40861,9 @@
       "source_location": "L55",
       "weight": 1.0,
       "context": "attribute",
-      "confidence_score": 1.0,
       "source": "ui_tdmenuholder_tdmenuholder_getinventory",
-      "target": "src_main_java_com_pauljang_towerdefense_ui_tdmenuholder_java_override"
+      "target": "src_main_java_com_pauljang_towerdefense_ui_tdmenuholder_java_override",
+      "confidence_score": 1.0
     },
     {
       "relation": "documents",
@@ -42261,9 +42261,9 @@
       "source_file": "bug_fixing/CLAUDE.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_claude",
-      "target": "bug_fixing_claude_graphify"
+      "target": "bug_fixing_claude_graphify",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42271,9 +42271,9 @@
       "source_file": "bug_fixing/GEMINI.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini",
-      "target": "bug_fixing_gemini_graphify"
+      "target": "bug_fixing_gemini_graphify",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42461,9 +42461,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42471,9 +42471,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L5",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_1_concurrent_match_architecture"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_1_concurrent_match_architecture",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42481,9 +42481,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L11",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_2_dynamic_map_template_system"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_2_dynamic_map_template_system",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42491,9 +42491,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L17",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_3_matchmaking_voting_system"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_3_matchmaking_voting_system",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42501,9 +42501,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L22",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_4_single_player_wave_engine"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_4_single_player_wave_engine",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42511,9 +42511,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L28",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_5_streamlined_admin_tooling_template_editing"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_5_streamlined_admin_tooling_template_editing",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42521,9 +42521,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L39",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_6_map_creation_documentation"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_6_map_creation_documentation",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42531,9 +42531,9 @@
       "source_file": "bug_fixing/MULTI_MAP_AND_SINGLEPLAYER_UPDATE.md",
       "source_location": "L44",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_multi_map_and_singleplayer_update_tower_defense_multi_map_single_player_update_summary",
-      "target": "bug_fixing_multi_map_and_singleplayer_update_7_technical_integrity_bug_fixes"
+      "target": "bug_fixing_multi_map_and_singleplayer_update_7_technical_integrity_bug_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42541,9 +42541,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report",
-      "target": "bug_fixing_bug_report_bug_report_code_audit_fixes"
+      "target": "bug_fixing_bug_report_bug_report_code_audit_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42551,9 +42551,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L83",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_code_fixes"
+      "target": "bug_fixing_bug_report_code_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42561,9 +42561,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L5",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_issue_1_game_wasn_t_starting_after_timer_ended_missing_scoreboards_towers"
+      "target": "bug_fixing_bug_report_issue_1_game_wasn_t_starting_after_timer_ended_missing_scoreboards_towers",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42571,9 +42571,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L15",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_issue_2_player_allowed_to_queue_while_about_to_be_transported"
+      "target": "bug_fixing_bug_report_issue_2_player_allowed_to_queue_while_about_to_be_transported",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42581,9 +42581,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L32",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_issue_3_some_td_commands_broke_td_loadworld_td_unloadworld"
+      "target": "bug_fixing_bug_report_issue_3_some_td_commands_broke_td_loadworld_td_unloadworld",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42591,9 +42591,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L44",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_issue_4_copying_template_worlds_missing_plots_yml_waypoints_yml_in_match_folders"
+      "target": "bug_fixing_bug_report_issue_4_copying_template_worlds_missing_plots_yml_waypoints_yml_in_match_folders",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42601,9 +42601,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L69",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_issue_5_match_worlds_created_inside_lobby_dimensions_folder_not_deleting"
+      "target": "bug_fixing_bug_report_issue_5_match_worlds_created_inside_lobby_dimensions_folder_not_deleting",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42611,9 +42611,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L77",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_bug_report_code_audit_fixes",
-      "target": "bug_fixing_bug_report_issue_6_wand_outputs_hash_of_plot_when_creating_plots"
+      "target": "bug_fixing_bug_report_issue_6_wand_outputs_hash_of_plot_when_creating_plots",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42621,9 +42621,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L85",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_code_fixes",
-      "target": "bug_fixing_bug_report_fix_1_gamemanager_java_game_startup_placement_gui_and_deletions"
+      "target": "bug_fixing_bug_report_fix_1_gamemanager_java_game_startup_placement_gui_and_deletions",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42631,9 +42631,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L222",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_code_fixes",
-      "target": "bug_fixing_bug_report_fix_2_endmatch_file_lock_deletions_in_gamemanager_java"
+      "target": "bug_fixing_bug_report_fix_2_endmatch_file_lock_deletions_in_gamemanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42641,9 +42641,9 @@
       "source_file": "bug_fixing/bug_report.md",
       "source_location": "L279",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_bug_report_code_fixes",
-      "target": "bug_fixing_bug_report_fix_3_wandlistener_java_human_readable_plot_output"
+      "target": "bug_fixing_bug_report_fix_3_wandlistener_java_human_readable_plot_output",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42651,9 +42651,9 @@
       "source_file": "bug_fixing/game_updates.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_game_updates",
-      "target": "bug_fixing_game_updates_tower_defense_game_updates_fixes"
+      "target": "bug_fixing_game_updates_tower_defense_game_updates_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42661,9 +42661,9 @@
       "source_file": "bug_fixing/game_updates.md",
       "source_location": "L16",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_game_updates_tower_defense_game_updates_fixes",
-      "target": "bug_fixing_game_updates_mob_fixes_balancing"
+      "target": "bug_fixing_game_updates_mob_fixes_balancing",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42671,9 +42671,9 @@
       "source_file": "bug_fixing/game_updates.md",
       "source_location": "L3",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_game_updates_tower_defense_game_updates_fixes",
-      "target": "bug_fixing_game_updates_player_interaction_changes"
+      "target": "bug_fixing_game_updates_player_interaction_changes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42681,9 +42681,9 @@
       "source_file": "bug_fixing/game_updates.md",
       "source_location": "L9",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_game_updates_tower_defense_game_updates_fixes",
-      "target": "bug_fixing_game_updates_tower_spell_fixes"
+      "target": "bug_fixing_game_updates_tower_spell_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42691,9 +42691,9 @@
       "source_file": "bug_fixing/game_updates.md",
       "source_location": "L25",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_game_updates_tower_defense_game_updates_fixes",
-      "target": "bug_fixing_game_updates_ui_match_flow_end_of_game"
+      "target": "bug_fixing_game_updates_ui_match_flow_end_of_game",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42701,9 +42701,9 @@
       "source_file": "bug_fixing/gemini-code-1781158577643.md",
       "source_location": "L13",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781158577643",
-      "target": "bug_fixing_gemini_code_1781158577643_critical_core_directive"
+      "target": "bug_fixing_gemini_code_1781158577643_critical_core_directive",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42711,9 +42711,9 @@
       "source_file": "bug_fixing/gemini-code-1781158577643.md",
       "source_location": "L5",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781158577643",
-      "target": "bug_fixing_gemini_code_1781158577643_graphify_execution_directive"
+      "target": "bug_fixing_gemini_code_1781158577643_graphify_execution_directive",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42721,9 +42721,9 @@
       "source_file": "bug_fixing/gemini-code-1781158577643.md",
       "source_location": "L19",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781158577643",
-      "target": "bug_fixing_gemini_code_1781158577643_step_1_graph_based_bug_hunting_state_management"
+      "target": "bug_fixing_gemini_code_1781158577643_step_1_graph_based_bug_hunting_state_management",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42731,9 +42731,9 @@
       "source_file": "bug_fixing/gemini-code-1781158577643.md",
       "source_location": "L31",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781158577643",
-      "target": "bug_fixing_gemini_code_1781158577643_step_2_performance_tick_loop_optimization"
+      "target": "bug_fixing_gemini_code_1781158577643_step_2_performance_tick_loop_optimization",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42741,9 +42741,9 @@
       "source_file": "bug_fixing/gemini-code-1781158577643.md",
       "source_location": "L41",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781158577643",
-      "target": "bug_fixing_gemini_code_1781158577643_step_3_refactoring_delivery_format"
+      "target": "bug_fixing_gemini_code_1781158577643_step_3_refactoring_delivery_format",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42751,9 +42751,9 @@
       "source_file": "bug_fixing/gemini-code-1781158577643.md",
       "source_location": "L44",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781158577643_step_3_refactoring_delivery_format",
-      "target": "bug_fixing_gemini_code_1781158577643_file_name_class_method_name"
+      "target": "bug_fixing_gemini_code_1781158577643_file_name_class_method_name",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42761,9 +42761,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176",
-      "target": "bug_fixing_gemini_code_1781235681176_tower_defense_code_review_optimization_report"
+      "target": "bug_fixing_gemini_code_1781235681176_tower_defense_code_review_optimization_report",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42771,9 +42771,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L7",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_tower_defense_code_review_optimization_report",
-      "target": "bug_fixing_gemini_code_1781235681176_1_performance_server_lag_tps_optimizations"
+      "target": "bug_fixing_gemini_code_1781235681176_1_performance_server_lag_tps_optimizations",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42781,9 +42781,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L29",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_tower_defense_code_review_optimization_report",
-      "target": "bug_fixing_gemini_code_1781235681176_2_architecture_oop_code_smells"
+      "target": "bug_fixing_gemini_code_1781235681176_2_architecture_oop_code_smells",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42791,9 +42791,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L45",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_tower_defense_code_review_optimization_report",
-      "target": "bug_fixing_gemini_code_1781235681176_3_safety_bukkit_api_practices"
+      "target": "bug_fixing_gemini_code_1781235681176_3_safety_bukkit_api_practices",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42801,9 +42801,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L19",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_1_performance_server_lag_tps_optimizations",
-      "target": "bug_fixing_gemini_code_1781235681176_expensive_entity_lookups_towermanager_java"
+      "target": "bug_fixing_gemini_code_1781235681176_expensive_entity_lookups_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42811,9 +42811,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L13",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_1_performance_server_lag_tps_optimizations",
-      "target": "bug_fixing_gemini_code_1781235681176_heavy_ticker_operations_towermanager_java"
+      "target": "bug_fixing_gemini_code_1781235681176_heavy_ticker_operations_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42821,9 +42821,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L23",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_1_performance_server_lag_tps_optimizations",
-      "target": "bug_fixing_gemini_code_1781235681176_reflection_overhead"
+      "target": "bug_fixing_gemini_code_1781235681176_reflection_overhead",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42831,9 +42831,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L9",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_1_performance_server_lag_tps_optimizations",
-      "target": "bug_fixing_gemini_code_1781235681176_synchronous_world_cloning_gamemanager_java"
+      "target": "bug_fixing_gemini_code_1781235681176_synchronous_world_cloning_gamemanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42841,9 +42841,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L39",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_2_architecture_oop_code_smells",
-      "target": "bug_fixing_gemini_code_1781235681176_blatant_code_duplication"
+      "target": "bug_fixing_gemini_code_1781235681176_blatant_code_duplication",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42851,9 +42851,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L31",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_2_architecture_oop_code_smells",
-      "target": "bug_fixing_gemini_code_1781235681176_data_fragmentation_gamemanager_java"
+      "target": "bug_fixing_gemini_code_1781235681176_data_fragmentation_gamemanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42861,9 +42861,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L35",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_2_architecture_oop_code_smells",
-      "target": "bug_fixing_gemini_code_1781235681176_telescoping_methods_mobmanager_java"
+      "target": "bug_fixing_gemini_code_1781235681176_telescoping_methods_mobmanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42871,9 +42871,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L47",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_3_safety_bukkit_api_practices",
-      "target": "bug_fixing_gemini_code_1781235681176_inventory_title_matching_moblistener_java"
+      "target": "bug_fixing_gemini_code_1781235681176_inventory_title_matching_moblistener_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42881,9 +42881,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L55",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_3_safety_bukkit_api_practices",
-      "target": "bug_fixing_gemini_code_1781235681176_magic_strings_for_state"
+      "target": "bug_fixing_gemini_code_1781235681176_magic_strings_for_state",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -42891,9 +42891,9 @@
       "source_file": "bug_fixing/gemini-code-1781235681176.md",
       "source_location": "L51",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_gemini_code_1781235681176_3_safety_bukkit_api_practices",
-      "target": "bug_fixing_gemini_code_1781235681176_particle_flooding_gamemanager_java"
+      "target": "bug_fixing_gemini_code_1781235681176_particle_flooding_gamemanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43241,9 +43241,9 @@
       "source_file": "bug_fixing/tower_defense_code_fixes_batch6.md",
       "source_location": "L33",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_code_fixes_batch6_tower_defense_plugin_comprehensive_bug_fixes_polish_batch_6",
-      "target": "bug_fixing_tower_defense_code_fixes_batch6_3_chorus_tower_teleportation_fail"
+      "target": "bug_fixing_tower_defense_code_fixes_batch6_3_chorus_tower_teleportation_fail",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43401,9 +43401,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments",
-      "target": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes"
+      "target": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43481,9 +43481,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L7",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_1_towers_yaml_updates"
+      "target": "bug_fixing_tower_defense_final_adjustments_1_towers_yaml_updates",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43491,9 +43491,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L152",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_2_towerconfigmanager_java_updates"
+      "target": "bug_fixing_tower_defense_final_adjustments_2_towerconfigmanager_java_updates",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43501,9 +43501,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L200",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_3_gui_updates_in_towermanager_java"
+      "target": "bug_fixing_tower_defense_final_adjustments_3_gui_updates_in_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43511,9 +43511,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L263",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_4_dripstone_mechanics_in_towermanager_java"
+      "target": "bug_fixing_tower_defense_final_adjustments_4_dripstone_mechanics_in_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43521,9 +43521,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L388",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_5_turret_bombardier_fixes_in_towermanager_java"
+      "target": "bug_fixing_tower_defense_final_adjustments_5_turret_bombardier_fixes_in_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43531,9 +43531,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L471",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_6_beehive_mechanics_in_towermanager_java"
+      "target": "bug_fixing_tower_defense_final_adjustments_6_beehive_mechanics_in_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43541,9 +43541,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments.md",
       "source_location": "L552",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_tower_defense_final_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_final_adjustments_7_5x5_tower_placement_validation_in_towermanager_java"
+      "target": "bug_fixing_tower_defense_final_adjustments_7_5x5_tower_placement_validation_in_towermanager_java",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43551,9 +43551,9 @@
       "source_file": "bug_fixing/tower_defense_final_adjustments_v5.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_final_adjustments_v5",
-      "target": "bug_fixing_tower_defense_final_adjustments_v5_tower_defense_plugin_advanced_ui_pathing_and_entity_persistence_fixes"
+      "target": "bug_fixing_tower_defense_final_adjustments_v5_tower_defense_plugin_advanced_ui_pathing_and_entity_persistence_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43661,9 +43661,9 @@
       "source_file": "bug_fixing/tower_defense_fixes.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes",
-      "target": "bug_fixing_tower_defense_fixes_tower_defense_system_fixes_pathfinding_entity_management"
+      "target": "bug_fixing_tower_defense_fixes_tower_defense_system_fixes_pathfinding_entity_management",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43791,9 +43791,9 @@
       "source_file": "bug_fixing/tower_defense_fixes.md",
       "source_location": "L101",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_part_2_the_happy_ghast_initialization_fix",
-      "target": "bug_fixing_tower_defense_fixes_required_code_changes_101"
+      "target": "bug_fixing_tower_defense_fixes_required_code_changes_101",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43801,9 +43801,9 @@
       "source_file": "bug_fixing/tower_defense_fixes.md",
       "source_location": "L103",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_required_code_changes_101",
-      "target": "bug_fixing_tower_defense_fixes_fix_the_material_enum_towermanager_happyghast_initialization_class"
+      "target": "bug_fixing_tower_defense_fixes_fix_the_material_enum_towermanager_happyghast_initialization_class",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43831,9 +43831,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7",
-      "target": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes"
+      "target": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43841,9 +43841,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L7",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_fixes_batch7_1_towers_yaml_removing_level_4s"
+      "target": "bug_fixing_tower_defense_fixes_batch7_1_towers_yaml_removing_level_4s",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43851,9 +43851,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L66",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_fixes_batch7_2_general_tower_ticker_placement_emp_fixes"
+      "target": "bug_fixing_tower_defense_fixes_batch7_2_general_tower_ticker_placement_emp_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43861,9 +43861,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L107",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_fixes_batch7_3_dripstone_mechanics_syncing_full_block_waves_upside_down_fixes"
+      "target": "bug_fixing_tower_defense_fixes_batch7_3_dripstone_mechanics_syncing_full_block_waves_upside_down_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43871,9 +43871,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L255",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_fixes_batch7_4_turret_spread_bombardier_arcs_mines"
+      "target": "bug_fixing_tower_defense_fixes_batch7_4_turret_spread_bombardier_arcs_mines",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43881,9 +43881,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L378",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_fixes_batch7_5_beehive_updates"
+      "target": "bug_fixing_tower_defense_fixes_batch7_5_beehive_updates",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43891,9 +43891,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch7.md",
       "source_location": "L411",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch7_tower_defense_adjustments_fixes",
-      "target": "bug_fixing_tower_defense_fixes_batch7_6_chain_lightning_damage_buff"
+      "target": "bug_fixing_tower_defense_fixes_batch7_6_chain_lightning_damage_buff",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43901,9 +43901,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch8.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch8",
-      "target": "bug_fixing_tower_defense_fixes_batch8_tower_defense_adjustments_fixes"
+      "target": "bug_fixing_tower_defense_fixes_batch8_tower_defense_adjustments_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -43961,9 +43961,9 @@
       "source_file": "bug_fixing/tower_defense_fixes_batch9.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_fixes_batch9",
-      "target": "bug_fixing_tower_defense_fixes_batch9_tower_defense_adjustments_fixes"
+      "target": "bug_fixing_tower_defense_fixes_batch9_tower_defense_adjustments_fixes",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -44021,9 +44021,9 @@
       "source_file": "bug_fixing/tower_defense_polish_fixes.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_polish_fixes",
-      "target": "bug_fixing_tower_defense_polish_fixes_tower_defense_plugin_polish_critical_fixes_for_claude_code"
+      "target": "bug_fixing_tower_defense_polish_fixes_tower_defense_plugin_polish_critical_fixes_for_claude_code",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -44171,9 +44171,9 @@
       "source_file": "bug_fixing/tower_defense_update_2.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_tower_defense_update_2",
-      "target": "bug_fixing_tower_defense_update_2_tower_defense_system_updates_wave_gui_progression_balance"
+      "target": "bug_fixing_tower_defense_update_2_tower_defense_system_updates_wave_gui_progression_balance",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -44501,9 +44501,9 @@
       "source_file": "bug_fixing/ui_pathing_and_siege_combined.md",
       "source_location": "L1",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "bug_fixing_ui_pathing_and_siege_combined",
-      "target": "bug_fixing_ui_pathing_and_siege_combined_tower_defense_plugin_ui_pathing_castle_siege_polish"
+      "target": "bug_fixing_ui_pathing_and_siege_combined_tower_defense_plugin_ui_pathing_castle_siege_polish",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",

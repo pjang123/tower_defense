@@ -433,8 +433,8 @@ public class TowerManager {
                 + tower.getType().getDisplayName() + tower.getDisplayPathSuffix() + " " + tower.getRomanLevel());
         
         if (tower.getType() == TowerType.REDSTONE) {
-            lines.add(ChatColor.RED + "âœ¦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
-                      ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% âš¡");
+            lines.add(ChatColor.RED + "✦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
+                      ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% ⚡");
         } else {
             // ❤ DMG | ⚡  Speed | ✦ Range
             lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" +
@@ -1193,10 +1193,8 @@ public class TowerManager {
                     java.util.List<String> history = tdMob.getPathHistory();
                     java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph = tdMob.getWaypointGraph();
 
-                    plugin.getLogger().info("[CHORUS DEBUG] Tier: " + tower.getLevel() + ", BlocksBack: " + blocksBack + ", Current: " + currentLoc + ", History size: " + history.size());
 
                     if (history.isEmpty()) {
-                        plugin.getLogger().warning("[CHORUS DEBUG] History is empty, cannot teleport!");
                         return;
                     }
 
@@ -1205,7 +1203,6 @@ public class TowerManager {
                     // so the second-to-last entry is the waypoint the mob actually last passed through.
 
                     if (history.size() < 2) {
-                        plugin.getLogger().warning("[CHORUS DEBUG] Not enough history to teleport back!");
                         return;
                     }
 
@@ -1213,7 +1210,6 @@ public class TowerManager {
                     String lastPassedWpId = history.get(history.size() - 2);
                     com.pauljang.towerDefense.data.TDWaypoint lastPassedWp = graph.get(lastPassedWpId);
                     if (lastPassedWp == null) {
-                        plugin.getLogger().warning("[CHORUS DEBUG] Last passed waypoint not found!");
                         return;
                     }
 
@@ -1229,11 +1225,17 @@ public class TowerManager {
                     // Case 1: blocksBack is less than distance to last passed waypoint
                     // Mob stays on current segment (between lastPassed and current target)
                     if (remainingDist <= distToLastPassed) {
-                        org.bukkit.util.Vector direction = lastPassedLoc.toVector().subtract(currentLoc.toVector()).normalize();
+                        // Interpolate horizontally only. currentLoc may be well above the path (flying
+                        // mobs like the Breeze hover at a height offset), so we must NOT carry its Y into
+                        // teleportLoc — the later height-offset adjustment re-adds that elevation, which
+                        // otherwise compounds and launches flying mobs steadily upward on every cast.
+                        org.bukkit.util.Vector direction = lastPassedLoc.toVector().subtract(currentLoc.toVector());
+                        direction.setY(0);
+                        if (direction.lengthSquared() > 1.0e-6) direction.normalize();
                         teleportLoc = currentLoc.clone().add(direction.multiply(remainingDist));
+                        teleportLoc.setY(lastPassedLoc.getY()); // re-base onto the path's block level
                         // Mob is still on same segment, keep current target waypoint
                         newTargetWpId = history.get(history.size() - 1);
-                        plugin.getLogger().info("[CHORUS DEBUG] Interpolating on current segment, target stays: " + newTargetWpId);
                     } else {
                         // Case 2: Need to go back past the last waypoint
                         remainingDist -= distToLastPassed;
@@ -1256,7 +1258,6 @@ public class TowerManager {
                                 teleportLoc = walkbackLoc.clone().add(direction.multiply(remainingDist));
                                 // Mob is now between prevWp and currentWp, so it should target currentWp
                                 newTargetWpId = currentWpId;
-                                plugin.getLogger().info("[CHORUS DEBUG] Found target on segment between " + prevWpId + " and " + currentWpId + ", new target: " + newTargetWpId);
                                 break;
                             } else {
                                 // Keep going backwards
@@ -1273,13 +1274,11 @@ public class TowerManager {
                                 teleportLoc = firstWp.getLocation().clone();
                                 // If there's a waypoint after 0, target it; otherwise target 0
                                 newTargetWpId = history.size() > 1 ? history.get(1) : firstWpId;
-                                plugin.getLogger().info("[CHORUS DEBUG] Ran out of path, teleporting to waypoint 0, new target: " + newTargetWpId);
                             }
                         }
                     }
 
                     if (teleportLoc == null || newTargetWpId == null) {
-                        plugin.getLogger().warning("[CHORUS DEBUG] Could not calculate teleport location!");
                         return;
                     }
 
@@ -1311,7 +1310,6 @@ public class TowerManager {
                     target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, currentLoc, 15, 0.5, 0.5, 0.5, 0.1);
                     target.getWorld().playSound(currentLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
 
-                    plugin.getLogger().info("[CHORUS DEBUG] Teleporting from " + currentLoc + " to " + teleportLoc + " (distance: " + currentLoc.distance(teleportLoc) + " blocks)");
 
                     // Store the final teleport location
                     final Location finalTeleportLoc = teleportLoc;
@@ -1334,14 +1332,12 @@ public class TowerManager {
 
                         // Check if entity is still valid
                         if (!finalTarget.isValid() || finalTarget.isDead()) {
-                            plugin.getLogger().warning("[CHORUS DEBUG] Entity is dead/invalid, cannot teleport");
                             return;
                         }
 
                         // Check if destination is safe (not inside blocks)
                         org.bukkit.block.Block atFeet = finalTeleportLoc.getBlock();
                         org.bukkit.block.Block atHead = finalTeleportLoc.clone().add(0, 1, 0).getBlock();
-                        plugin.getLogger().info("[CHORUS DEBUG] Destination blocks - Feet: " + atFeet.getType() + ", Head: " + atHead.getType());
 
                         // FORCE teleport by removing and re-spawning at new location
                         // This bypasses all teleport checks and events
@@ -1358,13 +1354,11 @@ public class TowerManager {
                         org.bukkit.entity.EntityType vehicleType = null;
                         if (vehicle != null) {
                             vehicleType = vehicle.getType();
-                            plugin.getLogger().info("[CHORUS DEBUG] Mob has vehicle: " + vehicleType);
                         }
 
                         // Check that TDMob is in activeMobs before removing
                         boolean wasInList = plugin.getMobManager().removeActiveMob(finalTDMob);
                         if (!wasInList) {
-                            plugin.getLogger().warning("[CHORUS DEBUG] TDMob was not in activeMobs list!");
                         }
 
                         // Remove old entity and vehicle (but keep reference for copying data)
@@ -1396,7 +1390,6 @@ public class TowerManager {
                                     TDKeys.MOB,
                                     org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
                             }
-                            plugin.getLogger().info("[CHORUS DEBUG] Spawned new vehicle");
                         }
 
                         // Spawn new entity at target location
@@ -1406,7 +1399,6 @@ public class TowerManager {
                         // Mount the new entity on the new vehicle
                         if (newVehicle != null) {
                             newVehicle.addPassenger(newEntity);
-                            plugin.getLogger().info("[CHORUS DEBUG] Mounted entity on vehicle");
                         }
 
                         // Restore properties - use scoreboard team for collision instead of setCollidable
@@ -1426,7 +1418,12 @@ public class TowerManager {
                             org.bukkit.attribute.AttributeInstance newMaxHealthAttr = newEntity.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
                             if (newMaxHealthAttr != null) {
                                 newMaxHealthAttr.setBaseValue(maxHealth);
-                                newEntity.setHealth(health);
+                                // Guard against NaN / out-of-range carried health (a source of the
+                                // "had NaN health set" console spam), clamping into the valid [0, max] band.
+                                double safeHealth = health;
+                                double newMax = newMaxHealthAttr.getValue();
+                                if (Double.isNaN(safeHealth) || safeHealth <= 0.0) safeHealth = newMax;
+                                newEntity.setHealth(Math.min(safeHealth, newMax));
                             }
                         }
 
@@ -1498,9 +1495,7 @@ public class TowerManager {
                             entityField = finalTDMob.getClass().getDeclaredField("entity");
                             entityField.setAccessible(true);
                             entityField.set(finalTDMob, newEntity);
-                            plugin.getLogger().info("[CHORUS DEBUG] Successfully updated TDMob entity reference");
                         } catch (Exception e) {
-                            plugin.getLogger().severe("[CHORUS DEBUG] Failed to update TDMob entity: " + e.getMessage());
                             e.printStackTrace();
                             // If reflection fails, the mob will be lost - clean up new entity
                             newEntity.remove();
@@ -1518,16 +1513,13 @@ public class TowerManager {
                         }
                         finalTDMob.setPathHistory(newHistory);
                         finalTDMob.setCurrentWaypointId(finalNewTargetWpId);
-                        plugin.getLogger().info("[CHORUS DEBUG] Updated waypoint state - target: " + finalNewTargetWpId + ", history size: " + newHistory.size());
 
                         // Re-add to active mobs - CRITICAL for mob to continue existing
                         plugin.getMobManager().addActiveMob(finalTDMob);
-                        plugin.getLogger().info("[CHORUS DEBUG] Re-added TDMob to activeMobs list");
 
                         // Update health bar
                         plugin.getMobManager().updateHealthBar(newEntity);
 
-                        plugin.getLogger().info("[CHORUS DEBUG] Force respawn successful, new location: " + newEntity.getLocation());
 
                         // Effects at destination
                         newEntity.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, finalTeleportLoc, 15, 0.5, 0.5, 0.5, 0.1);
@@ -1696,10 +1688,21 @@ public class TowerManager {
                     int arrows = plugin.getTowerConfigManager().getStat(TowerType.TURRET, tower.getPathId(), tower.getLevel(), "arrows", 5);
                     double damage = tower.getDamage();
 
-                    // Spawn arrows from above the top of the tower so they clear the build's collision
-                    // box instead of pushing the origin horizontally into adjacent blocks.
-                    double topHeight = (tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 3) + 0.5;
-                    Location safeStart = tower.getCenterLocation().clone().add(0, topHeight, 0);
+                    // Spawn arrows from above the top of the tower AND pushed horizontally out past the
+                    // structure's footprint toward the target, so they never clip the tower's own blocks
+                    // (which made spent arrows stick to the build).
+                    double topHeight = (tower.getStructureSize() != null ? tower.getStructureSize().getBlockY() : 3) + 1.0;
+                    Location towerTop = tower.getCenterLocation().clone().add(0, topHeight, 0);
+
+                    // Horizontal aim direction (flatten Y) used to clear the footprint before re-aiming in 3D.
+                    org.bukkit.util.Vector flatDir = target.getLocation().toVector().subtract(towerTop.toVector());
+                    flatDir.setY(0);
+                    if (flatDir.lengthSquared() < 1.0e-4) flatDir = new org.bukkit.util.Vector(0, 0, 1);
+                    flatDir.normalize();
+
+                    int structureWidth = tower.getStructureSize() != null ? tower.getStructureSize().getBlockX() : 5;
+                    double clearOut = (structureWidth / 2.0) + 1.0;
+                    Location safeStart = towerTop.clone().add(flatDir.clone().multiply(clearOut));
 
                     org.bukkit.util.Vector dir = target.getEyeLocation().toVector().subtract(safeStart.toVector()).normalize();
 
@@ -1813,6 +1816,14 @@ public class TowerManager {
                 }
 
                 Location current = fallingSpike.getLocation();
+                // If the spike's world was torn down (e.g. the match ended mid-fall) its location can be
+                // invalid; bail out rather than teleporting to a NaN position.
+                if (current.getWorld() == null
+                        || Double.isNaN(current.getX()) || Double.isNaN(current.getY()) || Double.isNaN(current.getZ())) {
+                    fallingSpike.remove();
+                    this.cancel();
+                    return;
+                }
                 current.subtract(0, 0.4, 0);
                 fallingSpike.teleport(current);
 

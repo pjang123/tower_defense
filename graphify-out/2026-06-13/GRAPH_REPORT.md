@@ -1,11 +1,11 @@
 # Graph Report - Tower Defense  (2026-06-13)
 
 ## Corpus Check
-- 63 files · ~85,110 words
+- 63 files · ~85,248 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1291 nodes · 3092 edges · 75 communities (65 shown, 10 thin omitted)
+- 1291 nodes · 3092 edges · 76 communities (66 shown, 10 thin omitted)
 - Extraction: 70% EXTRACTED · 30% INFERRED · 0% AMBIGUOUS · INFERRED: 927 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -56,6 +56,7 @@
 - [[_COMMUNITY_Claude V2 Update|Claude V2 Update]]
 - [[_COMMUNITY_Project Structure|Project Structure]]
 - [[_COMMUNITY_Preliminary Balancing|Preliminary Balancing]]
+- [[_COMMUNITY_Waypoint Traversal|Waypoint Traversal]]
 - [[_COMMUNITY_Mob Types|Mob Types]]
 - [[_COMMUNITY_Architecture Overview|Architecture Overview]]
 - [[_COMMUNITY_Wave GUI & Warden Fixes|Wave GUI & Warden Fixes]]
@@ -101,6 +102,8 @@
 10. `TDMob` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `TowerConfigManager.java` --used_by--> `TowerManager.java`  [INFERRED]
+  bug_fixing/tower_defense_final_adjustments.md → PROJECT_STRUCTURE.md
 - `Graphify-Based Architecture Audit Directive` --conceptually_related_to--> `Graphify PreToolUse Enforcement Hook`  [INFERRED]
   gemini-code-1781158577643.md → .claude/settings.json
 - `Dripstone 3D BlockDisplay Rendering` --semantically_similar_to--> `Dripstone Strike Impact-Synced Damage (ArmorStand)`  [INFERRED] [semantically similar]
@@ -109,8 +112,6 @@
   tower_defense_fixes_batch8.md → tower_defense_fixes_batch7.md
 - `Dripstone Hazards As Dynamic Landmines (Ticker)` --semantically_similar_to--> `Bombardier Arc & Landmine Triggers`  [INFERRED] [semantically similar]
   tower_defense_fixes_batch9.md → tower_defense_fixes_batch7.md
-- `Beehive Unique-Target Assignment & Sounds` --semantically_similar_to--> `Beehive Swarm I-Frame Clearing`  [INFERRED] [semantically similar]
-  tower_defense_fixes_batch8.md → tower_defense_fixes_batch7.md
 
 ## Import Cycles
 - None detected.
@@ -120,7 +121,7 @@
 - **Beehive Swarm Targeting Fix Progression** — tower_defense_fixes_batch7_beehive_iframes, tower_defense_fixes_batch8_beehive_targeting, tower_defense_fixes_batch9_beehive_slab_timeout, towers_beehive [INFERRED 0.80]
 - **Match World Lifecycle State & File-Lock Bug Cluster** — bug_report_issue1_game_not_starting, bug_report_issue4_template_plots_waypoints, bug_report_issue5_match_world_dimensions_folder, bug_report_world_file_lock_cleanup [INFERRED 0.80]
 
-## Communities (75 total, 10 thin omitted)
+## Communities (76 total, 10 thin omitted)
 
 ### Community 0 - "Tower Placement & Mob Movement"
 Cohesion: 0.05
@@ -199,8 +200,8 @@ Cohesion: 0.13
 Nodes (20): 1. `towers.yaml` Updates, 2. `TowerConfigManager.java` Updates, 3. GUI Updates in `TowerManager.java`, 4. Dripstone Mechanics in `TowerManager.java`, 5. Turret & Bombardier Fixes in `TowerManager.java`, 6. Beehive Mechanics in `TowerManager.java`, 7. 5x5 Tower Placement Validation in `TowerManager.java`, Tower Defense Final Adjustments & Fixes (+12 more)
 
 ### Community 20 - "Project Summary"
-Cohesion: 0.14
-Nodes (14): 1. Newly Implemented Features, 2. Code Modifications, 3. Server Directory & Troubleshooting, Directory Structure, [GameManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/GameManager.java), Golem Tower (5x5 Size), Happy Ghast Tower (5x5 Size), Hotbar Offhand Protection (+6 more)
+Cohesion: 0.12
+Nodes (16): 1. Newly Implemented Features, 2. Code Modifications, 3. Server Directory & Troubleshooting, Directory Structure, [GameManager.java](file:///C:/Users/pjang/IdeaProjects/Tower%20Defense/src/main/java/com/pauljang/towerDefense/core/GameManager.java), Golem Tower (5x5), Golem Tower (5x5 Size), Happy Ghast Tower (5x5) (+8 more)
 
 ### Community 21 - "Preset Mob Types"
 Cohesion: 0.17
@@ -239,8 +240,8 @@ Cohesion: 0.23
 Nodes (8): ChatColor, Material, String, getBaseMaterial(), getColor(), getDisplayName(), getMiddleMaterial(), TowerType()
 
 ### Community 30 - "Towers Reference Doc"
-Cohesion: 0.15
-Nodes (13): 1. Archer Tower (`archer`), 2. Fire Tower (`fire`), 3. Prismarine Tower (`prismarine`), 4. Chorus Tower (`chorus`), 5. Redstone Tower (`redstone`), 6. Poison Tower (`poison`), 7. Ice Tower (`ice`), Fire Tower (+5 more)
+Cohesion: 0.25
+Nodes (8): 1. Archer Tower (`archer`), 2. Fire Tower (`fire`), 3. Prismarine Tower (`prismarine`), 4. Chorus Tower (`chorus`), 5. Redstone Tower (`redstone`), 6. Poison Tower (`poison`), 7. Ice Tower (`ice`), Tower Defense: Tower Reference Guide
 
 ### Community 31 - "Branching Tower Paths"
 Cohesion: 0.20
@@ -271,12 +272,16 @@ Cohesion: 0.17
 Nodes (11): 10. CSV Adjustments (mob_upgrades_polymorphic.csv), 1. Queueing Mechanics & Mixed Mob Levels, 2. Universal Velocity Movement & Collision, 3. Spell Cooldowns & Dynamic Cost Scaling, 4. Spell Adjustments (Overcharge & Freeze), 5. Mob Immunities & Status Display Fixes, 6. Chorus Tower Teleportation & Visual Glitch Fix, 7. Tower Fixes (EMP) (+3 more)
 
 ### Community 39 - "Project Structure"
-Cohesion: 0.24
-Nodes (11): TowerConfigManager.java, SetupManager.java, TargetingMode.java (Enum), TDCommand.java, Tower.java (Instance Model), TowerManager.java, TowerType.java (Enum), WandListener.java (+3 more)
+Cohesion: 0.43
+Nodes (7): SetupManager.java, TargetingMode.java (Enum), TDCommand.java, Tower.java (Instance Model), TowerManager.java, TowerType.java (Enum), WandListener.java
 
 ### Community 40 - "Preliminary Balancing"
 Cohesion: 0.17
 Nodes (11): 1. Mob Statistics, Costs, & Rewards, 2. Player Upgrades & Shops, 3. Tower Progression Balances, Melee Sword Upgrades, Mob Statistics & Rewards, Passive Gold Generator, Permanent Splash Potion Purchases, Player Upgrades (Sword/Bow/Gold Generator) (+3 more)
+
+### Community 41 - "Waypoint Traversal"
+Cohesion: 0.33
+Nodes (6): Archer Tower, Fire Tower, Ice Tower (Freeze), Poison Tower, Prismarine Tower (Slow), Redstone Tower (Speed Boost)
 
 ### Community 42 - "Mob Types"
 Cohesion: 0.20
@@ -303,8 +308,8 @@ Cohesion: 0.36
 Nodes (8): bug_fixing/tower_defense_code_fixes_batch6.md, Happy Ghast Harness Fix (RED_HARNESS/BLUE_HARNESS), Velocity Branch Fix (setAI removal), bug_fixing/tower_defense_fixes.md, MobListener.java, MobManager.java, TDMob.java, Mob Movement Architecture (Velocity vs Pathfinder)
 
 ### Community 48 - "Branching Path Towers"
-Cohesion: 0.46
-Nodes (8): bug_fixing/tower_defense_final_adjustments.md, Beehive Tower (Goliath/Swarm paths), Bombardier Tower (BiggerBombs/Landmines paths), Branching Path Tower System, Dripstone Tower, bug_fixing/tower_agent_specification.md, Thunder Tower, Turret Tower (Gatling/Scatter paths)
+Cohesion: 0.39
+Nodes (9): bug_fixing/tower_defense_final_adjustments.md, TowerConfigManager.java, Beehive Tower (Goliath/Swarm paths), Bombardier Tower (BiggerBombs/Landmines paths), Branching Path Tower System, Dripstone Tower, bug_fixing/tower_agent_specification.md, Thunder Tower (+1 more)
 
 ### Community 49 - "Active Match Tracking"
 Cohesion: 0.17

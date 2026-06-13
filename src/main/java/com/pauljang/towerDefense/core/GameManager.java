@@ -30,6 +30,10 @@ public class GameManager {
     // Concurrent match management
     private final Map<UUID, Match> activeMatches = new HashMap<>();
     private final Map<UUID, Match> playerToMatch = new HashMap<>();
+    // Match ids whose end-of-game sequence has already fired / whose world teardown has run, so the
+    // splash + stats display and world deletion each happen exactly once.
+    private final java.util.Set<UUID> finishedMatches = new java.util.HashSet<>();
+    private final java.util.Set<UUID> tornDownMatches = new java.util.HashSet<>();
 
     // Map of player UUID -> (upgrade chain -> tier)
     private final Map<UUID, Map<String, Integer>> playerMobTiers = new HashMap<>();
@@ -304,6 +308,7 @@ public class GameManager {
                 // but nothing actually runs — the "game never starts" symptom.
                 currentState = GameState.ACTIVE;
                 matchStartTime = System.currentTimeMillis();
+                match.setStartTimeMillis(matchStartTime);
 
                 // Show the castle HUD now the match is live. The new per-match startMatch flow never
                 // called these (only the legacy handleGameStart did), so the boss bar and castle
@@ -392,6 +397,22 @@ public class GameManager {
                 updateBossBar();
                 updateCastleHologram("1");
                 updateCastleHologram("2");
+
+                // Damage Storm: while the spell is active on a track, scorch every mob on it once per
+                // second. Previously the spell only spawned particles and dealt no damage at all.
+                double stormDps = plugin.getConfig().getDouble("spells.damage-storm.damage-per-second", 2.0);
+                for (String arena : new String[]{"1", "2"}) {
+                    if (!isSpellActive(arena, "DAMAGE_STORM")) continue;
+                    for (com.pauljang.towerDefense.entities.TDMob tdMob : plugin.getMobManager().getActiveMobs()) {
+                        org.bukkit.entity.Mob mob = tdMob.getEntity();
+                        if (mob == null || mob.isDead() || !mob.isValid()) continue;
+                        if (!arena.equals(tdMob.getArena())) continue;
+                        mob.setNoDamageTicks(0);
+                        mob.damage(stormDps);
+                        mob.getWorld().spawnParticle(org.bukkit.Particle.FLAME,
+                                mob.getLocation().add(0, 0.6, 0), 6, 0.25, 0.4, 0.25, 0.02);
+                    }
+                }
             }
             updateTabNames();
         }, 0L, 20L);
@@ -1308,7 +1329,148 @@ public class GameManager {
     }
 
     private void handleMatchEnd(Match match) {
-        endMatch(match);
+        if (match == null) return;
+        if (!finishedMatches.add(match.getMatchId())) return; // already handled
+
+        match.setEndTimeMillis(System.currentTimeMillis());
+        long durationSec = getMatchElapsedSeconds(match);
+        boolean singlePlayer = match.getMapData().isSinglePlayer();
+
+        // The losing castle is the one that hit 0; the other arena wins. (Single-player has no winner —
+        // the lone defender's castle fell.)
+        String winnerArena = match.getArenaHealth().getOrDefault("1", maxCastleHealth) > 0 ? "1" : "2";
+
+        // Stop spawning so the world goes quiet during the post-game screen, but keep it loaded.
+        plugin.getWaveManager().stopWaves(match);
+
+        // Build the team rosters for the chat summary.
+        java.util.List<String> blueNames = new java.util.ArrayList<>();
+        java.util.List<String> redNames = new java.util.ArrayList<>();
+        for (UUID id : match.getPlayers()) {
+            String name = Bukkit.getOfflinePlayer(id).getName();
+            if (name == null) name = id.toString().substring(0, 8);
+            if ("1".equals(match.getPlayerArenas().getOrDefault(id, "1"))) blueNames.add(name);
+            else redNames.add(name);
+        }
+
+        for (UUID id : match.getPlayers()) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            String arena = match.getPlayerArenas().getOrDefault(id, "1");
+            boolean won = !singlePlayer && arena.equals(winnerArena);
+
+            // 1) Winner / loser splash screen.
+            if (singlePlayer) {
+                int wave = plugin.getWaveManager().getCurrentWave(match);
+                p.sendTitle(ChatColor.RED + "" + ChatColor.BOLD + "GAME OVER",
+                        ChatColor.GRAY + "Your castle has fallen on wave " + wave, 10, 80, 20);
+                p.playSound(p.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.6f, 1.0f);
+            } else if (won) {
+                p.sendTitle(ChatColor.GREEN + "" + ChatColor.BOLD + "VICTORY!",
+                        ChatColor.YELLOW + "Your castle stood strong!", 10, 80, 20);
+                p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+            } else {
+                p.sendTitle(ChatColor.RED + "" + ChatColor.BOLD + "DEFEAT",
+                        ChatColor.GRAY + "Your castle has fallen!", 10, 80, 20);
+                p.playSound(p.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.6f, 1.0f);
+            }
+
+            // 2) Match summary in chat: team rosters + duration.
+            p.sendMessage("");
+            p.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "============ MATCH OVER ============");
+            if (!singlePlayer) {
+                p.sendMessage(ChatColor.YELLOW + "Winner: "
+                        + ("1".equals(winnerArena) ? ChatColor.BLUE + "BLUE Team" : ChatColor.RED + "RED Team"));
+            }
+            p.sendMessage(ChatColor.GRAY + "Duration: " + ChatColor.WHITE + formatDuration(durationSec));
+            p.sendMessage(ChatColor.BLUE + "Blue Team: " + ChatColor.WHITE
+                    + (blueNames.isEmpty() ? "—" : String.join(", ", blueNames)));
+            if (!singlePlayer) {
+                p.sendMessage(ChatColor.RED + "Red Team: " + ChatColor.WHITE
+                        + (redNames.isEmpty() ? "—" : String.join(", ", redNames)));
+            }
+
+            // 3) Personal stats.
+            int spawned = match.getMobsSpawned().getOrDefault(id, 0);
+            int killed = match.getMobsKilled().getOrDefault(id, 0);
+            double dmg = match.getDamageDealt().getOrDefault(id, 0.0);
+            int goldEarned = match.getTotalGoldEarned().getOrDefault(id, 0);
+            int xpEarned = match.getTotalExpEarned().getOrDefault(id, 0);
+            p.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + "Your Stats:");
+            p.sendMessage(ChatColor.GRAY + " • Mobs spawned: " + ChatColor.WHITE + spawned);
+            p.sendMessage(ChatColor.GRAY + " • Mobs killed: " + ChatColor.WHITE + killed
+                    + ChatColor.GRAY + " (" + String.format("%.1f", dmg) + " damage dealt)");
+            p.sendMessage(ChatColor.GRAY + " • Total Gold earned: " + ChatColor.GOLD + goldEarned);
+            p.sendMessage(ChatColor.GRAY + " • Total XP gained: " + ChatColor.GREEN + xpEarned);
+            p.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "===================================");
+            p.sendMessage(ChatColor.YELLOW + "Click the " + ChatColor.GOLD + "compass"
+                    + ChatColor.YELLOW + " to return to the lobby.");
+
+            // 4) Do NOT kick the player out. Swap their game items for a single return-to-lobby compass.
+            p.getInventory().clear();
+            p.getInventory().remove(Material.ARROW);
+            p.setFireTicks(0);
+            for (org.bukkit.potion.PotionEffect effect : p.getActivePotionEffects()) {
+                p.removePotionEffect(effect.getType());
+            }
+            p.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            p.setAllowFlight(true);
+            p.getInventory().setItem(4, createReturnToLobbyCompass());
+        }
+
+        // Safety net: if players linger in the dead match world, tear it down automatically after 2
+        // minutes so the cloned world can't leak. Players who click the compass leave sooner.
+        final UUID matchId = match.getMatchId();
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Match m = activeMatches.get(matchId);
+            if (m != null) endMatch(m);
+        }, 20L * 120L);
+    }
+
+    /** A compass that returns a player from a finished match to the lobby (recognised by isLobbyCompass). */
+    public org.bukkit.inventory.ItemStack createReturnToLobbyCompass() {
+        org.bukkit.inventory.ItemStack compass = new org.bukkit.inventory.ItemStack(Material.COMPASS);
+        org.bukkit.inventory.meta.ItemMeta meta = compass.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.RED + "" + ChatColor.BOLD + "Return to Lobby");
+            java.util.List<String> lore = new java.util.ArrayList<>();
+            lore.add(ChatColor.GRAY + "Click to leave the match and return to the lobby.");
+            meta.setLore(lore);
+            compass.setItemMeta(meta);
+        }
+        return compass;
+    }
+
+    /**
+     * Sends a single player from a finished match back to the lobby (compass click). Once the last
+     * player has left the match world, the match is fully torn down.
+     */
+    public void returnToLobbyFromMatch(Player player) {
+        Match match = playerToMatch.get(player.getUniqueId());
+        org.bukkit.World lobby = Bukkit.getWorld("lobby_world");
+        Location lobbySpawn = lobby != null ? lobby.getSpawnLocation() : Bukkit.getWorlds().get(0).getSpawnLocation();
+
+        playerToMatch.remove(player.getUniqueId());
+        playerScoreboards.remove(player.getUniqueId());
+        player.teleport(lobbySpawn);
+        player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+        player.setAllowFlight(true);
+        giveLobbyItems(player);
+        player.sendMessage(ChatColor.YELLOW + "You have returned to the lobby.");
+
+        // If nobody is left in the match world, finish tearing it down.
+        if (match != null) {
+            boolean anyoneLeft = false;
+            for (UUID id : match.getPlayers()) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null && p.isOnline() && p.getWorld().equals(match.getWorld())) {
+                    anyoneLeft = true;
+                    break;
+                }
+            }
+            if (!anyoneLeft) endMatch(match);
+        }
     }
 
     /**
@@ -1319,6 +1481,7 @@ public class GameManager {
      */
     public void endMatch(Match match) {
         if (match == null) return;
+        if (!tornDownMatches.add(match.getMatchId())) return; // teardown already ran for this match
 
         activeMatches.remove(match.getMatchId());
         plugin.getWaveManager().stopWaves(match);
@@ -1691,7 +1854,8 @@ public class GameManager {
         if (match != null) {
             int current = match.getPlayerGold().getOrDefault(uuid, 0);
             match.getPlayerGold().put(uuid, current + amount);
-            
+            if (amount > 0) match.getTotalGoldEarned().merge(uuid, amount, Integer::sum);
+
             if (!silent) {
                 pendingGold.merge(uuid, amount, Integer::sum);
                 Player player = Bukkit.getPlayer(uuid);
@@ -1727,6 +1891,7 @@ public class GameManager {
         if (match != null) {
             int current = match.getPlayerExp().getOrDefault(uuid, 0);
             match.getPlayerExp().put(uuid, current + amount);
+            if (amount > 0) match.getTotalExpEarned().merge(uuid, amount, Integer::sum);
 
             pendingExp.merge(uuid, amount, Integer::sum);
             Player player = Bukkit.getPlayer(uuid);
@@ -2216,6 +2381,7 @@ public class GameManager {
 
         java.util.List<String> lines = new java.util.ArrayList<>();
         lines.add(sep);
+        lines.add(ChatColor.GRAY + "Time: " + ChatColor.WHITE + formatDuration(getMatchElapsedSeconds(match)));
         lines.add(ChatColor.GRAY + "Team: " + teamLabel);
         lines.add(ChatColor.GOLD + "Gold: " + ChatColor.WHITE + "$" + getGold(uuid));
         lines.add(ChatColor.GREEN + "EXP: " + ChatColor.WHITE + getExp(uuid) + " XP");
@@ -2287,6 +2453,41 @@ public class GameManager {
         bar.append(ChatColor.DARK_GRAY);
         for (int i = filled; i < totalBars; i++) bar.append("■");
         return bar.toString();
+    }
+
+    /** Elapsed seconds since the match started (0 before the start time is set). */
+    public long getMatchElapsedSeconds(Match match) {
+        if (match == null || match.getStartTimeMillis() <= 0L) return 0L;
+        long end = match.getEndTimeMillis() > 0L ? match.getEndTimeMillis() : System.currentTimeMillis();
+        return Math.max(0L, (end - match.getStartTimeMillis()) / 1000L);
+    }
+
+    /** Formats a duration in seconds as M:SS (or H:MM:SS past an hour). */
+    public String formatDuration(long totalSeconds) {
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        }
+        return String.format("%d:%02d", minutes, seconds);
+    }
+
+    // --- End-of-game stat tracking (per match, per player) ---
+
+    public void recordMobSpawned(java.util.UUID uuid, int count) {
+        Match match = playerToMatch.get(uuid);
+        if (match != null) match.getMobsSpawned().merge(uuid, count, Integer::sum);
+    }
+
+    public void recordMobKilled(java.util.UUID uuid) {
+        Match match = playerToMatch.get(uuid);
+        if (match != null) match.getMobsKilled().merge(uuid, 1, Integer::sum);
+    }
+
+    public void recordDamageDealt(java.util.UUID uuid, double amount) {
+        Match match = playerToMatch.get(uuid);
+        if (match != null) match.getDamageDealt().merge(uuid, amount, Double::sum);
     }
 
     public void updateTabNames() {

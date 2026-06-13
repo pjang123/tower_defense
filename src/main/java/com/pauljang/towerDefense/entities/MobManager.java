@@ -316,15 +316,17 @@ public class MobManager {
         boolean fireImmune = profile.getEntityType() == EntityType.BLAZE
                 || profile.getEntityType() == EntityType.WITHER_SKELETON
                 || profile.getSpecialMechanics().toLowerCase().contains("fire resistant");
-        // Flying mobs dodge ground-based slow effects; mobs with an ICE/SLOW immunity (e.g. Warden)
-        // also fully resist Freeze spells and Ice Towers.
-        boolean slowImmune = isFlying
-                || profile.getImmunities().contains("ICE")
-                || profile.getImmunities().contains("SLOW");
+        // Ice-tower (freeze) immunity and Prismarine (slow) immunity are independent. A mob immune to
+        // ICE resists the Ice Tower / Freeze, while SLOW immunity resists the Prismarine slow. e.g. a
+        // Blaze (ICE only) is frozen-proof but can still be slowed by Prismarine, and a Breeze (neither)
+        // is affected by both.
+        boolean freezeImmune = profile.getImmunities().contains("ICE");
+        boolean prismarineImmune = profile.getImmunities().contains("SLOW");
 
-        // Kill gold reward = 10% of spawn price, minimum 1
-        int killGold = Math.max(1, (int) (profile.getPrice() / 10.0));
-        int xpReward = profile.getExpReward();
+        // Kill gold reward = 20% of spawn price, minimum 2 (buffed from 10%/1 to reward defending).
+        int killGold = Math.max(2, (int) (profile.getPrice() / 5.0));
+        // XP awarded to the sender, buffed 50% over the base CSV payout.
+        int xpReward = Math.max(1, (int) Math.round(profile.getExpReward() * 1.5));
 
         // presetKey drives height-offset config lookup; use "flying" for flying mobs
         String presetKey = isFlying ? chain : chain.replace(" ", "_");
@@ -337,9 +339,20 @@ public class MobManager {
             plugin.getConfig().set("mobs." + presetKey + ".height-offset", 5.0);
         }
 
+        // Pass immuneToSlow=false here so spawnMob doesn't blanket-set both immunity keys; we set the
+        // freeze and slow keys independently below. (spawnMob still applies the temporary SLOW_SHIELD
+        // sabotage blanket immunity on its own.)
         Mob entity = spawnMob(match, arena, profile.getEntityType(), profile.getSpeed(), profile.getHp(),
-                0.0, slowImmune, fireImmune, killGold, xpReward, presetKey);
+                0.0, false, fireImmune, killGold, xpReward, presetKey);
         if (entity == null) return;
+
+        // Apply the decoupled immunities: ICE -> Ice Tower/Freeze proof, SLOW -> Prismarine proof.
+        if (freezeImmune) {
+            entity.getPersistentDataContainer().set(TDKeys.FREEZE_IMMUNE, PersistentDataType.BYTE, (byte) 1);
+        }
+        if (prismarineImmune) {
+            entity.getPersistentDataContainer().set(TDKeys.SLOW_IMMUNE, PersistentDataType.BYTE, (byte) 1);
+        }
 
         // Override gravity for flying mobs so they don't sink toward the ground.
         if (isFlying) {
@@ -679,9 +692,9 @@ public class MobManager {
                             }
                         }
 
-                        // Witches heal nearby allied mobs every 3 seconds
-                        if (mob.getEntity() instanceof org.bukkit.entity.Witch witchHealer && tickCounter % 60 == 0) {
-                            double healAmount = mob.getTier() * 10.0;
+                        // Witches heal nearby allied mobs for a flat 5 HP every 30 seconds.
+                        if (mob.getEntity() instanceof org.bukkit.entity.Witch witchHealer && tickCounter % 600 == 0) {
+                            double healAmount = 5.0;
                             witchHealer.getWorld().spawnParticle(org.bukkit.Particle.HEART, witchHealer.getLocation().add(0, 2, 0), 3);
                             for (TDMob ally : match.getActiveMobs()) {
                                 org.bukkit.entity.Mob allyEnt = ally.getEntity();
@@ -691,7 +704,9 @@ public class MobManager {
                                 org.bukkit.attribute.AttributeInstance maxHpAttr = allyEnt.getAttribute(Attribute.MAX_HEALTH);
                                 if (maxHpAttr == null) continue;
                                 double maxHp = maxHpAttr.getValue();
-                                allyEnt.setHealth(Math.min(maxHp, allyEnt.getHealth() + healAmount));
+                                double curHp = allyEnt.getHealth();
+                                if (Double.isNaN(maxHp) || Double.isNaN(curHp)) continue;
+                                allyEnt.setHealth(Math.max(0.0, Math.min(maxHp, curHp + healAmount)));
                                 allyEnt.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, allyEnt.getLocation().add(0, 1, 0), 5);
                             }
                         }
@@ -749,6 +764,17 @@ public class MobManager {
                 }
             }
             witch.setTarget(null);
+        }
+
+        // Zoglins (and Hoglins) are natively aggressive and keep re-acquiring player targets through
+        // their brain even with goals stripped, which makes them lunge off-track and "break" their
+        // movement. Continuously clear the target and brain memory so they stay velocity-driven.
+        if (mob.getEntity() instanceof org.bukkit.entity.Zoglin
+                || mob.getEntity() instanceof org.bukkit.entity.Hoglin) {
+            mob.getEntity().setTarget(null);
+            if (mob.getEntity() instanceof org.bukkit.entity.Mob aggro) {
+                aggro.setAggressive(false);
+            }
         }
 
         // Freeze status check (applied by Ice Towers)
@@ -1127,6 +1153,9 @@ public class MobManager {
         }
 
         if (spawnList.isEmpty()) return;
+
+        // Credit the sender with the mobs they're about to deploy (end-of-game stats).
+        plugin.getGameManager().recordMobSpawned(uuid, spawnList.size());
 
         // Determine opponent's arena
         String playerArena = plugin.getGameManager().getPlayerArena(uuid);
