@@ -1,7 +1,6 @@
 package com.pauljang.towerDefense.core;
 
 import com.pauljang.towerDefense.TowerDefense;
-import com.pauljang.towerDefense.entities.PresetMobType;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -122,19 +121,22 @@ public class WaveManager {
 
             for (Map<?, ?> group : groups) {
                 long initialDelay = group.get("delay") != null ? ((Number) group.get("delay")).longValue() : 0L;
-                String mobTypeStr = group.get("mob") != null ? (String) group.get("mob") : "ZOMBIE";
+                String mobTypeStr = group.get("mob") != null ? (String) group.get("mob") : "zombie";
                 int count = group.get("count") != null ? ((Number) group.get("count")).intValue() : 10;
                 int tier = group.get("tier") != null ? ((Number) group.get("tier")).intValue() : 1;
                 long interval = group.get("interval") != null ? ((Number) group.get("interval")).longValue() : 20L;
 
-                PresetMobType type;
-                try {
-                    type = PresetMobType.valueOf(mobTypeStr.toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    type = PresetMobType.ZOMBIE;
+                // The mob field is a raw CSV upgrade-chain key (e.g. "zombie", "zombie pigman",
+                // "warden"). Validate it against the registry and fall back to zombie so a typo
+                // never silently spawns nothing.
+                String chain = mobTypeStr.toLowerCase();
+                if (plugin.getMobManager().getUpgradeRegistry().getProfile(chain, 1) == null) {
+                    plugin.getLogger().warning("Unknown wave mob chain '" + chain + "' in wave "
+                            + currentWave + "; defaulting to zombie.");
+                    chain = "zombie";
                 }
 
-                final PresetMobType finalType = type;
+                final String finalChain = chain;
                 final int finalTier = tier;
                 
                 new BukkitRunnable() {
@@ -146,7 +148,7 @@ public class WaveManager {
                             return;
                         }
 
-                        plugin.getMobManager().spawnMobByChain(match, GameManager.SINGLE_PLAYER_ARENA, finalType.name().toLowerCase(), finalTier);
+                        plugin.getMobManager().spawnMobByChain(match, GameManager.SINGLE_PLAYER_ARENA, finalChain, finalTier);
                         spawned++;
 
                         if (spawned >= count) {

@@ -772,6 +772,9 @@ public class MobManager {
                 as.setPersistent(false);
                 as.setSmall(false);
                 as.setRightArmPose(new org.bukkit.util.EulerAngle(Math.toRadians(-90), 0, 0));
+                // Tag so the interaction listener can block players from manipulating/looting the shield.
+                as.getPersistentDataContainer().set(com.pauljang.towerDefense.TDKeys.EVOKER_SHIELD,
+                        org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
                 org.bukkit.inventory.EntityEquipment eq = as.getEquipment();
                 if (eq != null) {
                     eq.setItemInMainHand(new org.bukkit.inventory.ItemStack(org.bukkit.Material.SHIELD));
@@ -1259,6 +1262,21 @@ public class MobManager {
                 mob.getEntity().swingMainHand();
             }
             return;
+        }
+
+        // Vexes fly and would otherwise glide into/through the castle walls on the final leg, ending up
+        // inside the castle where melee players can't hit them. Stop a vex one node early: as soon as the
+        // node it's heading toward is the final node (the castle door), treat it as arrived at its current
+        // (second-to-last) waypoint — out on the open path — and let the siege logic damage the castle from
+        // there. settledAtEnd is forced so it never fans out toward the door offset (which is inside the walls).
+        if (mob.getEntity().getType() == EntityType.VEX && mob.getCurrentWaypointId() != null) {
+            TDWaypoint headingTo = mob.getWaypointGraph().get(mob.getCurrentWaypointId());
+            if (headingTo != null && headingTo.getNextIds().isEmpty()) {
+                mob.setCurrentWaypointId(null); // hasReachedFinalWaypoint() is now true
+                mob.setSettledAtEnd(true);      // skip the fan-out toward the door
+                mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                return;
+            }
         }
 
         Location target = mob.getNextWaypoint();

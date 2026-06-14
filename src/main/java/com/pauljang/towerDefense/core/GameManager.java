@@ -1752,6 +1752,13 @@ public class GameManager {
         for (UUID id : new ArrayList<>(match.getPlayers())) {
             playerToMatch.remove(id);
             playerScoreboards.remove(id);
+            // Reset mob progression so unlocked/selected tiers don't carry into the player's next match;
+            // getMobTier defaults back to Tier 1 and higher tiers default to locked. Per-player removal
+            // (not a global clear) keeps any concurrently running match's progression intact.
+            playerMobTiers.remove(id);
+            playerUnlockedTiers.remove(id);
+            // Also drop any mobs the player had queued to send, so the queue starts empty next match.
+            plugin.getMobManager().clearQueue(id);
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
                 p.getInventory().clear();

@@ -1,74 +1,536 @@
+# ===========================================================================
+# Tower Defense — Wave Definitions (1-100)
+#
+# Each wave lists one or more "groups". A group spawns `count` mobs of an
+# upgrade chain at a given `tier` (1-5), one every `interval` ticks, after an
+# optional `delay` (ticks) from the start of the wave. 20 ticks = 1 second.
+#
+# `mob` is a raw CSV upgrade-chain key from mob_upgrades_polymorphic.csv:
+#   zombie, spider, skeleton, creeper, silverfish, blaze, "zombie pigman",
+#   witch, slime, giant, warden, ravager, hoglin, enderman, endermite,
+#   breeze, evoker, vex
+#
+# Difficulty ramps from trivial (wave 1) to extreme (wave 100). Bosses and
+# heavies headline milestone (multiple-of-5/10) waves; support casters
+# (witch heals, evoker shields) escort swarms once introduced.
+# ===========================================================================
 waves:
-  # Waves 1-10: Basic Combinations
+  # ---- Waves 1-10: Basics (Tier 1) ----
   1:
     groups:
-      - { mob: ZOMBIE, count: 5, tier: 1, interval: 40 }
+      - { mob: zombie, count: 5, tier: 1, interval: 40 }
   2:
     groups:
-      - { mob: ZOMBIE, count: 8, tier: 1, interval: 30 }
+      - { mob: zombie, count: 8, tier: 1, interval: 30 }
+  3:
+    groups:
+      - { mob: zombie, count: 10, tier: 1, interval: 25 }
+      - { mob: silverfish, count: 6, tier: 1, interval: 15, delay: 60 }
+  4:
+    groups:
+      - { mob: zombie, count: 10, tier: 1, interval: 25 }
+      - { mob: spider, count: 4, tier: 1, interval: 30, delay: 40 }
   5:
     groups:
-      - { mob: ZOMBIE, count: 10, tier: 1, interval: 25 }
-      - { mob: SKELETON, count: 3, tier: 1, interval: 60, delay: 100 }
+      - { mob: zombie, count: 12, tier: 1, interval: 20 }
+      - { mob: skeleton, count: 3, tier: 1, interval: 50, delay: 80 }
+  6:
+    groups:
+      - { mob: spider, count: 8, tier: 1, interval: 25 }
+      - { mob: silverfish, count: 10, tier: 1, interval: 12, delay: 40 }
+  7:
+    groups:
+      - { mob: zombie, count: 12, tier: 1, interval: 18 }
+      - { mob: endermite, count: 10, tier: 1, interval: 12, delay: 40 }
+  8:
+    groups:
+      - { mob: skeleton, count: 5, tier: 1, interval: 40 }
+      - { mob: zombie, count: 12, tier: 1, interval: 18, delay: 40 }
+  9:
+    groups:
+      - { mob: spider, count: 10, tier: 1, interval: 20 }
+      - { mob: silverfish, count: 12, tier: 1, interval: 10, delay: 50 }
+      - { mob: endermite, count: 10, tier: 1, interval: 10, delay: 80 }
   10:
     groups:
-      - { mob: PIGMAN, count: 2, tier: 1, interval: 60 }
-      - { mob: ZOMBIE, count: 10, tier: 1, interval: 20, delay: 40 }
+      - { mob: hoglin, count: 2, tier: 1, interval: 60 }
+      - { mob: zombie, count: 14, tier: 1, interval: 15, delay: 40 }
+      - { mob: skeleton, count: 4, tier: 1, interval: 40, delay: 80 }
 
-  # Waves 11-30: Tier 2 and Synergies
+  # ---- Waves 11-25: Pressure (Tier 1-2) — +pigman, creeper, vex, hoglin, witch ----
+  11:
+    groups:
+      - { mob: "zombie pigman", count: 4, tier: 1, interval: 40 }
+      - { mob: zombie, count: 12, tier: 1, interval: 18, delay: 40 }
+  12:
+    groups:
+      - { mob: spider, count: 10, tier: 2, interval: 20 }
+      - { mob: silverfish, count: 15, tier: 1, interval: 8, delay: 50 }
+  13:
+    groups:
+      - { mob: skeleton, count: 6, tier: 2, interval: 35 }
+      - { mob: endermite, count: 12, tier: 1, interval: 10, delay: 60 }
+  14:
+    groups:
+      - { mob: "zombie pigman", count: 6, tier: 1, interval: 30 }
+      - { mob: vex, count: 8, tier: 1, interval: 15, delay: 40 }
   15:
     groups:
-      - { mob: SPIDER, count: 8, tier: 1, interval: 30 }
-      - { mob: SILVERFISH, count: 15, tier: 1, interval: 10, delay: 60 }
+      - { mob: spider, count: 10, tier: 1, interval: 25 }
+      - { mob: silverfish, count: 18, tier: 1, interval: 8, delay: 40 }
+      - { mob: vex, count: 10, tier: 1, interval: 12, delay: 70 }
+  16:
+    groups:
+      - { mob: creeper, count: 3, tier: 1, interval: 60 }
+      - { mob: zombie, count: 16, tier: 2, interval: 14, delay: 40 }
+  17:
+    groups:
+      - { mob: hoglin, count: 3, tier: 1, interval: 50 }
+      - { mob: spider, count: 12, tier: 2, interval: 18, delay: 50 }
+  18:
+    groups:
+      - { mob: "zombie pigman", count: 8, tier: 2, interval: 25 }
+      - { mob: skeleton, count: 6, tier: 2, interval: 35, delay: 40 }
+      - { mob: witch, count: 1, tier: 1, interval: 80, delay: 60 }
+  19:
+    groups:
+      - { mob: vex, count: 14, tier: 1, interval: 10 }
+      - { mob: endermite, count: 14, tier: 1, interval: 8, delay: 50 }
   20:
     groups:
-      - { mob: PIGMAN, count: 5, tier: 2, interval: 40 }
-      - { mob: SKELETON, count: 10, tier: 2, interval: 25, delay: 20 }
+      - { mob: ravager, count: 1, tier: 1, interval: 100 }
+      - { mob: skeleton, count: 10, tier: 2, interval: 25, delay: 30 }
+      - { mob: zombie, count: 16, tier: 2, interval: 14, delay: 60 }
+  21:
+    groups:
+      - { mob: creeper, count: 5, tier: 2, interval: 50 }
+      - { mob: "zombie pigman", count: 8, tier: 2, interval: 25, delay: 40 }
+  22:
+    groups:
+      - { mob: spider, count: 14, tier: 2, interval: 16 }
+      - { mob: silverfish, count: 20, tier: 2, interval: 6, delay: 50 }
+      - { mob: vex, count: 12, tier: 1, interval: 10, delay: 80 }
+  23:
+    groups:
+      - { mob: hoglin, count: 4, tier: 2, interval: 45 }
+      - { mob: witch, count: 2, tier: 1, interval: 60, delay: 40 }
+      - { mob: zombie, count: 18, tier: 2, interval: 12, delay: 60 }
+  24:
+    groups:
+      - { mob: skeleton, count: 10, tier: 2, interval: 22 }
+      - { mob: creeper, count: 4, tier: 2, interval: 50, delay: 40 }
+      - { mob: endermite, count: 16, tier: 1, interval: 8, delay: 70 }
   25:
     groups:
-      - { mob: SLIME, count: 5, tier: 1, interval: 50 }
-      - { mob: SPIDER, count: 15, tier: 2, interval: 20, delay: 40 }
+      - { mob: slime, count: 3, tier: 1, interval: 60 }
+      - { mob: spider, count: 16, tier: 2, interval: 14, delay: 40 }
+      - { mob: "zombie pigman", count: 10, tier: 2, interval: 22, delay: 70 }
 
-  # Waves 31-50: Tier 3 and Elemental Pressure
+  # ---- Waves 26-40: Control & Elements (Tier 2-3) — +enderman, evoker, breeze, slime, blaze ----
+  26:
+    groups:
+      - { mob: enderman, count: 4, tier: 1, interval: 45 }
+      - { mob: zombie, count: 20, tier: 3, interval: 12, delay: 40 }
+      - { mob: witch, count: 2, tier: 2, interval: 60, delay: 70 }
+  27:
+    groups:
+      - { mob: enderman, count: 6, tier: 2, interval: 35 }
+      - { mob: vex, count: 12, tier: 2, interval: 12, delay: 40 }
+      - { mob: witch, count: 2, tier: 2, interval: 60, delay: 80 }
+  28:
+    groups:
+      - { mob: evoker, count: 3, tier: 1, interval: 50 }
+      - { mob: skeleton, count: 10, tier: 3, interval: 22, delay: 30 }
+      - { mob: creeper, count: 5, tier: 2, interval: 45, delay: 60 }
+  29:
+    groups:
+      - { mob: breeze, count: 4, tier: 1, interval: 50 }
+      - { mob: blaze, count: 4, tier: 1, interval: 50, delay: 40 }
+      - { mob: spider, count: 16, tier: 3, interval: 14, delay: 70 }
+  30:
+    groups:
+      - { mob: enderman, count: 6, tier: 2, interval: 40 }
+      - { mob: evoker, count: 4, tier: 1, interval: 45, delay: 30 }
+      - { mob: vex, count: 16, tier: 2, interval: 10, delay: 60 }
+      - { mob: endermite, count: 18, tier: 2, interval: 8, delay: 90 }
+  31:
+    groups:
+      - { mob: blaze, count: 6, tier: 1, interval: 45 }
+      - { mob: "zombie pigman", count: 12, tier: 3, interval: 18, delay: 40 }
+  32:
+    groups:
+      - { mob: creeper, count: 6, tier: 2, interval: 45 }
+      - { mob: hoglin, count: 5, tier: 2, interval: 40, delay: 40 }
+      - { mob: witch, count: 2, tier: 3, interval: 60, delay: 70 }
+  33:
+    groups:
+      - { mob: breeze, count: 5, tier: 2, interval: 45 }
+      - { mob: vex, count: 16, tier: 3, interval: 8, delay: 40 }
+  34:
+    groups:
+      - { mob: slime, count: 4, tier: 1, interval: 60 }
+      - { mob: skeleton, count: 12, tier: 3, interval: 20, delay: 40 }
+      - { mob: evoker, count: 4, tier: 2, interval: 45, delay: 70 }
   35:
     groups:
-      - { mob: CREEPER, count: 8, tier: 2, interval: 40 }
-      - { mob: ZOMBIE, count: 25, tier: 3, interval: 15, delay: 20 }
+      - { mob: creeper, count: 8, tier: 2, interval: 40 }
+      - { mob: zombie, count: 25, tier: 3, interval: 12, delay: 40 }
+      - { mob: enderman, count: 5, tier: 2, interval: 45, delay: 70 }
+  36:
+    groups:
+      - { mob: blaze, count: 8, tier: 2, interval: 40 }
+      - { mob: silverfish, count: 25, tier: 3, interval: 5, delay: 50 }
+  37:
+    groups:
+      - { mob: enderman, count: 8, tier: 3, interval: 35 }
+      - { mob: breeze, count: 5, tier: 2, interval: 45, delay: 40 }
+      - { mob: witch, count: 3, tier: 3, interval: 60, delay: 70 }
+  38:
+    groups:
+      - { mob: "zombie pigman", count: 14, tier: 3, interval: 16 }
+      - { mob: creeper, count: 6, tier: 3, interval: 45, delay: 40 }
+      - { mob: vex, count: 16, tier: 3, interval: 8, delay: 70 }
+  39:
+    groups:
+      - { mob: slime, count: 5, tier: 2, interval: 55 }
+      - { mob: hoglin, count: 6, tier: 3, interval: 40, delay: 40 }
+      - { mob: evoker, count: 4, tier: 2, interval: 45, delay: 70 }
   40:
     groups:
-      - { mob: BLAZE, count: 8, tier: 1, interval: 45 }
-      - { mob: MAGMA_CUBE, count: 5, tier: 2, interval: 50, delay: 60 }
+      - { mob: blaze, count: 8, tier: 1, interval: 45 }
+      - { mob: blaze, count: 6, tier: 3, interval: 40, delay: 40 }
+      - { mob: breeze, count: 6, tier: 3, interval: 40, delay: 70 }
+      - { mob: vex, count: 18, tier: 3, interval: 8, delay: 100 }
+
+  # ---- Waves 41-60: Heavies (Tier 3-4) — +ravager; Giant @50; Warden @55/60 ----
+  41:
+    groups:
+      - { mob: ravager, count: 2, tier: 2, interval: 80 }
+      - { mob: skeleton, count: 14, tier: 3, interval: 18, delay: 40 }
+      - { mob: witch, count: 3, tier: 3, interval: 60, delay: 70 }
+  42:
+    groups:
+      - { mob: creeper, count: 8, tier: 3, interval: 40 }
+      - { mob: enderman, count: 8, tier: 3, interval: 35, delay: 40 }
+      - { mob: evoker, count: 5, tier: 3, interval: 45, delay: 70 }
+  43:
+    groups:
+      - { mob: blaze, count: 8, tier: 3, interval: 38 }
+      - { mob: breeze, count: 6, tier: 3, interval: 40, delay: 40 }
+      - { mob: vex, count: 20, tier: 3, interval: 6, delay: 70 }
+  44:
+    groups:
+      - { mob: slime, count: 6, tier: 3, interval: 50 }
+      - { mob: "zombie pigman", count: 16, tier: 4, interval: 14, delay: 40 }
+      - { mob: hoglin, count: 6, tier: 3, interval: 40, delay: 70 }
+  45:
+    groups:
+      - { mob: ravager, count: 3, tier: 3, interval: 70 }
+      - { mob: spider, count: 18, tier: 4, interval: 12, delay: 40 }
+      - { mob: silverfish, count: 30, tier: 4, interval: 4, delay: 70 }
+  46:
+    groups:
+      - { mob: skeleton, count: 16, tier: 4, interval: 16 }
+      - { mob: creeper, count: 8, tier: 3, interval: 40, delay: 40 }
+      - { mob: witch, count: 3, tier: 4, interval: 60, delay: 70 }
+  47:
+    groups:
+      - { mob: enderman, count: 10, tier: 3, interval: 32 }
+      - { mob: breeze, count: 8, tier: 3, interval: 38, delay: 40 }
+      - { mob: evoker, count: 5, tier: 3, interval: 45, delay: 70 }
+  48:
+    groups:
+      - { mob: blaze, count: 10, tier: 3, interval: 35 }
+      - { mob: vex, count: 24, tier: 4, interval: 6, delay: 40 }
+      - { mob: endermite, count: 24, tier: 4, interval: 6, delay: 70 }
+  49:
+    groups:
+      - { mob: hoglin, count: 8, tier: 4, interval: 35 }
+      - { mob: ravager, count: 3, tier: 3, interval: 70, delay: 40 }
+      - { mob: slime, count: 6, tier: 3, interval: 50, delay: 70 }
   50:
     groups:
-      - { mob: GIANT, count: 1, tier: 1, interval: 200 }
-      - { mob: ZOMBIE, count: 30, tier: 3, interval: 10, delay: 40 }
-
-  # Waves 51-80: High Tier Swards and Bosses
+      - { mob: giant, count: 1, tier: 2, interval: 200 }
+      - { mob: zombie, count: 30, tier: 3, interval: 10, delay: 40 }
+      - { mob: evoker, count: 4, tier: 3, interval: 45, delay: 60 }
+      - { mob: skeleton, count: 16, tier: 4, interval: 16, delay: 80 }
+  51:
+    groups:
+      - { mob: creeper, count: 10, tier: 4, interval: 38 }
+      - { mob: enderman, count: 10, tier: 4, interval: 30, delay: 40 }
+      - { mob: witch, count: 4, tier: 4, interval: 55, delay: 70 }
+  52:
+    groups:
+      - { mob: ravager, count: 4, tier: 3, interval: 65 }
+      - { mob: blaze, count: 10, tier: 4, interval: 35, delay: 40 }
+      - { mob: breeze, count: 8, tier: 4, interval: 38, delay: 70 }
+  53:
+    groups:
+      - { mob: "zombie pigman", count: 18, tier: 4, interval: 12 }
+      - { mob: slime, count: 7, tier: 3, interval: 50, delay: 40 }
+      - { mob: vex, count: 24, tier: 4, interval: 5, delay: 70 }
+  54:
+    groups:
+      - { mob: skeleton, count: 18, tier: 4, interval: 14 }
+      - { mob: creeper, count: 10, tier: 4, interval: 38, delay: 40 }
+      - { mob: evoker, count: 6, tier: 4, interval: 45, delay: 70 }
+  55:
+    groups:
+      - { mob: warden, count: 1, tier: 1, interval: 150 }
+      - { mob: spider, count: 20, tier: 4, interval: 10, delay: 40 }
+      - { mob: silverfish, count: 35, tier: 4, interval: 4, delay: 70 }
+  56:
+    groups:
+      - { mob: ravager, count: 4, tier: 4, interval: 60 }
+      - { mob: hoglin, count: 8, tier: 4, interval: 35, delay: 40 }
+      - { mob: witch, count: 4, tier: 4, interval: 55, delay: 70 }
+  57:
+    groups:
+      - { mob: blaze, count: 12, tier: 4, interval: 32 }
+      - { mob: breeze, count: 10, tier: 4, interval: 35, delay: 40 }
+      - { mob: vex, count: 28, tier: 4, interval: 5, delay: 70 }
+  58:
+    groups:
+      - { mob: enderman, count: 12, tier: 4, interval: 28 }
+      - { mob: evoker, count: 6, tier: 4, interval: 45, delay: 40 }
+      - { mob: endermite, count: 30, tier: 4, interval: 5, delay: 70 }
+  59:
+    groups:
+      - { mob: slime, count: 8, tier: 4, interval: 45 }
+      - { mob: creeper, count: 12, tier: 4, interval: 35, delay: 40 }
+      - { mob: "zombie pigman", count: 20, tier: 4, interval: 12, delay: 70 }
   60:
     groups:
-      - { mob: GIANT, count: 2, tier: 2, interval: 150 }
-      - { mob: SKELETON, count: 30, tier: 4, interval: 12, delay: 40 }
-      - { mob: BLAZE, count: 10, tier: 3, interval: 40, delay: 80 }
+      - { mob: warden, count: 1, tier: 1, interval: 150 }
+      - { mob: skeleton, count: 30, tier: 4, interval: 12, delay: 40 }
+      - { mob: blaze, count: 10, tier: 3, interval: 38, delay: 60 }
+      - { mob: ravager, count: 4, tier: 4, interval: 60, delay: 80 }
+      - { mob: witch, count: 5, tier: 4, interval: 50, delay: 100 }
+
+  # ---- Waves 61-80: Sieges (Tier 4-5) ----
+  61:
+    groups:
+      - { mob: giant, count: 1, tier: 3, interval: 180 }
+      - { mob: zombie, count: 30, tier: 4, interval: 10, delay: 40 }
+      - { mob: evoker, count: 6, tier: 4, interval: 45, delay: 70 }
+  62:
+    groups:
+      - { mob: ravager, count: 5, tier: 4, interval: 55 }
+      - { mob: enderman, count: 12, tier: 4, interval: 28, delay: 40 }
+      - { mob: witch, count: 5, tier: 4, interval: 50, delay: 70 }
+  63:
+    groups:
+      - { mob: blaze, count: 14, tier: 4, interval: 30 }
+      - { mob: breeze, count: 10, tier: 5, interval: 35, delay: 40 }
+      - { mob: vex, count: 30, tier: 5, interval: 4, delay: 70 }
+  64:
+    groups:
+      - { mob: creeper, count: 12, tier: 5, interval: 35 }
+      - { mob: hoglin, count: 10, tier: 5, interval: 32, delay: 40 }
+      - { mob: slime, count: 8, tier: 4, interval: 45, delay: 70 }
+  65:
+    groups:
+      - { mob: warden, count: 1, tier: 2, interval: 150 }
+      - { mob: spider, count: 24, tier: 5, interval: 8, delay: 40 }
+      - { mob: silverfish, count: 40, tier: 5, interval: 3, delay: 70 }
+  66:
+    groups:
+      - { mob: skeleton, count: 24, tier: 5, interval: 12 }
+      - { mob: "zombie pigman", count: 24, tier: 5, interval: 10, delay: 40 }
+      - { mob: evoker, count: 7, tier: 5, interval: 45, delay: 70 }
+  67:
+    groups:
+      - { mob: enderman, count: 14, tier: 5, interval: 25 }
+      - { mob: breeze, count: 12, tier: 5, interval: 32, delay: 40 }
+      - { mob: witch, count: 6, tier: 5, interval: 50, delay: 70 }
+  68:
+    groups:
+      - { mob: ravager, count: 6, tier: 4, interval: 50 }
+      - { mob: blaze, count: 14, tier: 5, interval: 28, delay: 40 }
+      - { mob: vex, count: 32, tier: 5, interval: 4, delay: 70 }
+  69:
+    groups:
+      - { mob: slime, count: 10, tier: 4, interval: 42 }
+      - { mob: creeper, count: 14, tier: 5, interval: 32, delay: 40 }
+      - { mob: endermite, count: 36, tier: 5, interval: 4, delay: 70 }
+  70:
+    groups:
+      - { mob: giant, count: 1, tier: 3, interval: 180 }
+      - { mob: ravager, count: 4, tier: 4, interval: 55, delay: 40 }
+      - { mob: skeleton, count: 24, tier: 5, interval: 12, delay: 60 }
+      - { mob: witch, count: 6, tier: 5, interval: 50, delay: 90 }
+  71:
+    groups:
+      - { mob: warden, count: 1, tier: 2, interval: 150 }
+      - { mob: enderman, count: 14, tier: 5, interval: 24, delay: 40 }
+      - { mob: evoker, count: 7, tier: 5, interval: 45, delay: 70 }
+  72:
+    groups:
+      - { mob: blaze, count: 16, tier: 5, interval: 26 }
+      - { mob: breeze, count: 12, tier: 5, interval: 30, delay: 40 }
+      - { mob: vex, count: 36, tier: 5, interval: 3, delay: 70 }
+  73:
+    groups:
+      - { mob: ravager, count: 6, tier: 5, interval: 48 }
+      - { mob: hoglin, count: 12, tier: 5, interval: 30, delay: 40 }
+      - { mob: creeper, count: 14, tier: 5, interval: 32, delay: 70 }
+  74:
+    groups:
+      - { mob: "zombie pigman", count: 26, tier: 5, interval: 9 }
+      - { mob: spider, count: 26, tier: 5, interval: 7, delay: 40 }
+      - { mob: silverfish, count: 45, tier: 5, interval: 3, delay: 70 }
   75:
     groups:
-      - { mob: GIANT, count: 5, tier: 3, interval: 100 }
-      - { mob: MAGMA_CUBE, count: 20, tier: 4, interval: 25, delay: 20 }
-      - { mob: CREEPER, count: 15, tier: 4, interval: 35, delay: 60 }
+      - { mob: giant, count: 2, tier: 3, interval: 120 }
+      - { mob: slime, count: 10, tier: 5, interval: 40, delay: 40 }
+      - { mob: creeper, count: 16, tier: 5, interval: 30, delay: 60 }
+      - { mob: witch, count: 7, tier: 5, interval: 50, delay: 90 }
+  76:
+    groups:
+      - { mob: warden, count: 1, tier: 3, interval: 140 }
+      - { mob: skeleton, count: 28, tier: 5, interval: 10, delay: 40 }
+      - { mob: evoker, count: 8, tier: 5, interval: 45, delay: 70 }
+  77:
+    groups:
+      - { mob: enderman, count: 16, tier: 5, interval: 22 }
+      - { mob: breeze, count: 14, tier: 5, interval: 28, delay: 40 }
+      - { mob: vex, count: 40, tier: 5, interval: 3, delay: 70 }
+  78:
+    groups:
+      - { mob: ravager, count: 7, tier: 5, interval: 45 }
+      - { mob: blaze, count: 18, tier: 5, interval: 24, delay: 40 }
+      - { mob: hoglin, count: 12, tier: 5, interval: 30, delay: 70 }
+  79:
+    groups:
+      - { mob: slime, count: 12, tier: 5, interval: 38 }
+      - { mob: creeper, count: 16, tier: 5, interval: 30, delay: 40 }
+      - { mob: endermite, count: 45, tier: 5, interval: 3, delay: 70 }
+  80:
+    groups:
+      - { mob: warden, count: 2, tier: 2, interval: 130 }
+      - { mob: blaze, count: 20, tier: 4, interval: 22, delay: 40 }
+      - { mob: ravager, count: 6, tier: 5, interval: 48, delay: 60 }
+      - { mob: witch, count: 8, tier: 5, interval: 45, delay: 90 }
+      - { mob: vex, count: 40, tier: 5, interval: 3, delay: 110 }
 
-  # Waves 81-100: The Final Siege (Tier 5)
+  # ---- Waves 81-100: The Final Siege (Tier 5, full roster) ----
+  81:
+    groups:
+      - { mob: giant, count: 2, tier: 4, interval: 120 }
+      - { mob: "zombie pigman", count: 30, tier: 5, interval: 8, delay: 40 }
+      - { mob: evoker, count: 8, tier: 5, interval: 45, delay: 70 }
+  82:
+    groups:
+      - { mob: warden, count: 1, tier: 3, interval: 130 }
+      - { mob: enderman, count: 18, tier: 5, interval: 20, delay: 40 }
+      - { mob: witch, count: 8, tier: 5, interval: 45, delay: 70 }
+  83:
+    groups:
+      - { mob: ravager, count: 8, tier: 5, interval: 42 }
+      - { mob: blaze, count: 20, tier: 5, interval: 22, delay: 40 }
+      - { mob: breeze, count: 16, tier: 5, interval: 26, delay: 70 }
+  84:
+    groups:
+      - { mob: creeper, count: 18, tier: 5, interval: 28 }
+      - { mob: hoglin, count: 14, tier: 5, interval: 28, delay: 40 }
+      - { mob: slime, count: 12, tier: 5, interval: 38, delay: 70 }
+  85:
+    groups:
+      - { mob: giant, count: 3, tier: 4, interval: 100 }
+      - { mob: skeleton, count: 30, tier: 5, interval: 10, delay: 40 }
+      - { mob: silverfish, count: 60, tier: 5, interval: 2, delay: 70 }
+      - { mob: evoker, count: 8, tier: 5, interval: 45, delay: 100 }
+  86:
+    groups:
+      - { mob: warden, count: 2, tier: 3, interval: 120 }
+      - { mob: spider, count: 30, tier: 5, interval: 6, delay: 40 }
+      - { mob: vex, count: 50, tier: 5, interval: 2, delay: 70 }
+  87:
+    groups:
+      - { mob: ravager, count: 8, tier: 5, interval: 40 }
+      - { mob: enderman, count: 18, tier: 5, interval: 20, delay: 40 }
+      - { mob: witch, count: 9, tier: 5, interval: 45, delay: 70 }
+  88:
+    groups:
+      - { mob: blaze, count: 24, tier: 5, interval: 20 }
+      - { mob: breeze, count: 18, tier: 5, interval: 24, delay: 40 }
+      - { mob: vex, count: 50, tier: 5, interval: 2, delay: 70 }
+  89:
+    groups:
+      - { mob: giant, count: 3, tier: 4, interval: 100 }
+      - { mob: slime, count: 14, tier: 5, interval: 36, delay: 40 }
+      - { mob: creeper, count: 20, tier: 5, interval: 26, delay: 60 }
+      - { mob: endermite, count: 60, tier: 5, interval: 2, delay: 90 }
   90:
     groups:
-      - { mob: GIANT, count: 8, tier: 4, interval: 80 }
-      - { mob: GHAST, count: 15, tier: 4, interval: 50, delay: 40 }
-      - { mob: PIGMAN, count: 40, tier: 5, interval: 10, delay: 20 }
+      - { mob: giant, count: 3, tier: 4, interval: 90 }
+      - { mob: warden, count: 1, tier: 2, interval: 130, delay: 30 }
+      - { mob: "zombie pigman", count: 40, tier: 5, interval: 8, delay: 50 }
+      - { mob: witch, count: 9, tier: 5, interval: 45, delay: 80 }
+      - { mob: evoker, count: 9, tier: 5, interval: 45, delay: 110 }
+  91:
+    groups:
+      - { mob: warden, count: 2, tier: 4, interval: 110 }
+      - { mob: ravager, count: 9, tier: 5, interval: 38, delay: 40 }
+      - { mob: blaze, count: 24, tier: 5, interval: 18, delay: 70 }
+  92:
+    groups:
+      - { mob: enderman, count: 20, tier: 5, interval: 18 }
+      - { mob: breeze, count: 20, tier: 5, interval: 22, delay: 40 }
+      - { mob: vex, count: 60, tier: 5, interval: 2, delay: 70 }
+      - { mob: witch, count: 10, tier: 5, interval: 45, delay: 100 }
+  93:
+    groups:
+      - { mob: giant, count: 4, tier: 5, interval: 90 }
+      - { mob: skeleton, count: 32, tier: 5, interval: 8, delay: 40 }
+      - { mob: creeper, count: 22, tier: 5, interval: 24, delay: 70 }
+  94:
+    groups:
+      - { mob: warden, count: 2, tier: 4, interval: 110 }
+      - { mob: slime, count: 16, tier: 5, interval: 34, delay: 40 }
+      - { mob: hoglin, count: 16, tier: 5, interval: 26, delay: 60 }
+      - { mob: silverfish, count: 70, tier: 5, interval: 2, delay: 90 }
   95:
     groups:
-      - { mob: GIANT, count: 12, tier: 5, interval: 60 }
-      - { mob: BLAZE, count: 40, tier: 5, interval: 15, delay: 30 }
-      - { mob: SILVERFISH, count: 150, tier: 5, interval: 2, delay: 10 }
+      - { mob: giant, count: 4, tier: 5, interval: 80 }
+      - { mob: blaze, count: 40, tier: 5, interval: 14, delay: 30 }
+      - { mob: silverfish, count: 100, tier: 5, interval: 2, delay: 60 }
+      - { mob: evoker, count: 10, tier: 5, interval: 45, delay: 90 }
+      - { mob: witch, count: 10, tier: 5, interval: 45, delay: 120 }
+  96:
+    groups:
+      - { mob: warden, count: 3, tier: 4, interval: 100 }
+      - { mob: ravager, count: 10, tier: 5, interval: 36, delay: 40 }
+      - { mob: enderman, count: 20, tier: 5, interval: 16, delay: 70 }
+      - { mob: vex, count: 60, tier: 5, interval: 2, delay: 100 }
+  97:
+    groups:
+      - { mob: giant, count: 5, tier: 5, interval: 80 }
+      - { mob: breeze, count: 22, tier: 5, interval: 20, delay: 40 }
+      - { mob: creeper, count: 24, tier: 5, interval: 22, delay: 70 }
+      - { mob: endermite, count: 80, tier: 5, interval: 2, delay: 100 }
+  98:
+    groups:
+      - { mob: warden, count: 3, tier: 5, interval: 90 }
+      - { mob: blaze, count: 30, tier: 5, interval: 14, delay: 40 }
+      - { mob: ravager, count: 10, tier: 5, interval: 34, delay: 70 }
+      - { mob: witch, count: 12, tier: 5, interval: 45, delay: 100 }
+  99:
+    groups:
+      - { mob: giant, count: 6, tier: 5, interval: 70 }
+      - { mob: "zombie pigman", count: 40, tier: 5, interval: 6, delay: 40 }
+      - { mob: skeleton, count: 36, tier: 5, interval: 7, delay: 60 }
+      - { mob: spider, count: 36, tier: 5, interval: 5, delay: 90 }
+      - { mob: evoker, count: 12, tier: 5, interval: 45, delay: 120 }
   100:
     groups:
-      - { mob: GIANT, count: 25, tier: 5, interval: 40 }
-      - { mob: GHAST, count: 30, tier: 5, interval: 30, delay: 20 }
-      - { mob: CREEPER, count: 50, tier: 5, interval: 10, delay: 40 }
-
+      - { mob: giant, count: 5, tier: 5, interval: 70 }
+      - { mob: warden, count: 2, tier: 5, interval: 150, delay: 20 }
+      - { mob: ravager, count: 8, tier: 5, interval: 38, delay: 40 }
+      - { mob: blaze, count: 24, tier: 5, interval: 12, delay: 60 }
+      - { mob: breeze, count: 20, tier: 5, interval: 18, delay: 70 }
+      - { mob: creeper, count: 24, tier: 5, interval: 20, delay: 90 }
+      - { mob: silverfish, count: 100, tier: 5, interval: 2, delay: 110 }
+      - { mob: vex, count: 60, tier: 5, interval: 2, delay: 130 }
+      - { mob: witch, count: 12, tier: 5, interval: 45, delay: 100 }
+      - { mob: evoker, count: 12, tier: 5, interval: 45, delay: 120 }

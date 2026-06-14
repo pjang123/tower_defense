@@ -798,6 +798,9 @@ public class TowerManager {
 
             // Check for mobs stepping on the hazard (checking slightly above ground)
             java.util.List<Mob> hit = getMobsInRadius(loc.clone().add(0, 1.0, 0), 1.5, arena);
+            // Ground hazard: ignore flying mobs (they hover ~5 blocks up) while still tagging short
+            // ground mobs. getMobsInRadius is cylindrical, so filter out anything above the tile plane.
+            hit.removeIf(m -> Math.abs(m.getLocation().getY() - loc.getY()) > 3.0);
             if (!hit.isEmpty()) {
                 org.bukkit.NamespacedKey vulnKey = new org.bukkit.NamespacedKey(plugin, "td_vulnerable_until");
                 long until = System.currentTimeMillis() + 4000L;
@@ -824,8 +827,9 @@ public class TowerManager {
             double t = Math.random();
             Location baseLoc = segment[0].clone().add(
                     segment[1].clone().subtract(segment[0]).toVector().multiply(t));
-            // Slight perpendicular jitter so hazards spread across the lane width
-            baseLoc.add((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);
+            // Slight perpendicular jitter so hazards spread across the lane width, but kept inside the
+            // 1.5 trigger radius of the lane center so center-walking mobs reliably step on them.
+            baseLoc.add((Math.random() - 0.5) * 1.0, 0, (Math.random() - 0.5) * 1.0);
 
             if (baseLoc.distanceSquared(tower.getCenterLocation()) <= tower.getRange() * tower.getRange()) {
                 org.bukkit.entity.BlockDisplay hazard = baseLoc.getWorld().spawn(baseLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
@@ -853,7 +857,13 @@ public class TowerManager {
     private void tickLandmines(Tower tower, long tick) {
         String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
 
+        // Periodically cull orphaned mines: stands this tower stamped as its own but that are no
+        // longer in its tracked list (e.g. a list/world desync across rebuilds or chunk churn).
+        // Without this the world can accumulate more live mines than the list-based cap allows.
+        if (tick % 40 == 0) reconcileLandmines(tower);
+
         java.util.Iterator<ArmorStand> it = tower.getLandmines().iterator();
+        boolean playedBlastThisTick = false;
         while (it.hasNext()) {
             ArmorStand mine = it.next();
             if (mine == null || !mine.isValid()) {
@@ -863,9 +873,19 @@ public class TowerManager {
             // Mobs walk above the sunk stand's origin, so check slightly higher with a wider radius.
             Location trigger = mine.getLocation().clone().add(0, 1.5, 0);
             java.util.List<Mob> hit = getMobsInRadius(trigger, 2.0, arena);
+            // getMobsInRadius is cylindrical (Y-agnostic) so towers can reach hovering mobs, but a
+            // ground trap must not. Flying mobs hover ~5 blocks up, so drop anything well above the
+            // mine's plane; ground mobs (even short ones like silverfish) stay within the band.
+            hit.removeIf(m -> Math.abs(m.getLocation().getY() - trigger.getY()) > 3.0);
             if (!hit.isEmpty()) {
                 trigger.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION_EMITTER, trigger, 1);
-                trigger.getWorld().playSound(trigger, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+                // Cap explosion sounds to one per tick per tower: a whole wave tripping mines in the
+                // same tick would otherwise fire a burst of long ENTITY_GENERIC_EXPLODE samples and
+                // exhaust the client's sound-source pool, silencing all audio mid-match.
+                if (!playedBlastThisTick) {
+                    trigger.getWorld().playSound(trigger, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+                    playedBlastThisTick = true;
+                }
                 hit.get(0).damage(tower.getDamage());
                 mine.remove();
                 it.remove();
@@ -886,7 +906,10 @@ public class TowerManager {
         double t = Math.random();
         Location mineLoc = segment[0].clone().add(
                 segment[1].clone().subtract(segment[0]).toVector().multiply(t));
-        mineLoc.add((Math.random() - 0.5) * 3.0, 0, (Math.random() - 0.5) * 3.0);
+        // Keep the perpendicular jitter inside the 2.0 trigger radius of the lane center, otherwise a
+        // mine can land too far off-path for a center-walking mob to ever touch it (fast, small mobs
+        // like silverfish then slip straight through a field of unreachable mines).
+        mineLoc.add((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);
 
         // Ensure the offset mine is still inside the tower's shooting radius
         if (mineLoc.distanceSquared(tower.getCenterLocation()) > tower.getRange() * tower.getRange()) {
@@ -908,6 +931,10 @@ public class TowerManager {
             as.setGravity(false);
             as.setInvulnerable(true);
             as.setPersistent(false);
+            // Stamp the owning plot so reconcileLandmines() can recognise (and cull) any mine that
+            // drifts out of the tracked list yet stays alive in the world, keeping the count <= cap.
+            as.getPersistentDataContainer().set(TDKeys.LANDMINE_OWNER,
+                    org.bukkit.persistence.PersistentDataType.STRING, tower.getPlotId());
             if (as.getEquipment() != null) {
                 as.getEquipment().setHelmet(new ItemStack(Material.TNT));
             }
@@ -915,6 +942,25 @@ public class TowerManager {
         tower.getLandmines().add(stand);
         tower.setLastAttackTick(tick);
         mineLoc.getWorld().playSound(mineLoc, Sound.ENTITY_TNT_PRIMED, 0.6f, 1.5f);
+    }
+
+    // Despawn any landmine ArmorStand this tower stamped as its own that is no longer tracked in its
+    // list. The list-based cap can only bound mines it still knows about; a desync (rebuild, chunk
+    // churn, etc.) can leave live-but-untracked stands that make the field exceed mine_count. This
+    // reconciliation keeps the world authoritative to the tracked list so the cap actually holds.
+    private void reconcileLandmines(Tower tower) {
+        Location center = tower.getCenterLocation();
+        if (center == null || center.getWorld() == null) return;
+        String plotId = tower.getPlotId();
+        double r = Math.max(tower.getRange(), 16.0) + 4.0; // cover the whole deploy radius plus margin
+        for (org.bukkit.entity.Entity e : center.getWorld().getNearbyEntities(center, r, r, r)) {
+            if (!(e instanceof ArmorStand as)) continue;
+            String owner = as.getPersistentDataContainer().get(
+                    TDKeys.LANDMINE_OWNER, org.bukkit.persistence.PersistentDataType.STRING);
+            if (plotId.equals(owner) && !tower.getLandmines().contains(as)) {
+                as.remove();
+            }
+        }
     }
 
     // Beehive: spawn bees on cooldown up to the path's cap, steer them at mobs, detonate on contact
@@ -2764,7 +2810,8 @@ public class TowerManager {
                     + plugin.getTowerConfigManager().getStat(type, path, level, "arrows", 5));
             case "bigger_bombs" -> lore.add(ChatColor.GRAY + "Blast Radius: " + ChatColor.YELLOW
                     + plugin.getTowerConfigManager().getStat(type, path, level, "radius", 3.5) + " blocks");
-            case "landmines" -> lore.add(ChatColor.GRAY + "Max Active Mines: " + ChatColor.YELLOW + 3);
+            case "landmines" -> lore.add(ChatColor.GRAY + "Max Active Mines: " + ChatColor.YELLOW
+                    + plugin.getTowerConfigManager().getStat(type, path, level, "mine_count", 3));
             case "goliath" -> lore.add(ChatColor.GRAY + "Bee Scale: " + ChatColor.YELLOW
                     + plugin.getTowerConfigManager().getStat(type, path, level, "scale", 2.0) + "x");
             case "swarm" -> lore.add(ChatColor.GRAY + "Max Bees: " + ChatColor.YELLOW

@@ -79,13 +79,13 @@ Breeze,2,BREEZE,1350,2.0,1540,1.2,95,None,None,None,"Flying, Hovering, Fast"
 Breeze,3,BREEZE,1620,2.5,2156,0.9,100,None,None,None,"Flying, Deflects Projectiles"
 Breeze,4,BREEZE,1944,3.0,3018,0.9,105,None,None,None,"Flying, High Deflection"
 Breeze,5,BREEZE,2332,3.5,4224,0.9,110,None,None,None,"Flying, Storm Conjurer"
-Evoker,1,EVOKER,420,2.0,500,1.0,55,None,None,None,Shielded
-Evoker,2,EVOKER,500,2.0,700,1.0,58,None,None,None,Shielded
-Evoker,3,EVOKER,600,2.5,980,1.0,62,None,None,None,Shielded
-Evoker,4,EVOKER,720,3.0,1372,0.9,66,None,None,None,Shielded
-Evoker,5,EVOKER,864,3.5,1920,0.9,70,None,None,None,Shielded
-Vex,1,VEX,350,1.0,100,2.5,42,None,None,None,"Flying, Splits when slowed/stunned/teleported"
-Vex,2,VEX,420,1.0,140,2.5,45,None,None,None,"Flying, Splits when slowed/stunned/teleported"
-Vex,3,VEX,504,1.5,196,2.5,48,None,None,None,"Flying, Splits when slowed/stunned/teleported"
-Vex,4,VEX,605,1.5,274,2.5,52,None,None,None,"Flying, Splits when slowed/stunned/teleported"
-Vex,5,VEX,726,2.0,384,2.5,56,None,None,None,"Flying, Splits when slowed/stunned/teleported"
+Evoker,1,EVOKER,1500,2.0,350,1.0,55,None,None,None,Shielded
+Evoker,2,EVOKER,1800,2.0,490,1.0,58,None,None,None,Shielded
+Evoker,3,EVOKER,2200,2.5,690,1.0,62,None,None,None,Shielded
+Evoker,4,EVOKER,2700,3.0,960,0.9,66,None,None,None,Shielded
+Evoker,5,EVOKER,3200,3.5,1350,0.9,70,None,None,None,Shielded
+Vex,1,VEX,900,1.0,60,2.5,42,None,None,None,"Flying, Splits when slowed/stunned/teleported"
+Vex,2,VEX,1100,1.0,90,2.5,45,None,None,None,"Flying, Splits when slowed/stunned/teleported"
+Vex,3,VEX,1300,1.5,130,2.5,48,None,None,None,"Flying, Splits when slowed/stunned/teleported"
+Vex,4,VEX,1550,1.5,180,2.5,52,None,None,None,"Flying, Splits when slowed/stunned/teleported"
+Vex,5,VEX,1850,2.0,250,2.5,56,None,None,None,"Flying, Splits when slowed/stunned/teleported"

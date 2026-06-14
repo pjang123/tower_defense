@@ -35,6 +35,9 @@ public final class TDKeys {
     public static NamespacedKey TOWER_PET;
     public static NamespacedKey ARMAGEDDON_WITHER;
     public static NamespacedKey QUEUE_VOTE_ITEM;
+    public static NamespacedKey EVOKER_SHIELD;
+    /** plotId of the Bombardier tower that owns a deployed landmine ArmorStand. */
+    public static NamespacedKey LANDMINE_OWNER;
 
     /** Builds every key against the owning plugin. Call once from {@code onEnable}. */
     public static void init(Plugin plugin) {
@@ -56,5 +59,7 @@ public final class TDKeys {
         TOWER_PET = new NamespacedKey(plugin, "td_tower_pet");
         ARMAGEDDON_WITHER = new NamespacedKey(plugin, "td_armageddon_wither");
         QUEUE_VOTE_ITEM = new NamespacedKey(plugin, "td_queue_vote_item");
+        EVOKER_SHIELD = new NamespacedKey(plugin, "td_evoker_shield");
+        LANDMINE_OWNER = new NamespacedKey(plugin, "td_landmine_owner");
     }
 }

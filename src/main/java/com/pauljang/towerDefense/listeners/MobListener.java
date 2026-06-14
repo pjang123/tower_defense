@@ -51,6 +51,27 @@ public class MobListener implements Listener {
         }
     }
 
+    /**
+     * Blocks players from swapping/taking the shield held by an evoker's shield-ring armor stands.
+     * Without this, a player could right-click a stand and walk off with (or lose) items.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onArmorStandManipulate(org.bukkit.event.player.PlayerArmorStandManipulateEvent event) {
+        if (event.getRightClicked().getPersistentDataContainer()
+                .has(TDKeys.EVOKER_SHIELD, PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Blocks any other right-click interaction with the evoker shield stands. */
+    @EventHandler(ignoreCancelled = true)
+    public void onInteractShieldStand(org.bukkit.event.player.PlayerInteractAtEntityEvent event) {
+        if (event.getRightClicked().getPersistentDataContainer()
+                .has(TDKeys.EVOKER_SHIELD, PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler
     public void onMobBurn(EntityCombustEvent event) {
         Entity entity = event.getEntity();
