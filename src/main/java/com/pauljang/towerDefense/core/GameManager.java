@@ -1373,6 +1373,9 @@ public class GameManager {
      */
     private void tickArmageddon(Match match) {
         if (match == null || match.getCurrentState() != GameState.ACTIVE) return;
+        // Single-player is a solo survival run with no opponent, so the late-game Armageddon escalation
+        // (and its tower-disabling Wither bosses) is disabled there entirely.
+        if (match.getMapData().isSinglePlayer()) return;
         if (match.getStartTimeMillis() <= 0L) return;
 
         if (match.isArmageddonActive()) {
@@ -1416,6 +1419,7 @@ public class GameManager {
      */
     public boolean forceArmageddon(Match match) {
         if (match == null || match.getCurrentState() != GameState.ACTIVE) return false;
+        if (match.getMapData().isSinglePlayer()) return false; // no Armageddon in solo runs
         if (match.isArmageddonActive()) return false;
         triggerArmageddon(match);
         return true;

@@ -191,6 +191,8 @@ public class MobManager {
             case "enderman"     -> org.bukkit.Material.ENDERMAN_SPAWN_EGG;
             case "endermite"    -> org.bukkit.Material.ENDERMITE_SPAWN_EGG;
             case "breeze"       -> org.bukkit.Material.BREEZE_SPAWN_EGG;
+            case "evoker"       -> org.bukkit.Material.EVOKER_SPAWN_EGG;
+            case "vex"          -> org.bukkit.Material.VEX_SPAWN_EGG;
             default             -> org.bukkit.Material.ZOMBIE_SPAWN_EGG;
         };
     }
@@ -443,7 +445,26 @@ public class MobManager {
             TDMob spawned = match.getActiveMobs().get(match.getActiveMobs().size() - 1);
             if (spawned.getEntity().equals(entity)) {
                 spawned.setTier(tier);
+
+                // Evoker: spin up its damage-absorbing shield ring. Shield HP is a high multiple of the
+                // evoker's own (moderate) health so the shield is the real obstacle, not the body.
+                if (profile.getEntityType() == EntityType.EVOKER
+                        && profile.getSpecialMechanics().contains("Shielded")) {
+                    org.bukkit.attribute.AttributeInstance hpAttr = entity.getAttribute(Attribute.MAX_HEALTH);
+                    double evokerMaxHp = hpAttr != null ? hpAttr.getValue() : profile.getHp();
+                    double shieldMax = evokerMaxHp * 2.0;
+                    spawned.setShieldMaxHp(shieldMax);
+                    spawned.setShieldHp(shieldMax);
+                    spawnEvokerShieldRing(spawned);
+                }
             }
+        }
+
+        // Vex: stop the vanilla self-damaging lifespan so it survives on the track, and clear its
+        // charge/teleport AI (already de-goaled, but Vexes also track via brain memory).
+        if (profile.getEntityType() == EntityType.VEX && entity instanceof org.bukkit.entity.Vex vexEntity) {
+            vexEntity.setLimitedLifetime(false);
+            vexEntity.setCharging(false);
         }
 
         // Apply equipment (helmet or hand item based on material type)
@@ -612,6 +633,203 @@ public class MobManager {
         match.getActiveMobs().add(zombieTDMob);
     }
 
+    // ===================== Vex splitting =====================
+    /** A vex lineage tops out at generation 4 (16 leaf vexes), after which leaves can no longer split. */
+    private static final int VEX_MAX_GENERATION = 4;
+
+    /** Finds the TDMob wrapper for a live mob entity across all active matches, or null. */
+    public TDMob findTDMob(org.bukkit.entity.Mob mob) {
+        if (mob == null) return null;
+        for (Match m : plugin.getGameManager().getActiveMatches()) {
+            for (TDMob t : m.getActiveMobs()) {
+                if (t.getEntity().equals(mob)) return t;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Splits a vex when it is disrupted (slowed by Prismarine, frozen by Ice, or teleported by Chorus):
+     * the vex and a fresh copy both advance to the next generation, so one disruption turns N same-gen
+     * vexes into 2N. Capped at {@link #VEX_MAX_GENERATION}; a 500ms debounce stops a single AoE pulse
+     * from splitting the same vex multiple times in consecutive ticks.
+     */
+    public void tryVexSplit(org.bukkit.entity.Mob mob) {
+        if (mob == null || mob.getType() != EntityType.VEX) return;
+        if (!mob.getPersistentDataContainer().has(TDKeys.MOB, PersistentDataType.BYTE)) return;
+        Match match = null;
+        TDMob tdMob = null;
+        outer:
+        for (Match m : plugin.getGameManager().getActiveMatches()) {
+            for (TDMob t : m.getActiveMobs()) {
+                if (t.getEntity().equals(mob)) { tdMob = t; match = m; break outer; }
+            }
+        }
+        if (tdMob == null || match == null) return;
+        if (tdMob.getVexGeneration() >= VEX_MAX_GENERATION) return;
+        if (System.currentTimeMillis() - tdMob.getLastVexSplit() < 500L) return;
+
+        int newGen = tdMob.getVexGeneration() + 1;
+        tdMob.setVexGeneration(newGen);
+        tdMob.setLastVexSplit(System.currentTimeMillis());
+        spawnVexChild(match, tdMob, newGen);
+
+        if (mob.getWorld() != null) {
+            mob.getWorld().spawnParticle(org.bukkit.Particle.WITCH, mob.getLocation().add(0, 0.5, 0), 14, 0.3, 0.4, 0.3, 0.0);
+            mob.getWorld().playSound(mob.getLocation(), org.bukkit.Sound.ENTITY_VEX_CHARGE, 1.0f, 1.5f);
+        }
+    }
+
+    /** Spawns one vex copy at the parent's position, inheriting its stats, path progress, and arena. */
+    private void spawnVexChild(Match match, TDMob parent, int generation) {
+        org.bukkit.entity.Mob parentEntity = parent.getEntity();
+        if (parentEntity.isDead() || !parentEntity.isValid()) return;
+        String arena = parent.getArena();
+        java.util.Map<String, com.pauljang.towerDefense.data.TDWaypoint> graph =
+                plugin.getWaypointConfigManager().getWaypointGraph(match, arena);
+        if (graph.isEmpty()) return;
+        Location spawnLoc = parentEntity.getLocation();
+        if (spawnLoc.getWorld() == null) return;
+        if (!spawnLoc.getChunk().isLoaded()) spawnLoc.getChunk().load();
+
+        org.bukkit.entity.Vex child = (org.bukkit.entity.Vex) spawnLoc.getWorld().spawnEntity(spawnLoc, EntityType.VEX);
+        child.setLimitedLifetime(false);
+        child.setCharging(false);
+
+        org.bukkit.scoreboard.Scoreboard scoreboard = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+        org.bukkit.scoreboard.Team tdMobTeam = scoreboard.getTeam("td_mobs");
+        if (tdMobTeam == null) {
+            tdMobTeam = scoreboard.registerNewTeam("td_mobs");
+            tdMobTeam.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE, org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+        }
+        tdMobTeam.addEntry(child.getUniqueId().toString());
+        child.setRemoveWhenFarAway(false);
+        child.setPersistent(true);
+        org.bukkit.Bukkit.getMobGoals().removeAllGoals(child);
+        child.setGravity(false);
+
+        child.getPersistentDataContainer().set(TDKeys.MOB, PersistentDataType.BYTE, (byte) 1);
+        child.getPersistentDataContainer().set(TDKeys.PRESET, PersistentDataType.STRING, "vex");
+        child.getPersistentDataContainer().set(TDKeys.ARENA, PersistentDataType.STRING, arena);
+        child.getPersistentDataContainer().set(TDKeys.GOLD_REWARD, PersistentDataType.INTEGER, 0); // no farming splits
+        child.getPersistentDataContainer().set(TDKeys.XP_REWARD, PersistentDataType.INTEGER, 0);
+        int castleDmg = parentEntity.getPersistentDataContainer().getOrDefault(
+                TDKeys.CASTLE_DAMAGE, PersistentDataType.INTEGER, 1);
+        child.getPersistentDataContainer().set(TDKeys.CASTLE_DAMAGE, PersistentDataType.INTEGER, castleDmg);
+
+        org.bukkit.attribute.AttributeInstance kbResist = child.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (kbResist != null) kbResist.setBaseValue(1.0);
+        org.bukkit.attribute.AttributeInstance pSpeed = parentEntity.getAttribute(Attribute.MOVEMENT_SPEED);
+        org.bukkit.attribute.AttributeInstance cSpeed = child.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (pSpeed != null && cSpeed != null) cSpeed.setBaseValue(pSpeed.getBaseValue());
+        org.bukkit.attribute.AttributeInstance pHp = parentEntity.getAttribute(Attribute.MAX_HEALTH);
+        org.bukkit.attribute.AttributeInstance cHp = child.getAttribute(Attribute.MAX_HEALTH);
+        if (pHp != null && cHp != null) {
+            cHp.setBaseValue(pHp.getBaseValue());
+            child.setHealth(Math.min(pHp.getBaseValue(), cHp.getValue()));
+        }
+        updateHealthBar(child);
+
+        TDMob childMob = new TDMob(child, graph);
+        childMob.setArena(arena);
+        childMob.setTier(parent.getTier());
+        childMob.setVexGeneration(generation);
+        childMob.setPathHistory(new java.util.ArrayList<>(parent.getPathHistory()));
+        childMob.setCurrentWaypointId(parent.getCurrentWaypointId());
+        match.getActiveMobs().add(childMob);
+    }
+
+    // ===================== Evoker shield =====================
+    private static final int EVOKER_SHIELD_STANDS = 6;
+    private static final double EVOKER_SHIELD_RADIUS = 1.7;
+    private static final long EVOKER_SHIELD_RESPAWN_MS = 60_000L;
+
+    /** Spawns the ring of invisible, shield-holding armor stands around an evoker (clearing any prior ring). */
+    public void spawnEvokerShieldRing(TDMob evoker) {
+        org.bukkit.entity.Mob entity = evoker.getEntity();
+        if (entity == null || entity.isDead() || !entity.isValid()) return;
+        org.bukkit.World world = entity.getWorld();
+        if (world == null) return;
+        clearEvokerShield(evoker);
+        Location base = entity.getLocation();
+        for (int i = 0; i < EVOKER_SHIELD_STANDS; i++) {
+            double ang = evoker.getShieldAngle() + (2 * Math.PI * i / EVOKER_SHIELD_STANDS);
+            Location loc = base.clone().add(Math.cos(ang) * EVOKER_SHIELD_RADIUS, 0.6, Math.sin(ang) * EVOKER_SHIELD_RADIUS);
+            loc.setYaw((float) Math.toDegrees(ang));
+            org.bukkit.entity.ArmorStand stand = world.spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
+                as.setVisible(false);
+                as.setMarker(false);
+                as.setArms(true);
+                as.setBasePlate(false);
+                as.setGravity(false);
+                as.setInvulnerable(true);
+                as.setPersistent(false);
+                as.setSmall(true);
+                as.setRightArmPose(new org.bukkit.util.EulerAngle(Math.toRadians(-90), 0, 0));
+                org.bukkit.inventory.EntityEquipment eq = as.getEquipment();
+                if (eq != null) {
+                    eq.setItemInMainHand(new org.bukkit.inventory.ItemStack(org.bukkit.Material.SHIELD));
+                }
+            });
+            evoker.getShieldStands().add(stand.getUniqueId());
+        }
+    }
+
+    /** Removes the evoker's shield armor stands (no-op if none). */
+    public void clearEvokerShield(TDMob evoker) {
+        for (java.util.UUID id : evoker.getShieldStands()) {
+            org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(id);
+            if (e != null) e.remove();
+        }
+        evoker.getShieldStands().clear();
+    }
+
+    /** Shatters the shield: zeroes its HP, despawns the ring, and schedules a full resummon in 60s. */
+    public void breakEvokerShield(TDMob evoker) {
+        evoker.setShieldHp(0.0);
+        evoker.setShieldRespawnAt(System.currentTimeMillis() + EVOKER_SHIELD_RESPAWN_MS);
+        org.bukkit.entity.Mob entity = evoker.getEntity();
+        if (entity != null && entity.getWorld() != null) {
+            entity.getWorld().playSound(entity.getLocation(), org.bukkit.Sound.ITEM_SHIELD_BREAK, 1.2f, 0.8f);
+            entity.getWorld().spawnParticle(org.bukkit.Particle.CRIT, entity.getLocation().add(0, 1, 0), 30, 0.8, 0.8, 0.8, 0.2);
+        }
+        clearEvokerShield(evoker);
+    }
+
+    /** Per-tick driver for an evoker: rotates the live shield ring, or resummons it once 60s have passed. */
+    public void tickEvokerShield(TDMob evoker, long tickCounter) {
+        org.bukkit.entity.Mob entity = evoker.getEntity();
+        if (entity == null || entity.isDead() || !entity.isValid()) return;
+
+        if (evoker.isShieldActive()) {
+            evoker.setShieldAngle(evoker.getShieldAngle() + 0.06);
+            Location base = entity.getLocation();
+            java.util.List<java.util.UUID> stands = evoker.getShieldStands();
+            if (stands.isEmpty()) { spawnEvokerShieldRing(evoker); return; }
+            int n = stands.size();
+            for (int i = 0; i < n; i++) {
+                org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(stands.get(i));
+                if (!(e instanceof org.bukkit.entity.ArmorStand stand) || !stand.isValid()) continue;
+                double ang = evoker.getShieldAngle() + (2 * Math.PI * i / n);
+                Location loc = base.clone().add(Math.cos(ang) * EVOKER_SHIELD_RADIUS, 0.6, Math.sin(ang) * EVOKER_SHIELD_RADIUS);
+                loc.setYaw((float) Math.toDegrees(ang));
+                stand.teleport(loc);
+            }
+            if (tickCounter % 10 == 0 && entity.getWorld() != null) {
+                entity.getWorld().spawnParticle(org.bukkit.Particle.ENCHANT,
+                        base.clone().add(0, 1, 0), 6, EVOKER_SHIELD_RADIUS * 0.6, 0.4, EVOKER_SHIELD_RADIUS * 0.6, 0.0);
+            }
+        } else if (evoker.getShieldRespawnAt() > 0 && System.currentTimeMillis() >= evoker.getShieldRespawnAt()) {
+            evoker.setShieldHp(evoker.getShieldMaxHp());
+            evoker.setShieldRespawnAt(0L);
+            spawnEvokerShieldRing(evoker);
+            if (entity.getWorld() != null) {
+                entity.getWorld().playSound(entity.getLocation(), org.bukkit.Sound.BLOCK_CONDUIT_ACTIVATE, 1.0f, 1.2f);
+                entity.getWorld().spawnParticle(org.bukkit.Particle.END_ROD, entity.getLocation().add(0, 1, 0), 30, 0.6, 0.8, 0.6, 0.05);
+            }
+        }
+    }
+
 
     public void updateHealthBar(Mob mob) {
         org.bukkit.attribute.AttributeInstance maxHealthAttr = mob.getAttribute(Attribute.MAX_HEALTH);
@@ -718,8 +936,15 @@ public class MobManager {
                         TDMob mob = iterator.next();
                         
                         if (mob.getEntity().isDead() || !mob.getEntity().isValid()) {
+                            if (!mob.getShieldStands().isEmpty()) clearEvokerShield(mob); // despawn evoker shield ring
                             iterator.remove();
                             continue;
+                        }
+
+                        // Evoker: rotate its shield ring and resummon it on the 60s timer.
+                        if (mob.getEntity().getType() == EntityType.EVOKER
+                                && (mob.isShieldActive() || mob.getShieldRespawnAt() > 0)) {
+                            tickEvokerShield(mob, tickCounter);
                         }
 
                         if (tickCounter % 5 == 0) {
@@ -1572,7 +1797,9 @@ public class MobManager {
             if (mech.contains("Deflects Projectiles") || mech.contains("High Deflection") || mech.contains("High Dodge Chance"))
                 explain.add(ChatColor.GRAY + "- Frequently deflects or dodges projectiles");
             if (mech.contains("Flying")) explain.add(ChatColor.GRAY + "- Hovers above the track");
-            if (mech.contains("Splits")) explain.add(ChatColor.GRAY + "- Splits into smaller slimes on death");
+            if (mech.contains("Splits") && mech.contains("on death")) explain.add(ChatColor.GRAY + "- Splits into smaller slimes on death");
+            if (mech.contains("Splits when")) explain.add(ChatColor.GRAY + "- Splits into two when slowed, frozen, or teleported (up to 4 times)");
+            if (mech.contains("Shielded")) explain.add(ChatColor.GRAY + "- Ringed by a spinning shield that absorbs all damage; it shatters at 0 HP and reforms after 60s");
             if (mech.contains("Summons zombies")) explain.add(ChatColor.GRAY + "- Spawns zombies periodically");
             if (mech.contains("Regenerates")) explain.add(ChatColor.GRAY + "- Slowly regenerates its own health");
             if (mech.contains("Invisible")) explain.add(ChatColor.GRAY + "- Invisible; only Fire Towers can target it");

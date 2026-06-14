@@ -724,6 +724,12 @@ public class TowerManager {
                         continue;
                     }
 
+                    // Gold Tower: pure economy structure — it never attacks. Its payout is handled in
+                    // MobListener.onMobDeath, which rewards the owner when a mob dies inside its radius.
+                    if (tower.getType() == TowerType.GOLD) {
+                        continue;
+                    }
+
                     long cooldown = tower.getCooldown();
                     String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
                     if (plugin.getGameManager().isSpellActive(towerArena, "OVERCHARGE")) {
@@ -1183,6 +1189,7 @@ public class TowerManager {
                 for (Mob mob : targets) {
                     mob.damage(damage);
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowDur, slowLvl - 1));
+                    plugin.getMobManager().tryVexSplit(mob); // Vex splits when slowed
                     drawParticleLine(start, mob.getEyeLocation(), org.bukkit.Particle.BUBBLE);
                 }
                 start.getWorld().playSound(start, Sound.ENTITY_PLAYER_SPLASH, 0.8f, 1.2f);
@@ -1192,6 +1199,7 @@ public class TowerManager {
                 if (isMobImmuneToTower(target, "CHORUS")) {
                     return;
                 }
+                plugin.getMobManager().tryVexSplit(target); // Vex splits when teleported by Chorus
                 target.damage(tower.getDamage());
 
                 com.pauljang.towerDefense.entities.TDMob tdMob = null;
@@ -1601,6 +1609,7 @@ public class TowerManager {
 
                     // Apply slowness II to visually slow/halt animations and trigger the snowflake indicator
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowDur, 2));
+                    plugin.getMobManager().tryVexSplit(mob); // Vex splits when frozen/stunned
                     drawParticleLine(start, mob.getEyeLocation(), org.bukkit.Particle.SNOWFLAKE);
                 }
                 start.getWorld().playSound(start, Sound.BLOCK_POWDER_SNOW_BREAK, 0.8f, 1.2f);
@@ -2249,11 +2258,92 @@ public class TowerManager {
     // The buy-tower content slots, and the tower placed in each by the original (hand-authored) layout.
     // The GUI builds every tower's item at its original slot, then re-sorts them across these slots by
     // ascending base cost; the click handler maps a clicked slot back to a type via the same sorted order.
-    private static final int[] BUY_TOWER_SLOTS = {10, 11, 12, 13, 14, 15, 16, 28, 29, 30, 31, 32, 33, 34};
+    // Display slots, in reading order, laid out as three rows of five for the 15 buyable towers. The
+    // click handler resolves a clicked slot to a tower via this same array + getBuyTowerOrder().
+    private static final int[] BUY_TOWER_SLOTS = {10, 11, 12, 13, 14, 19, 20, 21, 22, 23, 28, 29, 30, 31, 32};
+    // Source slots the openBuyTowerGUI build section writes each BUY_TOWER_ORIGINAL[i] item to before the
+    // cost-sort re-lays them out. Kept separate from the display slots so the hardcoded build positions
+    // don't have to change when the display layout does.
+    private static final int[] BUY_TOWER_BUILD_SLOTS = {10, 11, 12, 13, 14, 15, 16, 28, 29, 30, 31, 32, 33, 34, 19};
     private static final TowerType[] BUY_TOWER_ORIGINAL = {
             TowerType.ARCHER, TowerType.FIRE, TowerType.PRISMARINE, TowerType.CHORUS, TowerType.REDSTONE,
             TowerType.POISON, TowerType.ICE, TowerType.GOLEM, TowerType.HAPPY_GHAST, TowerType.DRIPSTONE,
-            TowerType.THUNDER, TowerType.TURRET, TowerType.BOMBARDIER, TowerType.BEEHIVE};
+            TowerType.THUNDER, TowerType.TURRET, TowerType.BOMBARDIER, TowerType.BEEHIVE, TowerType.GOLD};
+
+    /** Fraction of a slain mob's gold bounty that a Gold Tower of the given level pays its owner. */
+    public double getGoldTowerBonusFraction(int level) {
+        // Default scaling: +25% at L1, +40% at L2, +55% at L3. Overridable via towers config "bonus_fraction".
+        double def = 0.25 + 0.15 * (level - 1);
+        return plugin.getTowerConfigManager().getStat(TowerType.GOLD, level, "bonus_fraction", def);
+    }
+
+    /**
+     * Pays out Gold Tower bonuses when a mob dies. For every Gold Tower on the mob's arena whose radius
+     * covers the death location, the tower's owner earns a fraction of the mob's bounty. A single owner
+     * is paid once per kill (using their best-covering tower) so stacking Gold Towers on one chokepoint
+     * doesn't multiply the payout.
+     */
+    public void awardGoldTowerBonusOnDeath(String arena, Location deathLoc, int bounty) {
+        if (bounty <= 0 || deathLoc == null || deathLoc.getWorld() == null) return;
+        java.util.Map<java.util.UUID, Double> ownerBest = new java.util.HashMap<>();
+        for (Tower tower : getPlacedTowers().values()) {
+            if (tower.getType() != TowerType.GOLD) continue;
+            if (tower.isDisabled() || tower.isArmageddonDisabled()) continue;
+            if (tower.getOwnerId() == null) continue;
+            String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+            if (!arena.equals(towerArena)) continue;
+            Location c = tower.getCenterLocation();
+            if (c == null || c.getWorld() == null || !c.getWorld().equals(deathLoc.getWorld())) continue;
+            if (c.distanceSquared(deathLoc) > tower.getRange() * tower.getRange()) continue;
+            ownerBest.merge(tower.getOwnerId(), getGoldTowerBonusFraction(tower.getLevel()), Math::max);
+        }
+        if (ownerBest.isEmpty()) return;
+        for (java.util.Map.Entry<java.util.UUID, Double> e : ownerBest.entrySet()) {
+            int bonus = Math.max(1, (int) Math.round(bounty * e.getValue()));
+            plugin.getGameManager().addGold(e.getKey(), bonus, true); // quiet; we give our own feedback
+            org.bukkit.entity.Player p = org.bukkit.Bukkit.getPlayer(e.getKey());
+            if (p != null) {
+                p.sendActionBar(ChatColor.GOLD + "+" + bonus + " bonus gold (Gold Tower)");
+                p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);
+            }
+        }
+        deathLoc.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
+                deathLoc.clone().add(0, 0.5, 0), 8, 0.3, 0.4, 0.3, 0.0);
+    }
+
+    /**
+     * Temporarily disables (EMPs) every tower on {@code arena} within {@code radius} of {@code center}
+     * for {@code durationMillis}. Used by the Tier 5 Charged Creeper death blast. Reuses the existing
+     * isDisabled() display path, so affected towers show the standard "[DISABLED EMP]" hologram and stop
+     * firing until the window elapses.
+     */
+    public void empTowersNear(String arena, Location center, double radius, long durationMillis) {
+        if (center == null || center.getWorld() == null) return;
+        long until = System.currentTimeMillis() + durationMillis;
+        int disabled = 0;
+        for (Tower tower : getPlacedTowers().values()) {
+            if (tower.isArmageddonDisabled()) continue; // permanently down already
+            String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+            if (!arena.equals(towerArena)) continue;
+            Location c = tower.getCenterLocation();
+            if (c == null || c.getWorld() == null || !c.getWorld().equals(center.getWorld())) continue;
+            if (c.distanceSquared(center) > radius * radius) continue;
+            if (tower.getDisabledUntil() < until) tower.setDisabledUntil(until); // extend, never shorten
+            disabled++;
+        }
+        center.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK,
+                center.clone().add(0, 1, 0), 50, radius * 0.5, 1.0, radius * 0.5, 0.15);
+        center.getWorld().playSound(center, Sound.ENTITY_CREEPER_PRIMED, 1.2f, 0.6f);
+        if (disabled > 0) {
+            center.getWorld().playSound(center, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 0.8f);
+            for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                if (arena.equals(plugin.getGameManager().getPlayerArena(p.getUniqueId()))) {
+                    p.sendMessage(ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "[Charged Creeper] "
+                            + ChatColor.RED + disabled + " tower(s) disabled for " + (durationMillis / 1000) + "s!");
+                }
+            }
+        }
+    }
 
     /** Buyable tower types ordered by ascending Tier-1 cost (ties broken by name) for the buy GUI. */
     public java.util.List<TowerType> getBuyTowerOrder() {
@@ -2522,12 +2612,33 @@ public class TowerManager {
             ChatColor.GREEN + "Upgrades into Goliath or Swarm paths at Level 2."
         ));
 
+        // Build slot 19: Gold Tower (economy)
+        int goldCost = plugin.getTowerConfigManager().getCost(TowerType.GOLD, 1, TowerType.GOLD.getCost());
+        double goldRange = plugin.getTowerConfigManager().getRange(TowerType.GOLD, 1, TowerType.GOLD.getRange());
+        int goldBonusPct = (int) Math.round(getGoldTowerBonusFraction(1) * 100);
+        gui.setItem(19, createGUIItem(
+            Material.GOLD_BLOCK,
+            ChatColor.GOLD + "" + ChatColor.BOLD + "Gold Tower",
+            ChatColor.GRAY + "Base Cost: " + ChatColor.YELLOW + goldCost + " Gold",
+            ChatColor.GRAY + "Range: " + ChatColor.YELLOW + goldRange + " blocks",
+            ChatColor.GRAY + "Damage: " + ChatColor.RED + "None",
+            "",
+            ChatColor.GRAY + "Deals " + ChatColor.RED + "zero damage" + ChatColor.GRAY + ".",
+            ChatColor.GRAY + "Any mob that dies in its radius pays",
+            ChatColor.GRAY + "you " + ChatColor.YELLOW + "+" + goldBonusPct + "% bonus gold" + ChatColor.GRAY + " of its bounty.",
+            ChatColor.GREEN + "Upgrade for a bigger bonus."
+        ));
+
         // Re-sort the just-placed tower items across the content slots by ascending base cost, so the
-        // cheapest towers appear first. We read each tower's item back from its original slot, then lay
-        // them out in cost order; the click handler resolves slot -> type via the same getBuyTowerOrder().
+        // cheapest towers appear first. We read each tower's item back from its build slot, clear the
+        // build area, then lay them out across the display slots in cost order; the click handler
+        // resolves slot -> type via the same getBuyTowerOrder().
         java.util.Map<TowerType, ItemStack> built = new java.util.HashMap<>();
-        for (int i = 0; i < BUY_TOWER_SLOTS.length; i++) {
-            built.put(BUY_TOWER_ORIGINAL[i], gui.getItem(BUY_TOWER_SLOTS[i]));
+        for (int i = 0; i < BUY_TOWER_ORIGINAL.length && i < BUY_TOWER_BUILD_SLOTS.length; i++) {
+            built.put(BUY_TOWER_ORIGINAL[i], gui.getItem(BUY_TOWER_BUILD_SLOTS[i]));
+        }
+        for (int slot : BUY_TOWER_BUILD_SLOTS) {
+            gui.setItem(slot, filler); // clear stray build-only slots; display slots get re-placed below
         }
         java.util.List<TowerType> order = getBuyTowerOrder();
         for (int i = 0; i < order.size() && i < BUY_TOWER_SLOTS.length; i++) {
