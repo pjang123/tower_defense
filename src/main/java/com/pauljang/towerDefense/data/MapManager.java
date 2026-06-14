@@ -60,6 +60,11 @@ public class MapManager {
                 result.add(data);
             }
         }
+        // Stable, deterministic ordering (by display name, then id) so the map-vote panel is consistent
+        // every time instead of reflecting HashMap iteration order.
+        result.sort(java.util.Comparator
+                .comparing((MapData m) -> m.getDisplayName().toLowerCase())
+                .thenComparing(MapData::getId));
         return result;
     }
 

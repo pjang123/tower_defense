@@ -680,25 +680,44 @@ public class TDCommand implements CommandExecutor {
         // Defer the disk phase so Paper releases its file handles (Windows locking).
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
             // --- Step 2: Sync edits back to the source ---
-            // After unloadWorld(save=true) the live, post-edit data lives in Paper's migrated dimensions
-            // copy; fall back to the server-root copy if Paper didn't migrate. Copy that into the resolved
-            // source, unless they're the same directory (e.g. a root-resident world with no separate
-            // dimensions copy — nothing to sync).
-            File syncSource = dimensionsFolder.exists() ? dimensionsFolder : rootFolder;
-            if (fTemplate != null && syncSource.exists() && !sameFolder(syncSource, fTemplate)) {
+            // After unloadWorld(save=true) a loaded world's live data is split across TWO places, because
+            // Paper's legacy-world migration only MOVES the chunk directories:
+            //   * level.dat + world-root metadata (data/, players/, icon.png, the_nether/the_end,
+            //     overworld/data) are flushed to the server-root copy (rootFolder).
+            //   * the overworld region/entities/poi chunks were migrated (moved) into
+            //     <primaryWorld>/dimensions/minecraft/<name>/ (dimensionsFolder) and are flushed there.
+            // So we must reconstruct the template's self-contained layout from BOTH. The old code copied
+            // only dimensionsFolder onto the template root, which dropped level.dat entirely (its edits —
+            // spawn, gamerules, time, border — were lost) and mislanded chunks at <template>/region instead
+            // of <template>/dimensions/minecraft/overworld/region.
+            if (fTemplate != null) {
                 try {
-                    copyDirectoryNIO(syncSource.toPath(), fTemplate.toPath());
-                    plugin.getLogger().info("Synced world changes back to source: " + fTemplate.getAbsolutePath());
-                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.GREEN + "Synced world changes back to: " + fTemplate.getName());
+                    // 2a. World-root metadata, including the freshly-flushed level.dat. Skip when the source
+                    // IS the live root folder (a root-resident world already has level.dat updated in place).
+                    if (rootFolder.exists() && !sameFolder(rootFolder, fTemplate)) {
+                        copyDirectoryNIO(rootFolder.toPath(), fTemplate.toPath());
+                        plugin.getLogger().info("Synced world-root metadata (level.dat, players, data) back to: "
+                                + fTemplate.getAbsolutePath());
+                    }
+                    // 2b. Live overworld chunks back into the template's overworld dimension (the layout a
+                    // self-contained world folder expects, and that the next load will read from).
+                    if (dimensionsFolder.exists()) {
+                        File templateOverworld = new File(fTemplate,
+                                "dimensions" + File.separator + "minecraft" + File.separator + "overworld");
+                        copyDirectoryNIO(dimensionsFolder.toPath(), templateOverworld.toPath());
+                        plugin.getLogger().info("Synced overworld chunk data back to: "
+                                + templateOverworld.getAbsolutePath());
+                    }
+                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.GREEN
+                            + "Synced world changes (blocks + level.dat) back to: " + fTemplate.getName());
                 } catch (java.io.IOException e) {
                     plugin.getLogger().warning("Sync-back failed for " + worldName + ": " + e.getMessage());
-                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.YELLOW + "Warning: could not sync world back to source: " + e.getMessage());
+                    if (fFeedback != null) fFeedback.sendMessage(ChatColor.YELLOW
+                            + "Warning: could not sync world back to source: " + e.getMessage());
                     e.printStackTrace();
                 }
-            } else if (fTemplate == null) {
-                plugin.getLogger().info("No source resolved for " + worldName + "; skipping sync-back.");
             } else {
-                plugin.getLogger().info("Source is the live folder for " + worldName + "; no sync-back needed.");
+                plugin.getLogger().info("No source resolved for " + worldName + "; skipping sync-back.");
             }
 
             // --- Step 3: Dimensions cleanup (delete lobby_world/dimensions/minecraft/<name>) ---

@@ -49,6 +49,9 @@ public class Match {
     // Wither bosses so they can be ticked and cleaned up.
     private boolean armageddonActive = false;
     private long armageddonLastWarn = Long.MAX_VALUE;
+    // Build-phase grace window: players are in the map and may place towers, but cannot spawn mobs and
+    // the wave/Armageddon clocks haven't started yet. Set to (now + 10s) when the match goes live.
+    private long graceUntil = 0L;
     private final List<UUID> armageddonWithers = new ArrayList<>();
 
     public Match(TowerDefense plugin, MapManager.MapData mapData) {
@@ -95,6 +98,11 @@ public class Match {
 
     public boolean isArmageddonActive() { return armageddonActive; }
     public void setArmageddonActive(boolean armageddonActive) { this.armageddonActive = armageddonActive; }
+
+    public long getGraceUntil() { return graceUntil; }
+    public void setGraceUntil(long graceUntil) { this.graceUntil = graceUntil; }
+    /** True during the post-teleport build phase: towers allowed, mob spawning blocked. */
+    public boolean isInGracePeriod() { return System.currentTimeMillis() < graceUntil; }
     public long getArmageddonLastWarn() { return armageddonLastWarn; }
     public void setArmageddonLastWarn(long armageddonLastWarn) { this.armageddonLastWarn = armageddonLastWarn; }
     public List<UUID> getArmageddonWithers() { return armageddonWithers; }

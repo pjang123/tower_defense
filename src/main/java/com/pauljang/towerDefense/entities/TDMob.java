@@ -20,6 +20,8 @@ public class TDMob {
     private int tier = 1;
     private String arena = "1";
     private final Location finalOffsetWaypoint;
+    private boolean settledAtEnd = false; // true once the mob has walked to its fan-out spot at the end
+    private int endFanTicks = 0; // ticks spent trying to reach the fan-out spot (settle timeout safety net)
     private long teleportedUntil = 0; // Timestamp to pause movement after Chorus teleport
 
     public TDMob(Mob entity, Map<String, TDWaypoint> waypointGraph) {
@@ -35,7 +37,7 @@ public class TDMob {
         if (endId != null && waypointGraph.containsKey(endId)) {
             Location last = waypointGraph.get(endId).getLocation();
             double angle = Math.random() * 2 * Math.PI;
-            double radius = Math.random() * 2.0;
+            double radius = 1.0 + Math.random() * 2.5; // 1.0–3.5 blocks: mobs fan out around the door
             double offsetX = Math.cos(angle) * radius;
             double offsetZ = Math.sin(angle) * radius;
             this.finalOffsetWaypoint = last.clone().add(offsetX, 0, offsetZ);
@@ -153,6 +155,28 @@ public class TDMob {
 
     public Location getFinalOffsetWaypoint() {
         return finalOffsetWaypoint;
+    }
+
+    public boolean isSettledAtEnd() {
+        return settledAtEnd;
+    }
+
+    public void setSettledAtEnd(boolean settledAtEnd) {
+        this.settledAtEnd = settledAtEnd;
+    }
+
+    public int incrementEndFanTicks() {
+        return ++endFanTicks;
+    }
+
+    /**
+     * Sends the mob back to the first waypoint to march the track again (used to loop the Armageddon
+     * Wither so its huge hitbox never camps the castle door and block players hitting other mobs).
+     */
+    public void resetToStart() {
+        this.currentWaypointId = "0";
+        this.settledAtEnd = false;
+        this.endFanTicks = 0;
     }
 
     public Map<String, TDWaypoint> getWaypointGraph() {

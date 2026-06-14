@@ -1912,7 +1912,13 @@ public class TowerManager {
             if (mobArena == null) mobArena = "1";
             if (!arena.equals(mobArena)) continue;
 
-            if (mob.getLocation().distanceSquared(center) <= radiusSq) {
+            // Cylindrical (X/Z) range, ignoring vertical offset: flying mobs (Blaze, Breeze, Ghast) hover
+            // several blocks up, so a spherical 3D check left them outside slow/AoE tower range even when
+            // directly over the track — making them pseudo-immune. Matching the X/Z-only waypoint logic
+            // brings them (and tall/elevated towers' reach) back in line.
+            double dxr = mob.getLocation().getX() - center.getX();
+            double dzr = mob.getLocation().getZ() - center.getZ();
+            if (dxr * dxr + dzr * dzr <= radiusSq) {
                 result.add(mob);
             }
         }
@@ -2032,9 +2038,65 @@ public class TowerManager {
         }
     }
 
+    /** Gold cost to re-enable a Wither-disabled tower: its base (Tier 1) build cost. */
+    public int getReenableGoldCost(Tower tower) {
+        return plugin.getTowerConfigManager().getCost(tower.getType(), 1, tower.getType().getCost());
+    }
+
+    /** TD-XP cost to re-enable a Wither-disabled tower: ~20% of its gold cost, min 15, rounded to 5. */
+    public int getReenableXpCost(Tower tower) {
+        int xp = (int) (Math.round(getReenableGoldCost(tower) * 0.2 / 5.0) * 5);
+        return Math.max(15, xp);
+    }
+
+    /** Brings a Wither-disabled (withered) tower back online for the rest of the match. */
+    public void reenableTower(Tower tower) {
+        tower.setArmageddonDisabled(false);
+        tower.setDisabledUntil(0L);
+        updateHologram(tower);
+        Location c = tower.getCenterLocation();
+        if (c != null && c.getWorld() != null) {
+            c.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, c.clone().add(0, 1.5, 0), 15, 0.5, 0.8, 0.5, 0.0);
+            c.getWorld().playSound(c, org.bukkit.Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.4f);
+        }
+    }
+
     public void openManageTowerGUI(Player player, String plotId) {
         Tower tower = getTower(plotId);
         if (tower == null) return;
+
+        // Withered (Armageddon-disabled) towers show a dedicated re-enable menu instead of the normal
+        // management options: pay the tower's base (Tier 1) cost in Gold, or an equivalent in TD XP, to
+        // bring it back online for the rest of the match (until another Wither skull strikes it).
+        if (tower.isArmageddonDisabled()) {
+            com.pauljang.towerDefense.ui.TDMenuHolder wHolder =
+                    new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.MANAGE_TOWER, plotId);
+            Inventory wGui = org.bukkit.Bukkit.createInventory(wHolder, 27, ChatColor.DARK_RED + "Withered Tower: " + plotId);
+            wHolder.setInventory(wGui);
+            ItemStack wFiller = createGUIItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+            for (int i = 0; i < 27; i++) wGui.setItem(i, wFiller);
+
+            int goldCost = getReenableGoldCost(tower);
+            int xpCost = getReenableXpCost(tower);
+
+            wGui.setItem(13, createGUIItem(Material.WITHER_SKELETON_SKULL,
+                    ChatColor.DARK_RED + "" + ChatColor.BOLD + tower.getType().getDisplayName() + " - Withered",
+                    ChatColor.GRAY + "This tower was disabled by the Wither.",
+                    ChatColor.GRAY + "Pay to bring it back online."));
+            wGui.setItem(11, createGUIItem(Material.GOLD_INGOT,
+                    ChatColor.GOLD + "Re-enable with Gold",
+                    ChatColor.GRAY + "Cost: " + ChatColor.YELLOW + goldCost + " Gold",
+                    "",
+                    ChatColor.GREEN + "Click to repair this tower."));
+            wGui.setItem(15, createGUIItem(Material.EXPERIENCE_BOTTLE,
+                    ChatColor.GREEN + "Re-enable with XP",
+                    ChatColor.GRAY + "Cost: " + ChatColor.YELLOW + xpCost + " TD XP",
+                    "",
+                    ChatColor.GREEN + "Click to repair this tower."));
+
+            player.openInventory(wGui);
+            return;
+        }
 
         com.pauljang.towerDefense.ui.TDMenuHolder holder =
                 new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.MANAGE_TOWER, plotId);
@@ -2182,6 +2244,32 @@ public class TowerManager {
 
         player.openInventory(gui);
         player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.8f, 1.2f);
+    }
+
+    // The buy-tower content slots, and the tower placed in each by the original (hand-authored) layout.
+    // The GUI builds every tower's item at its original slot, then re-sorts them across these slots by
+    // ascending base cost; the click handler maps a clicked slot back to a type via the same sorted order.
+    private static final int[] BUY_TOWER_SLOTS = {10, 11, 12, 13, 14, 15, 16, 28, 29, 30, 31, 32, 33, 34};
+    private static final TowerType[] BUY_TOWER_ORIGINAL = {
+            TowerType.ARCHER, TowerType.FIRE, TowerType.PRISMARINE, TowerType.CHORUS, TowerType.REDSTONE,
+            TowerType.POISON, TowerType.ICE, TowerType.GOLEM, TowerType.HAPPY_GHAST, TowerType.DRIPSTONE,
+            TowerType.THUNDER, TowerType.TURRET, TowerType.BOMBARDIER, TowerType.BEEHIVE};
+
+    /** Buyable tower types ordered by ascending Tier-1 cost (ties broken by name) for the buy GUI. */
+    public java.util.List<TowerType> getBuyTowerOrder() {
+        java.util.List<TowerType> types = new java.util.ArrayList<>(java.util.Arrays.asList(BUY_TOWER_ORIGINAL));
+        types.sort(java.util.Comparator
+                .comparingInt((TowerType t) -> plugin.getTowerConfigManager().getCost(t, 1, t.getCost()))
+                .thenComparing(Enum::name));
+        return types;
+    }
+
+    /** Index into the cost-sorted buy order for a clicked content slot, or -1 if it isn't a tower slot. */
+    public int buyTowerSlotIndex(int slot) {
+        for (int i = 0; i < BUY_TOWER_SLOTS.length; i++) {
+            if (BUY_TOWER_SLOTS[i] == slot) return i;
+        }
+        return -1;
     }
 
     public void openBuyTowerGUI(Player player, String plotId) {
@@ -2433,6 +2521,19 @@ public class TowerManager {
             ChatColor.GRAY + "Spawns a basic bee to attack mobs.",
             ChatColor.GREEN + "Upgrades into Goliath or Swarm paths at Level 2."
         ));
+
+        // Re-sort the just-placed tower items across the content slots by ascending base cost, so the
+        // cheapest towers appear first. We read each tower's item back from its original slot, then lay
+        // them out in cost order; the click handler resolves slot -> type via the same getBuyTowerOrder().
+        java.util.Map<TowerType, ItemStack> built = new java.util.HashMap<>();
+        for (int i = 0; i < BUY_TOWER_SLOTS.length; i++) {
+            built.put(BUY_TOWER_ORIGINAL[i], gui.getItem(BUY_TOWER_SLOTS[i]));
+        }
+        java.util.List<TowerType> order = getBuyTowerOrder();
+        for (int i = 0; i < order.size() && i < BUY_TOWER_SLOTS.length; i++) {
+            ItemStack it = built.get(order.get(i));
+            if (it != null) gui.setItem(BUY_TOWER_SLOTS[i], it);
+        }
 
         // Footer: show the player's current gold so they can see what they can afford.
         gui.setItem(49, createGUIItem(

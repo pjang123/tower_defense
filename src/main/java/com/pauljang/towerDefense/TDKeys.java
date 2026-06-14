@@ -34,6 +34,7 @@ public final class TDKeys {
     public static NamespacedKey VULNERABLE_UNTIL;
     public static NamespacedKey TOWER_PET;
     public static NamespacedKey ARMAGEDDON_WITHER;
+    public static NamespacedKey QUEUE_VOTE_ITEM;
 
     /** Builds every key against the owning plugin. Call once from {@code onEnable}. */
     public static void init(Plugin plugin) {
@@ -54,5 +55,6 @@ public final class TDKeys {
         VULNERABLE_UNTIL = new NamespacedKey(plugin, "td_vulnerable_until");
         TOWER_PET = new NamespacedKey(plugin, "td_tower_pet");
         ARMAGEDDON_WITHER = new NamespacedKey(plugin, "td_armageddon_wither");
+        QUEUE_VOTE_ITEM = new NamespacedKey(plugin, "td_queue_vote_item");
     }
 }

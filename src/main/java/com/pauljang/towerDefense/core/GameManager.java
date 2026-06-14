@@ -90,7 +90,7 @@ public class GameManager {
     // Armageddon mode: triggers this many seconds into a match, with a chat countdown beginning
     // ARMAGEDDON_WARN_SECONDS earlier. Countdown announcements fire as each of these thresholds
     // (seconds-remaining) is crossed.
-    private static final long ARMAGEDDON_DELAY_SECONDS = 20 * 60;
+    private static final long ARMAGEDDON_DELAY_SECONDS = 30 * 60;
     private static final long ARMAGEDDON_WARN_SECONDS = 5 * 60;
     private static final long[] ARMAGEDDON_COUNTDOWN_THRESHOLDS = {300, 240, 180, 120, 60, 30, 10, 5, 4, 3, 2, 1};
     private final java.util.Random random = new java.util.Random();
@@ -316,8 +316,12 @@ public class GameManager {
                 // still read the global state. Without this the match world loads and players spawn,
                 // but nothing actually runs — the "game never starts" symptom.
                 currentState = GameState.ACTIVE;
-                matchStartTime = System.currentTimeMillis();
-                match.setStartTimeMillis(matchStartTime);
+
+                // 10-second build-phase grace: players are in the map and can place towers, but cannot
+                // send mobs, and the wave/Armageddon clocks don't start ticking until it ends. We leave
+                // startTimeMillis at 0 for now so tickArmageddon stays dormant during the grace window.
+                final long graceMs = 10_000L;
+                match.setGraceUntil(System.currentTimeMillis() + graceMs);
 
                 // Show the castle HUD now the match is live. The new per-match startMatch flow never
                 // called these (only the legacy handleGameStart did), so the boss bar and castle
@@ -326,14 +330,40 @@ public class GameManager {
                 updateCastleHologram(match, "1");
                 updateCastleHologram(match, "2");
 
-                plugin.getLogger().info("Match " + match.getMatchId() + " is now ACTIVE");
+                for (UUID id : playerIds) {
+                    Player p = Bukkit.getPlayer(id);
+                    if (p == null) continue;
+                    p.sendTitle(ChatColor.GREEN + "" + ChatColor.BOLD + "Build Phase",
+                            ChatColor.YELLOW + "Place towers — mobs unlock in 10s!", 5, 60, 10);
+                    p.sendMessage(ChatColor.GREEN + "Build phase! You have " + ChatColor.YELLOW + "10 seconds"
+                            + ChatColor.GREEN + " to place towers before mobs can be sent.");
+                }
+
+                // Grace-end: start the match clock, lift the mob-spawn block, and (single-player) kick off
+                // the wave engine.
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    matchStartTime = System.currentTimeMillis();
+                    match.setStartTimeMillis(matchStartTime);
+                    for (UUID id : playerIds) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p == null) continue;
+                        p.sendTitle(ChatColor.RED + "" + ChatColor.BOLD + "Mobs Incoming!",
+                                ChatColor.YELLOW + "The battle begins!", 5, 40, 10);
+                        p.playSound(p.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 1.0f, 1.0f);
+                        p.sendMessage(ChatColor.RED + "The build phase is over — mobs can now be sent!");
+                    }
+                    if (mapData.isSinglePlayer()) {
+                        plugin.getWaveManager().startWaves(match);
+                    }
+                    plugin.getLogger().info("Match " + match.getMatchId() + " build-phase grace ended; clocks started.");
+                }, graceMs / 50L);
+
+                plugin.getLogger().info("Match " + match.getMatchId() + " is now ACTIVE (10s build-phase grace)");
             }
         }, 0L, 20L); // Run every second
-        
-        // If Single Player, start the wave manager
-        if (mapData.isSinglePlayer()) {
-            plugin.getWaveManager().startWaves(match);
-        }
+
+        // Single-player waves are started at grace-end (see the runTaskLater above), not here, so the
+        // build phase isn't immediately overrun by the wave engine.
     }
 
     public void copyDirectory(File source, File target) throws java.io.IOException {
@@ -1381,7 +1411,7 @@ public class GameManager {
     }
 
     /**
-     * Admin/test hook: immediately starts Armageddon mode for a match, bypassing the 20-minute timer.
+     * Admin/test hook: immediately starts Armageddon mode for a match, bypassing the 30-minute timer.
      * Returns false if the match isn't an active game or is already in Armageddon.
      */
     public boolean forceArmageddon(Match match) {
@@ -1412,17 +1442,17 @@ public class GameManager {
         updateCastleHologram(match, "1");
         updateCastleHologram(match, "2");
 
-        // Permanent night + thunderstorm: lock the day/weather cycles, and disable mob griefing so the
-        // Wither's skulls and spawn blast can't carve up the map.
+        // Permanent night, clear skies: lock the day/weather cycles (no rain), and disable mob griefing
+        // so the Wither's skulls and spawn blast can't carve up the map.
         if (world != null) {
             world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
             world.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false);
             world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
             world.setTime(18000L);
-            world.setStorm(true);
-            world.setThundering(true);
+            world.setStorm(false);
+            world.setThundering(false);
             world.setWeatherDuration(Integer.MAX_VALUE);
-            world.setThunderDuration(Integer.MAX_VALUE);
+            world.setThunderDuration(0);
 
             // One Wither boss per team. Each spawns at its lane's start (waypoint 0) and traverses the
             // track like a mob — velocity-driven by the mob-movement ticker — flying above the path and
@@ -1434,7 +1464,7 @@ public class GameManager {
             for (String arena : teamArenas) {
                 org.bukkit.entity.Mob spawned = plugin.getMobManager().spawnMob(
                         match, arena, org.bukkit.entity.EntityType.WITHER,
-                        0.5, 500.0, 0.0, true, true, 0, 0, witherPreset);
+                        0.2, 500.0, 0.0, true, true, 0, 0, witherPreset);
                 if (!(spawned instanceof org.bukkit.entity.Wither wither)) continue;
                 wither.setInvulnerable(true);
                 wither.setInvulnerabilityTicks(0);
@@ -1460,12 +1490,12 @@ public class GameManager {
             p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.0f);
             p.sendMessage("");
             p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "============ ARMAGEDDON ============");
-            p.sendMessage(ChatColor.RED + "The 20-minute mark has passed and ARMAGEDDON is here:");
+            p.sendMessage(ChatColor.RED + "The 30-minute mark has passed and ARMAGEDDON is here:");
             p.sendMessage(ChatColor.GRAY + " • Every castle has been reduced to " + ChatColor.RED + "25% health" + ChatColor.GRAY + ".");
             p.sendMessage(ChatColor.GRAY + " • A " + ChatColor.DARK_RED + "Wither boss" + ChatColor.GRAY
                     + " now marches down each lane, firing skulls that " + ChatColor.RED + "permanently disable towers" + ChatColor.GRAY + ".");
             p.sendMessage(ChatColor.GRAY + " • Mobs you send now have " + ChatColor.RED + "+25% health and speed" + ChatColor.GRAY + ".");
-            p.sendMessage(ChatColor.GRAY + " • Night has fallen and a thunderstorm rages.");
+            p.sendMessage(ChatColor.GRAY + " • Night has fallen over the battlefield.");
             p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "===================================");
         }
         plugin.getLogger().info("Armageddon mode triggered for match " + match.getMatchId());
@@ -1478,7 +1508,9 @@ public class GameManager {
         for (UUID witherId : match.getArmageddonWithers()) {
             org.bukkit.entity.Entity ent = Bukkit.getEntity(witherId);
             if (!(ent instanceof org.bukkit.entity.Wither wither) || wither.isDead() || !wither.isValid()) continue;
-            if (random.nextDouble() < 0.5) {
+            // Fires on average about once every ~8 seconds (per-second driver), down from ~2s, so a
+            // disabled tower is a meaningful but recoverable setback rather than a constant barrage.
+            if (random.nextDouble() < 0.12) {
                 fireArmageddonSkull(wither);
             }
         }

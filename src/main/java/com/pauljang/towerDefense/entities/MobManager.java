@@ -99,12 +99,65 @@ public class MobManager {
         return chains;
     }
 
+    /** Mob-spawner sort options selectable from the GUI buttons (NONE = default chain order). */
+    public enum SortMode { NONE, GOLD_HP, GOLD_XP, GOLD_SPEED }
+
+    private final Map<UUID, SortMode> spawnerSort = new HashMap<>();
+
+    public SortMode getSpawnerSort(UUID uuid) { return spawnerSort.getOrDefault(uuid, SortMode.NONE); }
+
+    public void setSpawnerSort(UUID uuid, SortMode mode) {
+        if (mode == null || mode == SortMode.NONE) spawnerSort.remove(uuid);
+        else spawnerSort.put(uuid, mode);
+    }
+
+    /** Sort key for a chain under a given mode, computed from its Tier-1 stats (lower = listed first). */
+    private double sortMetric(String chain, SortMode mode) {
+        MobStateProfile p = upgradeRegistry.getProfile(chain, 1);
+        if (p == null) return Double.MAX_VALUE;
+        double price = p.getPrice();
+        return switch (mode) {
+            case GOLD_HP -> p.getHp() <= 0 ? Double.MAX_VALUE : price / p.getHp();
+            case GOLD_XP -> p.getExpReward() <= 0 ? Double.MAX_VALUE : price / p.getExpReward();
+            case GOLD_SPEED -> p.getSpeed() <= 0 ? Double.MAX_VALUE : price / p.getSpeed();
+            default -> 0;
+        };
+    }
+
+    /** GUI chain list ordered by the player's chosen sort mode (default insertion order for NONE). */
+    public List<String> getSortedGuiChains(UUID uuid) {
+        List<String> chains = new ArrayList<>(getGuiChains());
+        SortMode mode = getSpawnerSort(uuid);
+        if (mode != SortMode.NONE) {
+            chains.sort(java.util.Comparator.comparingDouble(c -> sortMetric(c, mode)));
+        }
+        return chains;
+    }
+
     public String getChainForSlot(int slot) {
         List<String> chains = getGuiChains();
         for (int i = 0; i < MOB_SLOTS.length && i < chains.size(); i++) {
             if (MOB_SLOTS[i] == slot) return chains.get(i);
         }
         return null;
+    }
+
+    /** Slot -> chain using the player's current sort order, so clicks match what they see. */
+    public String getChainForSlot(UUID uuid, int slot) {
+        List<String> chains = getSortedGuiChains(uuid);
+        for (int i = 0; i < MOB_SLOTS.length && i < chains.size(); i++) {
+            if (MOB_SLOTS[i] == slot) return chains.get(i);
+        }
+        return null;
+    }
+
+    String sortModeLabel(SortMode mode) {
+        return switch (mode) {
+            case GOLD_HP -> "Gold / HP";
+            case GOLD_XP -> "Gold / XP";
+            case GOLD_SPEED -> "Gold / Speed";
+            default -> "Default";
+        };
     }
 
     public String getChainDisplayName(String chainKey) {
@@ -194,6 +247,16 @@ public class MobManager {
         // Every TD mob is velocity-driven, so fully strip its vanilla AI goals. This stops Witches
         // from pausing to drink potions and Wardens from aggroing onto other mobs along the path.
         org.bukkit.Bukkit.getMobGoals().removeAllGoals(entity);
+
+        // Eject any vanilla "jockey" rider (e.g. the skeleton a spider can randomly spawn carrying).
+        // Left attached it rides the mob as a passenger, which both looks wrong and — via the mount
+        // protection in MobListener — made the carrier undamageable (the "can't hit the first spider"
+        // bug). Our own passengers (mounts, invisible-mob health bars) are added later, so anything
+        // riding the freshly spawned entity here is unwanted.
+        for (org.bukkit.entity.Entity passenger : new java.util.ArrayList<>(entity.getPassengers())) {
+            entity.removePassenger(passenger);
+            passenger.remove();
+        }
 
         // Scrub any random vanilla equipment (armor/weapons) so only CSV-defined equipment shows.
         if (entity.getEquipment() != null) {
@@ -885,6 +948,51 @@ public class MobManager {
         // the castle door. The mob stays alive and continuously sieges the castle on an attack
         // cooldown rather than despawning or draining health 20x/second.
         if (mob.hasReachedFinalWaypoint()) {
+            // Armageddon Wither: never let its enormous hitbox camp the castle door (it blocks players
+            // from hitting the other mobs gathered there). Instead, loop it back to the first waypoint
+            // to march the track again, continuing to disable towers along the way.
+            if (mob.getEntity().getPersistentDataContainer().has(
+                    TDKeys.ARMAGEDDON_WITHER, org.bukkit.persistence.PersistentDataType.BYTE)) {
+                TDWaypoint start = mob.getWaypointGraph().get("0");
+                if (start != null && start.getLocation() != null) {
+                    mob.getEntity().teleport(start.getLocation().clone().add(0, heightOffset, 0));
+                    mob.resetToStart();
+                }
+                return;
+            }
+
+            // Fan out around the castle door: rather than every mob stacking on the exact final node,
+            // each walks to its own random offset point near it (set at spawn), then settles to siege.
+            Location fanTarget = mob.getFinalOffsetWaypoint();
+            if (fanTarget != null && !mob.isSettledAtEnd()) {
+                org.bukkit.entity.Mob physicalMover = mob.getEntity();
+                if (mob.getEntity().getVehicle() instanceof org.bukkit.entity.Mob vMob) physicalMover = vMob;
+                Location loc = physicalMover.getLocation();
+                Location fanLoc = fanTarget.clone().add(0, heightOffset, 0);
+                double fanDistSq = Math.pow(loc.getX() - fanLoc.getX(), 2) + Math.pow(loc.getZ() - fanLoc.getZ(), 2);
+                // Settle-timeout safety net: a large/slow mob (Warden, Giant) that can't quite reach its
+                // offset spot still settles after ~2s so it always begins sieging the castle.
+                if (fanDistSq > 0.45 && mob.incrementEndFanTicks() < 40) {
+                    double fanSpeed = 0.1;
+                    org.bukkit.attribute.AttributeInstance fanSpeedAttr = mob.getEntity().getAttribute(Attribute.MOVEMENT_SPEED);
+                    if (fanSpeedAttr != null) fanSpeed = fanSpeedAttr.getValue();
+                    if (isVelocityDriven(mob.getEntity(), heightOffset)) {
+                        org.bukkit.util.Vector dir = fanLoc.clone().subtract(loc).toVector();
+                        if (heightOffset <= 0.0) dir.setY(0);
+                        if (dir.lengthSquared() > 1.0e-4) {
+                            dir.normalize();
+                            physicalMover.setRotation((float) Math.toDegrees(Math.atan2(-dir.getX(), dir.getZ())), 0f);
+                            if (heightOffset > 0.0) physicalMover.setVelocity(dir.multiply(fanSpeed));
+                            else physicalMover.setVelocity(dir.multiply(fanSpeed).setY(physicalMover.getVelocity().getY()));
+                        }
+                    } else {
+                        mob.getEntity().getPathfinder().moveTo(fanLoc, 1.0);
+                    }
+                    return; // still spreading out — don't stop or siege yet
+                }
+                mob.setSettledAtEnd(true); // arrived at its fan-out spot
+            }
+
             // Creepers are suicide bombers: they detonate once for their (larger) damage and are
             // consumed, instead of standing at the door.
             if (mob.getEntity().getType() == EntityType.CREEPER) {
@@ -1011,6 +1119,17 @@ public class MobManager {
         double reachDistSq = Math.pow(mobLoc.getX() - targetLoc.getX(), 2)
                 + Math.pow(mobLoc.getZ() - targetLoc.getZ(), 2);
         double reachThreshold = isVelocityDriven(mob.getEntity(), heightOffset) ? 0.5 : 0.25;
+        // At the final node, use a much larger acceptance radius. Tall/large mobs (Warden, Giant) can be
+        // physically blocked by the castle structure from getting within ~0.7 blocks of the end node, so
+        // they'd stall just short and never trigger the castle siege. A 2.5-block radius lets them reach
+        // "final" reliably and start attacking.
+        String curWp = mob.getCurrentWaypointId();
+        if (curWp != null) {
+            TDWaypoint curNode = mob.getWaypointGraph().get(curWp);
+            if (curNode != null && curNode.getNextIds().isEmpty()) {
+                reachThreshold = 6.25; // (2.5 blocks)^2
+            }
+        }
         if (reachDistSq < reachThreshold) {
             mob.advanceToNextWaypoint();
         }
@@ -1175,6 +1294,10 @@ public class MobManager {
         Map<String, Map<Integer, Integer>> queue = playerQueues.get(uuid);
         if (queue == null || queue.isEmpty()) return;
 
+        // Build-phase grace: no mobs may be sent until the match clock starts (towers can still be placed).
+        com.pauljang.towerDefense.core.Match graceMatch = plugin.getGameManager().getPlayerMatch(uuid);
+        if (graceMatch != null && graceMatch.isInGracePeriod()) return;
+
         // Flatten the queue into a spawn list preserving each mob's exact tier.
         List<QueuedSpawn> spawnList = new ArrayList<>();
         for (Map.Entry<String, Map<Integer, Integer>> chainEntry : queue.entrySet()) {
@@ -1234,8 +1357,16 @@ public class MobManager {
             }
         }
 
-        // Place all selectable mob chains in order (standalone Endermite is excluded)
-        List<String> chains = getGuiChains();
+        // Header (slot 4): title + the player's current sort mode.
+        SortMode sortMode = getSpawnerSort(player.getUniqueId());
+        gui.setItem(4, createGUIItem(Material.WITHER_SKELETON_SKULL,
+                ChatColor.RED + "" + ChatColor.BOLD + "Mob Spawner",
+                ChatColor.GRAY + "Queue mobs to send down your opponent's lane.",
+                "",
+                ChatColor.GRAY + "Sorted by: " + ChatColor.YELLOW + sortModeLabel(sortMode)));
+
+        // Place all selectable mob chains in the player's chosen order (standalone Endermite excluded).
+        List<String> chains = getSortedGuiChains(player.getUniqueId());
         for (int i = 0; i < MOB_SLOTS.length && i < chains.size(); i++) {
             String chain = chains.get(i);
             int queuedCount = getQueueTotal(player.getUniqueId(), chain);
@@ -1275,17 +1406,46 @@ public class MobManager {
             sendWaveLore.add(ChatColor.GREEN + "Total Payout: " + ChatColor.DARK_GREEN + "+" + totalXpPayout + " XP");
         }
 
-        gui.setItem(38, createGUIItem(Material.RED_WOOL,
-                ChatColor.RED + "Clear Queue",
+        // Sort buttons (row 4): reorder the grid by value ratios; click the active one again to reset.
+        gui.setItem(38, createSortButton(Material.IRON_INGOT, "Gold / HP",
+                "Cheapest HP per gold first.", sortMode == SortMode.GOLD_HP));
+        gui.setItem(40, createSortButton(Material.EXPERIENCE_BOTTLE, "Gold / XP",
+                "Least XP given to the enemy per gold.", sortMode == SortMode.GOLD_XP));
+        gui.setItem(42, createSortButton(Material.SUGAR, "Gold / Speed",
+                "Cheapest speed per gold first.", sortMode == SortMode.GOLD_SPEED));
+
+        // Action buttons (bottom row).
+        gui.setItem(47, createGUIItem(Material.RED_WOOL,
+                ChatColor.RED + "" + ChatColor.BOLD + "Clear Queue",
                 ChatColor.GRAY + "Dequeue all mobs and refund Gold."));
-        gui.setItem(40, createGUIItem(Material.LIME_WOOL,
-                ChatColor.GREEN + "Send Wave",
+        gui.setItem(49, createGUIItem(Material.LIME_WOOL,
+                ChatColor.GREEN + "" + ChatColor.BOLD + "Send Wave",
                 sendWaveLore.toArray(new String[0])));
-        gui.setItem(42, createGUIItem(Material.NETHER_STAR,
-                ChatColor.GOLD + "Player Upgrades",
+        gui.setItem(51, createGUIItem(Material.NETHER_STAR,
+                ChatColor.GOLD + "" + ChatColor.BOLD + "Player Upgrades",
                 ChatColor.GRAY + "Open weapons & upgrades screen."));
 
         player.openInventory(gui);
+    }
+
+    private org.bukkit.inventory.ItemStack createSortButton(Material mat, String name, String desc, boolean active) {
+        java.util.List<String> lore = new java.util.ArrayList<>();
+        lore.add(ChatColor.GRAY + desc);
+        lore.add("");
+        lore.add(active ? ChatColor.GREEN + "" + ChatColor.BOLD + "ACTIVE — click to reset"
+                        : ChatColor.YELLOW + "Click to sort by this");
+        org.bukkit.inventory.ItemStack item = createGUIItem(mat,
+                (active ? ChatColor.GREEN : ChatColor.WHITE) + "" + ChatColor.BOLD + "Sort: " + name,
+                lore.toArray(new String[0]));
+        if (active) {
+            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+                item.setItemMeta(meta);
+            }
+        }
+        return item;
     }
 
     private org.bukkit.inventory.ItemStack createChainGUIItem(Player player, String chain, int queuedCount) {

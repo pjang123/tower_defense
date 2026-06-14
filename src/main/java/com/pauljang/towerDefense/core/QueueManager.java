@@ -43,6 +43,7 @@ public class QueueManager {
                 player.sendMessage(ChatColor.YELLOW + "You left the Single Player queue.");
             } else {
                 multiPlayerQueue.remove(uuid);
+                removeVoteItem(player); // leaving MP for SP: drop the MP vote item
                 singlePlayerQueue.add(uuid);
                 player.sendMessage(ChatColor.GREEN + "You joined the Single Player queue!");
                 plugin.getLogger().info(player.getName() + " joined Single Player queue. Queue size: " + singlePlayerQueue.size());
@@ -50,15 +51,53 @@ public class QueueManager {
             }
         } else {
             if (multiPlayerQueue.remove(uuid)) {
+                removeVoteItem(player);
                 player.sendMessage(ChatColor.YELLOW + "You left the Multiplayer queue.");
             } else {
                 singlePlayerQueue.remove(uuid);
                 multiPlayerQueue.add(uuid);
+                giveVoteItem(player);
                 int required = plugin.getConfig().getInt("game.players-per-match", 2);
                 player.sendMessage(ChatColor.GREEN + "You joined the Multiplayer queue! (" + multiPlayerQueue.size() + "/" + required + ")");
                 plugin.getLogger().info(player.getName() + " joined Multiplayer queue. Queue size: " + multiPlayerQueue.size() + "/" + required);
                 checkQueues();
             }
+        }
+    }
+
+    /** Display name + identity of the queued-player "Map Vote" paper item. */
+    public static final String VOTE_ITEM_NAME = ChatColor.AQUA + "" + ChatColor.BOLD + "Map Vote";
+
+    public boolean isVoteItem(ItemStack item) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer().has(
+                        com.pauljang.towerDefense.TDKeys.QUEUE_VOTE_ITEM,
+                        org.bukkit.persistence.PersistentDataType.BYTE);
+    }
+
+    /** Gives the MP-queue player a non-droppable paper that opens the map-vote panel on right-click. */
+    public void giveVoteItem(Player player) {
+        removeVoteItem(player); // avoid duplicates
+        ItemStack paper = new ItemStack(Material.PAPER);
+        ItemMeta meta = paper.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(VOTE_ITEM_NAME);
+            meta.setLore(Arrays.asList(
+                    ChatColor.GRAY + "Right-click to open the map vote.",
+                    ChatColor.DARK_GRAY + "Given while you're in the multiplayer queue."));
+            meta.getPersistentDataContainer().set(
+                    com.pauljang.towerDefense.TDKeys.QUEUE_VOTE_ITEM,
+                    org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+            paper.setItemMeta(meta);
+        }
+        player.getInventory().setItem(0, paper);
+    }
+
+    /** Strips any Map Vote item from the player (on leaving the queue / entering a match). */
+    public void removeVoteItem(Player player) {
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        for (int i = 0; i < inv.getSize(); i++) {
+            if (isVoteItem(inv.getItem(i))) inv.setItem(i, null);
         }
     }
 
@@ -93,10 +132,13 @@ public class QueueManager {
             return;
         }
 
-        // Pick 3 random maps
-        Collections.shuffle(allMaps);
-        List<MapManager.MapData> options = allMaps.subList(0, Math.min(3, allMaps.size()));
-        
+        // Show ALL maps for this mode in a consistent (already-sorted) order, capped to what the panel
+        // can display, rather than 3 random picks.
+        List<MapManager.MapData> options = new ArrayList<>(allMaps);
+        if (options.size() > VotingSession.MAX_OPTIONS) {
+            options = new ArrayList<>(options.subList(0, VotingSession.MAX_OPTIONS));
+        }
+
         VotingSession session = new VotingSession(playerIds, options, singlePlayer);
         for (UUID id : playerIds) {
             activeVotes.put(id, session);
@@ -153,28 +195,55 @@ public class QueueManager {
             }
         }
 
+        // The vote panel lays maps into the inner area of a 54-slot inventory (4 rows x 7 columns).
+        static final int MAX_OPTIONS = 28;
+
+        /** Inner content slot (skipping the border) for the i-th map option. */
+        static int innerSlot(int i) {
+            int row = 1 + i / 7;
+            int col = 1 + i % 7;
+            return row * 9 + col;
+        }
+
+        /** Maps a clicked raw slot back to a map option index, or -1 if it isn't a map button. */
+        public int slotToOption(int rawSlot) {
+            for (int i = 0; i < options.size(); i++) {
+                if (innerSlot(i) == rawSlot) return i;
+            }
+            return -1;
+        }
+
         public void openGUI(Player player) {
             com.pauljang.towerDefense.ui.TDMenuHolder holder =
                     new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.VOTE_MAP);
-            Inventory gui = Bukkit.createInventory(holder, 27, ChatColor.BLUE + "Vote for a Map! (" + timeLeft + "s)");
+            Inventory gui = Bukkit.createInventory(holder, 54, ChatColor.BLUE + "Vote for a Map! (" + timeLeft + "s)");
             holder.setInventory(gui);
+
+            ItemStack border = new ItemStack(Material.BLUE_STAINED_GLASS_PANE);
+            ItemMeta borderMeta = border.getItemMeta();
+            if (borderMeta != null) { borderMeta.setDisplayName(" "); border.setItemMeta(borderMeta); }
+            for (int i = 0; i < 54; i++) {
+                if (i < 9 || i >= 45 || i % 9 == 0 || i % 9 == 8) gui.setItem(i, border);
+            }
 
             for (int i = 0; i < options.size(); i++) {
                 MapManager.MapData map = options.get(i);
                 int mapVotes = 0;
                 for (Integer v : votes.values()) if (v == i) mapVotes++;
-                
+
                 ItemStack item = new ItemStack(Material.PAPER);
                 ItemMeta meta = item.getItemMeta();
-                meta.setDisplayName(ChatColor.YELLOW + map.getDisplayName());
+                meta.setDisplayName(ChatColor.YELLOW + "" + ChatColor.BOLD + map.getDisplayName());
                 meta.setLore(Arrays.asList(
-                    ChatColor.GRAY + "Author: " + map.getAuthor(),
-                    ChatColor.GREEN + "Votes: " + mapVotes
+                    ChatColor.GRAY + "Author: " + ChatColor.WHITE + map.getAuthor(),
+                    ChatColor.GREEN + "Votes: " + ChatColor.WHITE + mapVotes,
+                    "",
+                    ChatColor.YELLOW + "Click to vote for this map!"
                 ));
                 item.setItemMeta(meta);
-                gui.setItem(11 + i, item);
+                gui.setItem(innerSlot(i), item);
             }
-            
+
             player.openInventory(gui);
         }
 
@@ -217,6 +286,7 @@ public class QueueManager {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) {
                     p.closeInventory();
+                    removeVoteItem(p); // entering a match — the queue vote item is no longer needed
                     p.sendMessage(ChatColor.GREEN + "Map selected: " + winner.getDisplayName());
                 }
             }
