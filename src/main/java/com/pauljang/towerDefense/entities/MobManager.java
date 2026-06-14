@@ -746,6 +746,8 @@ public class MobManager {
     // ===================== Evoker shield =====================
     private static final int EVOKER_SHIELD_STANDS = 6;
     private static final double EVOKER_SHIELD_RADIUS = 1.7;
+    // Vertical offset of each (now full-size) shield stand so its held shield sits at the evoker's body.
+    private static final double EVOKER_SHIELD_Y = -0.3;
     private static final long EVOKER_SHIELD_RESPAWN_MS = 60_000L;
 
     /** Spawns the ring of invisible, shield-holding armor stands around an evoker (clearing any prior ring). */
@@ -758,8 +760,8 @@ public class MobManager {
         Location base = entity.getLocation();
         for (int i = 0; i < EVOKER_SHIELD_STANDS; i++) {
             double ang = evoker.getShieldAngle() + (2 * Math.PI * i / EVOKER_SHIELD_STANDS);
-            Location loc = base.clone().add(Math.cos(ang) * EVOKER_SHIELD_RADIUS, 0.6, Math.sin(ang) * EVOKER_SHIELD_RADIUS);
-            loc.setYaw((float) Math.toDegrees(ang));
+            Location loc = base.clone().add(Math.cos(ang) * EVOKER_SHIELD_RADIUS, EVOKER_SHIELD_Y, Math.sin(ang) * EVOKER_SHIELD_RADIUS);
+            loc.setYaw((float) (Math.toDegrees(ang) - 180));
             org.bukkit.entity.ArmorStand stand = world.spawn(loc, org.bukkit.entity.ArmorStand.class, as -> {
                 as.setVisible(false);
                 as.setMarker(false);
@@ -768,7 +770,7 @@ public class MobManager {
                 as.setGravity(false);
                 as.setInvulnerable(true);
                 as.setPersistent(false);
-                as.setSmall(true);
+                as.setSmall(false);
                 as.setRightArmPose(new org.bukkit.util.EulerAngle(Math.toRadians(-90), 0, 0));
                 org.bukkit.inventory.EntityEquipment eq = as.getEquipment();
                 if (eq != null) {
@@ -815,8 +817,8 @@ public class MobManager {
                 org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(stands.get(i));
                 if (!(e instanceof org.bukkit.entity.ArmorStand stand) || !stand.isValid()) continue;
                 double ang = evoker.getShieldAngle() + (2 * Math.PI * i / n);
-                Location loc = base.clone().add(Math.cos(ang) * EVOKER_SHIELD_RADIUS, 0.6, Math.sin(ang) * EVOKER_SHIELD_RADIUS);
-                loc.setYaw((float) Math.toDegrees(ang));
+                Location loc = base.clone().add(Math.cos(ang) * EVOKER_SHIELD_RADIUS, EVOKER_SHIELD_Y, Math.sin(ang) * EVOKER_SHIELD_RADIUS);
+                loc.setYaw((float) (Math.toDegrees(ang) - 180));
                 stand.teleport(loc);
             }
             if (tickCounter % 10 == 0 && entity.getWorld() != null) {
