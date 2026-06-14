@@ -416,7 +416,7 @@ public class TowerManager {
         }
         String speedStr = String.format("%.1fs", cooldown / 20.0);
         if (isBoosted) {
-            speedStr += ChatColor.RED + " âš¡";
+            speedStr += ChatColor.RED + " ⚡";
         }
 
         // Prepend the owner's name to the tower title, e.g. "Steve's Archer Tower".
@@ -566,18 +566,30 @@ public class TowerManager {
                 for (Tower tower : placedTowers.values()) {
                     if (tower.isDisabled()) {
                         tower.setEmpDisplayed(true);
-                        // Make the disabled state obvious: relabel the top hologram line and emit heavy
-                        // smoke + redstone particles around the tower.
+                        // Make the disabled state obvious: relabel the top hologram line and emit particles.
+                        // Armageddon Wither disables get a distinct withered/soul look vs. the EMP spell.
+                        boolean witherDisabled = tower.isArmageddonDisabled();
                         java.util.List<ArmorStand> empStands = tower.getHolograms();
                         if (!empStands.isEmpty() && empStands.get(0) != null && empStands.get(0).isValid()) {
-                            empStands.get(0).setCustomName(ChatColor.RED + "" + ChatColor.MAGIC + "||| " + ChatColor.RED + ChatColor.BOLD + "[DISABLED EMP] " + ChatColor.RED + ChatColor.MAGIC + "|||");
+                            if (witherDisabled) {
+                                empStands.get(0).setCustomName(ChatColor.DARK_GRAY + "" + ChatColor.MAGIC + "::: " + ChatColor.BLACK + ChatColor.BOLD + "[WITHERED] " + ChatColor.DARK_GRAY + ChatColor.MAGIC + ":::");
+                            } else {
+                                empStands.get(0).setCustomName(ChatColor.RED + "" + ChatColor.MAGIC + "||| " + ChatColor.RED + ChatColor.BOLD + "[DISABLED EMP] " + ChatColor.RED + ChatColor.MAGIC + "|||");
+                            }
                             empStands.get(0).setCustomNameVisible(true);
                         }
                         if (tick % 5 == 0) {
                             Location center = tower.getCenterLocation();
-                            center.getWorld().spawnParticle(org.bukkit.Particle.LARGE_SMOKE, center.clone().add(0, 2, 0), 12, 0.5, 0.7, 0.5, 0.02);
-                            center.getWorld().spawnParticle(org.bukkit.Particle.DUST, center.clone().add(0, 2.5, 0), 10, 0.5, 0.7, 0.5,
-                                    new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.5f));
+                            if (witherDisabled) {
+                                center.getWorld().spawnParticle(org.bukkit.Particle.SMOKE, center.clone().add(0, 2, 0), 14, 0.5, 0.8, 0.5, 0.01);
+                                center.getWorld().spawnParticle(org.bukkit.Particle.SCULK_SOUL, center.clone().add(0, 2.4, 0), 8, 0.45, 0.6, 0.45, 0.0);
+                                center.getWorld().spawnParticle(org.bukkit.Particle.DUST, center.clone().add(0, 2.6, 0), 8, 0.5, 0.7, 0.5,
+                                        new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(30, 30, 30), 1.6f));
+                            } else {
+                                center.getWorld().spawnParticle(org.bukkit.Particle.LARGE_SMOKE, center.clone().add(0, 2, 0), 12, 0.5, 0.7, 0.5, 0.02);
+                                center.getWorld().spawnParticle(org.bukkit.Particle.DUST, center.clone().add(0, 2.5, 0), 10, 0.5, 0.7, 0.5,
+                                        new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.5f));
+                            }
                         }
                         continue;
                     }
@@ -625,7 +637,7 @@ public class TowerManager {
                                     org.bukkit.util.Vector pushBack = centerLoc.toVector().subtract(ghastLoc.toVector()).normalize().multiply(0.5);
                                     tower.getSpawnedGhast().setVelocity(pushBack);
                                     if (tick % 20 == 0) {
-                                        rider.sendMessage(org.bukkit.ChatColor.RED + "âš  You are reaching the edge of the arena boundary! Pushing back.");
+                                        rider.sendMessage(org.bukkit.ChatColor.RED + "⚠ You are reaching the edge of the arena boundary! Pushing back.");
                                     }
                                 }
                             }
@@ -1025,6 +1037,10 @@ public class TowerManager {
             if (mob == null || mob.isDead() || !mob.isValid()) continue;
 
             if (!mob.getWorld().equals(towerLoc.getWorld())) continue;
+
+            // Armageddon Wither bosses are invulnerable and not a valid target — towers must keep
+            // firing at the player's mobs, not waste shots on the unkillable boss.
+            if (mob.getPersistentDataContainer().has(TDKeys.ARMAGEDDON_WITHER, org.bukkit.persistence.PersistentDataType.BYTE)) continue;
 
             String mobArena = mob.getPersistentDataContainer().get(
                 TDKeys.ARENA,
@@ -1887,6 +1903,7 @@ public class TowerManager {
             Mob mob = tdMob.getEntity();
             if (mob == null || mob.isDead() || !mob.isValid()) continue;
             if (!mob.getWorld().equals(center.getWorld())) continue;
+            if (mob.getPersistentDataContainer().has(TDKeys.ARMAGEDDON_WITHER, org.bukkit.persistence.PersistentDataType.BYTE)) continue;
 
             String mobArena = mob.getPersistentDataContainer().get(
                 TDKeys.ARENA,

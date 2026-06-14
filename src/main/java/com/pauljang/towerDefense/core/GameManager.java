@@ -87,6 +87,14 @@ public class GameManager {
     private static final long SPELL_PRICE_RESET_MS = 10000L;
     private static final long FREEZE_COOLDOWN_MS = 30000L;
 
+    // Armageddon mode: triggers this many seconds into a match, with a chat countdown beginning
+    // ARMAGEDDON_WARN_SECONDS earlier. Countdown announcements fire as each of these thresholds
+    // (seconds-remaining) is crossed.
+    private static final long ARMAGEDDON_DELAY_SECONDS = 20 * 60;
+    private static final long ARMAGEDDON_WARN_SECONDS = 5 * 60;
+    private static final long[] ARMAGEDDON_COUNTDOWN_THRESHOLDS = {300, 240, 180, 120, 60, 30, 10, 5, 4, 3, 2, 1};
+    private final java.util.Random random = new java.util.Random();
+
     /**
      * Returns the current tier for a given upgrade chain for the player.
      * If no tier is stored, defaults to 1.
@@ -252,7 +260,8 @@ public class GameManager {
             playerToMatch.put(id, match);
 
             p.sendMessage(ChatColor.GREEN + "Match starting in 5 seconds...");
-            p.sendMessage(ChatColor.YELLOW + "You are on Arena " + arena);
+            String teamWord = "1".equals(arena) ? ChatColor.BLUE + "Blue" : ChatColor.RED + "Red";
+            p.sendMessage(ChatColor.YELLOW + "You are on the " + teamWord + ChatColor.YELLOW + " Team");
             p.sendTitle(ChatColor.GOLD + "Match Starting", ChatColor.YELLOW + "Teleporting in 5 seconds...", 10, 100, 10);
             p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
         }
@@ -414,6 +423,12 @@ public class GameManager {
                     }
                 }
             }
+
+            // Drive Armageddon timing/effects for every live match (independent of the global HUD state).
+            for (Match m : new java.util.ArrayList<>(activeMatches.values())) {
+                tickArmageddon(m);
+            }
+
             updateTabNames();
         }, 0L, 20L);
 
@@ -771,22 +786,13 @@ public class GameManager {
             }
         }
 
-        // In multiplayer, award the win to the opposing arena before the match closes.
-        if (!match.getMapData().isSinglePlayer()) {
-            String winningArena = "1".equals(arena) ? "2" : "1";
-            for (UUID id : new ArrayList<>(match.getPlayers())) {
-                if (winningArena.equals(match.getPlayerArenas().get(id))) {
-                    Player w = Bukkit.getPlayer(id);
-                    if (w != null) {
-                        w.sendTitle(ChatColor.GREEN + "VICTORY", ChatColor.YELLOW + "Your opponent forfeited!", 10, 70, 20);
-                        w.playSound(w.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
-                    }
-                }
-            }
-        }
-
+        // Run the same end-of-match sequence as a castle defeat: winner splash, chat stats, and a
+        // return-to-lobby compass. In multiplayer the opposing arena wins; single-player has no winner.
+        // handleMatchEnd keeps the match world alive and schedules teardown, so players can read their
+        // stats and leave via the compass rather than being yanked straight to the lobby.
         match.setCurrentState(GameState.ENDED);
-        endMatch(match);
+        String winningArena = match.getMapData().isSinglePlayer() ? null : ("1".equals(arena) ? "2" : "1");
+        handleMatchEnd(match, winningArena);
     }
 
     public java.util.List<java.util.UUID> getMatchQueue() {
@@ -1328,7 +1334,217 @@ public class GameManager {
         }
     }
 
+    // ===================== Armageddon Mode =====================
+
+    /**
+     * Per-second Armageddon driver for one match: announces the 5-minute chat countdown, triggers the
+     * mode at {@link #ARMAGEDDON_DELAY_SECONDS}, and once active makes the Wither bosses fire skulls
+     * that permanently disable towers.
+     */
+    private void tickArmageddon(Match match) {
+        if (match == null || match.getCurrentState() != GameState.ACTIVE) return;
+        if (match.getStartTimeMillis() <= 0L) return;
+
+        if (match.isArmageddonActive()) {
+            tickArmageddonWithers(match);
+            return;
+        }
+
+        long elapsed = (System.currentTimeMillis() - match.getStartTimeMillis()) / 1000L;
+        long remaining = ARMAGEDDON_DELAY_SECONDS - elapsed;
+
+        if (remaining <= 0) {
+            triggerArmageddon(match);
+            return;
+        }
+
+        // Countdown: announce each threshold once, as it is crossed, starting 5 minutes out.
+        if (remaining <= ARMAGEDDON_WARN_SECONDS) {
+            for (long threshold : ARMAGEDDON_COUNTDOWN_THRESHOLDS) {
+                if (remaining <= threshold && threshold < match.getArmageddonLastWarn()) {
+                    match.setArmageddonLastWarn(threshold);
+                    String pretty = threshold >= 60
+                            ? (threshold / 60) + " minute" + (threshold / 60 == 1 ? "" : "s")
+                            : threshold + " second" + (threshold == 1 ? "" : "s");
+                    for (UUID id : match.getPlayers()) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p == null) continue;
+                        p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "[Armageddon] "
+                                + ChatColor.RED + "The end draws near... " + ChatColor.YELLOW + pretty
+                                + ChatColor.RED + " until ARMAGEDDON.");
+                        p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 0.5f);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Admin/test hook: immediately starts Armageddon mode for a match, bypassing the 20-minute timer.
+     * Returns false if the match isn't an active game or is already in Armageddon.
+     */
+    public boolean forceArmageddon(Match match) {
+        if (match == null || match.getCurrentState() != GameState.ACTIVE) return false;
+        if (match.isArmageddonActive()) return false;
+        triggerArmageddon(match);
+        return true;
+    }
+
+    /** Fires the one-time transition into Armageddon mode for a match. */
+    private void triggerArmageddon(Match match) {
+        if (match.isArmageddonActive()) return;
+        match.setArmageddonActive(true);
+
+        World world = match.getWorld();
+
+        // Distinct arenas that actually hold players = the teams that each get a Wither.
+        java.util.LinkedHashSet<String> teamArenas = new java.util.LinkedHashSet<>(match.getPlayerArenas().values());
+        if (teamArenas.isEmpty()) teamArenas.add(SINGLE_PLAYER_ARENA);
+
+        // Castle health drops to 25% for both arenas.
+        int quarter = Math.max(1, maxCastleHealth / 4);
+        for (String arena : new String[]{"1", "2"}) {
+            match.getArenaHealth().put(arena, quarter);
+            arenaHealth.put(arena, quarter);
+        }
+        updateBossBar();
+        updateCastleHologram(match, "1");
+        updateCastleHologram(match, "2");
+
+        // Permanent night + thunderstorm: lock the day/weather cycles, and disable mob griefing so the
+        // Wither's skulls and spawn blast can't carve up the map.
+        if (world != null) {
+            world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
+            world.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false);
+            world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
+            world.setTime(18000L);
+            world.setStorm(true);
+            world.setThundering(true);
+            world.setWeatherDuration(Integer.MAX_VALUE);
+            world.setThunderDuration(Integer.MAX_VALUE);
+
+            // One Wither boss per team. Each spawns at its lane's start (waypoint 0) and traverses the
+            // track like a mob — velocity-driven by the mob-movement ticker — flying above the path and
+            // firing skulls that permanently disable towers along the way. Scaled +200% and invulnerable
+            // so it can't be stopped; rewards are zero. setInvulnerabilityTicks(0) skips the vanilla
+            // spawn charge/explosion.
+            String witherPreset = "armageddon_wither";
+            plugin.getConfig().set("mobs." + witherPreset + ".height-offset", 4.0); // fly above the track
+            for (String arena : teamArenas) {
+                org.bukkit.entity.Mob spawned = plugin.getMobManager().spawnMob(
+                        match, arena, org.bukkit.entity.EntityType.WITHER,
+                        0.5, 500.0, 0.0, true, true, 0, 0, witherPreset);
+                if (!(spawned instanceof org.bukkit.entity.Wither wither)) continue;
+                wither.setInvulnerable(true);
+                wither.setInvulnerabilityTicks(0);
+                org.bukkit.attribute.AttributeInstance scale = wither.getAttribute(org.bukkit.attribute.Attribute.SCALE);
+                if (scale != null) scale.setBaseValue(3.0); // +200% size
+                org.bukkit.attribute.AttributeInstance step = wither.getAttribute(org.bukkit.attribute.Attribute.STEP_HEIGHT);
+                if (step != null) step.setBaseValue(1.5); // its large body shouldn't snag on the path
+                wither.getPersistentDataContainer().set(com.pauljang.towerDefense.TDKeys.ARMAGEDDON_WITHER,
+                        org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+                // Sieges the castle if it reaches the end of the lane it is marching down.
+                wither.getPersistentDataContainer().set(com.pauljang.towerDefense.TDKeys.CASTLE_DAMAGE,
+                        org.bukkit.persistence.PersistentDataType.INTEGER, 10);
+                match.getArmageddonWithers().add(wither.getUniqueId());
+            }
+        }
+
+        // Splash + chat explanation for everyone in the match.
+        for (UUID id : match.getPlayers()) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            p.sendTitle(ChatColor.DARK_RED + "" + ChatColor.BOLD + "ARMAGEDDON",
+                    ChatColor.RED + "The final battle has begun!", 10, 80, 20);
+            p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.0f);
+            p.sendMessage("");
+            p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "============ ARMAGEDDON ============");
+            p.sendMessage(ChatColor.RED + "The 20-minute mark has passed and ARMAGEDDON is here:");
+            p.sendMessage(ChatColor.GRAY + " • Every castle has been reduced to " + ChatColor.RED + "25% health" + ChatColor.GRAY + ".");
+            p.sendMessage(ChatColor.GRAY + " • A " + ChatColor.DARK_RED + "Wither boss" + ChatColor.GRAY
+                    + " now marches down each lane, firing skulls that " + ChatColor.RED + "permanently disable towers" + ChatColor.GRAY + ".");
+            p.sendMessage(ChatColor.GRAY + " • Mobs you send now have " + ChatColor.RED + "+25% health and speed" + ChatColor.GRAY + ".");
+            p.sendMessage(ChatColor.GRAY + " • Night has fallen and a thunderstorm rages.");
+            p.sendMessage(ChatColor.DARK_RED + "" + ChatColor.BOLD + "===================================");
+        }
+        plugin.getLogger().info("Armageddon mode triggered for match " + match.getMatchId());
+    }
+
+    /** While Armageddon is active, each Wither randomly lobs a skull that disables a tower on its team. */
+    private void tickArmageddonWithers(Match match) {
+        World world = match.getWorld();
+        if (world == null) return;
+        for (UUID witherId : match.getArmageddonWithers()) {
+            org.bukkit.entity.Entity ent = Bukkit.getEntity(witherId);
+            if (!(ent instanceof org.bukkit.entity.Wither wither) || wither.isDead() || !wither.isValid()) continue;
+            if (random.nextDouble() < 0.5) {
+                fireArmageddonSkull(wither);
+            }
+        }
+    }
+
+    /** Launches a Wither skull at a random still-active tower on the Wither's team and disables it. */
+    private void fireArmageddonSkull(org.bukkit.entity.Wither wither) {
+        String arena = wither.getPersistentDataContainer().get(
+                com.pauljang.towerDefense.TDKeys.ARENA, org.bukkit.persistence.PersistentDataType.STRING);
+
+        java.util.List<com.pauljang.towerDefense.towers.Tower> candidates = new java.util.ArrayList<>();
+        for (com.pauljang.towerDefense.towers.Tower tower : plugin.getTowerManager().getPlacedTowers().values()) {
+            if (tower.isDisabled()) continue;
+            if (arena != null && !arena.equals(plugin.getPlotConfigManager().getPlotArena(tower.getPlotId()))) continue;
+            candidates.add(tower);
+        }
+        if (candidates.isEmpty()) return;
+        com.pauljang.towerDefense.towers.Tower target = candidates.get(random.nextInt(candidates.size()));
+
+        Location from = wither.getEyeLocation();
+        Location to = target.getCenterLocation().clone().add(0, 1.5, 0);
+        org.bukkit.util.Vector dir = to.toVector().subtract(from.toVector());
+        if (dir.lengthSquared() < 1.0e-4) return;
+        dir.normalize();
+
+        org.bukkit.entity.WitherSkull skull = wither.getWorld().spawn(from, org.bukkit.entity.WitherSkull.class);
+        skull.setShooter(wither);
+        skull.setDirection(dir);
+        skull.setCharged(true);
+
+        // Disable the tower when the skull would arrive — independent of collision, so a skull never misses.
+        long travelTicks = Math.max(5L, (long) (from.distance(to) / 0.8));
+        final com.pauljang.towerDefense.towers.Tower disableTarget = target;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (disableTarget.isDisabled()) return;
+            disableTarget.setDisabledUntil(Long.MAX_VALUE); // permanent for the rest of the match
+            disableTarget.setArmageddonDisabled(true);      // distinct "withered" display vs. EMP
+            Location c = disableTarget.getCenterLocation();
+            if (c.getWorld() != null) {
+                c.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, c.clone().add(0, 1.5, 0), 2);
+                c.getWorld().playSound(c, Sound.ENTITY_WITHER_BREAK_BLOCK, 1.0f, 0.8f);
+            }
+        }, travelTicks);
+    }
+
+    /** Removes any Armageddon Wither bosses belonging to a match (called when the match ends). */
+    private void clearArmageddonWithers(Match match) {
+        if (match == null) return;
+        for (UUID id : match.getArmageddonWithers()) {
+            org.bukkit.entity.Entity ent = Bukkit.getEntity(id);
+            if (ent != null && !ent.isDead()) ent.remove();
+        }
+        match.getArmageddonWithers().clear();
+    }
+
     private void handleMatchEnd(Match match) {
+        handleMatchEnd(match, null);
+    }
+
+    /**
+     * Runs the end-of-match sequence (winner splash, chat stats, return-to-lobby compass) for every
+     * way a game can end. When {@code winnerArenaOverride} is non-null it forces the winning arena —
+     * used by forfeits, where both castles may still be standing. When null, the surviving castle wins
+     * (the castle-destroyed path).
+     */
+    private void handleMatchEnd(Match match, String winnerArenaOverride) {
         if (match == null) return;
         if (!finishedMatches.add(match.getMatchId())) return; // already handled
 
@@ -1337,8 +1553,13 @@ public class GameManager {
         boolean singlePlayer = match.getMapData().isSinglePlayer();
 
         // The losing castle is the one that hit 0; the other arena wins. (Single-player has no winner —
-        // the lone defender's castle fell.)
-        String winnerArena = match.getArenaHealth().getOrDefault("1", maxCastleHealth) > 0 ? "1" : "2";
+        // the lone defender's castle fell.) A forfeit passes the winner explicitly.
+        String winnerArena = winnerArenaOverride != null
+                ? winnerArenaOverride
+                : (match.getArenaHealth().getOrDefault("1", maxCastleHealth) > 0 ? "1" : "2");
+
+        // Withers from Armageddon mode (if it reached that phase) must stop firing and disappear now.
+        clearArmageddonWithers(match);
 
         // Stop spawning so the world goes quiet during the post-game screen, but keep it loaded.
         plugin.getWaveManager().stopWaves(match);

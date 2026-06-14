@@ -49,11 +49,11 @@ Giant,2,GIANT,8625,20.0,8400,0.6,306,"ICE",None,LEATHER_HELMET,"Summons zombies,
 Giant,3,GIANT,9919,30.0,11776,0.6,312,"ICE",None,CHAINMAIL_HELMET,"Summons zombies, Regenerates"
 Giant,4,GIANT,11406,40.0,16464,0.6,318,"ICE",None,IRON_HELMET,"Summons zombies, Regenerates"
 Giant,5,GIANT,13117,50.0,23050,0.6,324,"ICE",None,DIAMOND_HELMET,"Summons zombies, Regenerates"
-Warden,1,WARDEN,6000,5.0,10000,0.9,250,"ICE, POISON",None,None,High health tank
-Warden,2,WARDEN,6900,10.0,14000,0.6,260,"ICE, POISON",None,None,Increased damage resistance
-Warden,3,WARDEN,7935,15.0,20000,0.6,270,"ICE, POISON",None,None,Sonic boom attack potential
-Warden,4,WARDEN,9124,20.0,28000,0.6,280,"ICE, POISON",None,None,Heavy tank
-Warden,5,WARDEN,10492,25.0,40000,0.6,290,"ICE, POISON",None,None,Unstoppable force
+Warden,1,WARDEN,6000,2.0,10000,0.6,250,"ICE, POISON",None,None,"Siege Commander: 5-block aura buffs nearby mobs speed and armor"
+Warden,2,WARDEN,6900,2.0,14000,0.6,260,"ICE, POISON",None,None,"Siege Commander: 5-block aura buffs nearby mobs speed and armor"
+Warden,3,WARDEN,7935,3.0,20000,0.6,270,"ICE, POISON",None,None,"Siege Commander: 5-block aura buffs nearby mobs speed and armor"
+Warden,4,WARDEN,9124,3.0,28000,0.6,280,"ICE, POISON",None,None,"Siege Commander: 5-block aura buffs nearby mobs speed and armor"
+Warden,5,WARDEN,10492,4.0,40000,0.6,290,"ICE, POISON",None,None,"Siege Commander: 5-block aura buffs nearby mobs speed and armor"
 Ravager,1,RAVAGER,3000,3.0,2400,0.9,180,None,None,None,Heavy beast
 Ravager,2,RAVAGER,3600,4.0,3360,0.9,190,None,None,None,Armored plates
 Ravager,3,RAVAGER,4320,5.0,4704,0.9,200,None,None,None,Roar stun resistance

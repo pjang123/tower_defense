@@ -16,6 +16,8 @@ public class Tower {
     private BlockVector structureSize = null;
     private TargetingMode targetingMode = TargetingMode.FIRST;
     private long disabledUntil = 0;
+    // True when this tower was permanently disabled by an Armageddon Wither (distinct display from EMP).
+    private boolean armageddonDisabled = false;
     private org.bukkit.entity.LivingEntity spawnedGolem = null;
     private org.bukkit.entity.HappyGhast spawnedGhast = null;
     private boolean autopilot = true;
@@ -36,6 +38,9 @@ public class Tower {
     public long getDisabledUntil() { return disabledUntil; }
     public void setDisabledUntil(long disabledUntil) { this.disabledUntil = disabledUntil; }
     public boolean isDisabled() { return System.currentTimeMillis() < disabledUntil; }
+
+    public boolean isArmageddonDisabled() { return armageddonDisabled; }
+    public void setArmageddonDisabled(boolean armageddonDisabled) { this.armageddonDisabled = armageddonDisabled; }
 
     public String getPlotId() { return plotId; }
     public Location getCenterLocation() { return centerLocation; }

@@ -29,11 +29,11 @@ import java.util.UUID;
 public class MobManager {
 
     /**
-     * Global scaling coefficient applied to every mob's movement-speed attribute. Reduced to 0.25
-     * (one quarter of the former 1.0) during the post-playtest rebalance to slow overall pacing.
+     * Global scaling coefficient applied to every mob's movement-speed attribute. Set to 0.2875 — a
+     * 15% bump over the previous 0.25 post-playtest value to quicken overall pacing.
      * Applied once at spawn so it flows through to both velocity-driven and pathfinder-driven mobs.
      */
-    private static final double GLOBAL_SPEED_COEFFICIENT = 0.25;
+    private static final double GLOBAL_SPEED_COEFFICIENT = 0.2875;
 
     private final TowerDefense plugin;
     private final MobUpgradeRegistry upgradeRegistry;
@@ -339,11 +339,14 @@ public class MobManager {
             plugin.getConfig().set("mobs." + presetKey + ".height-offset", 5.0);
         }
 
+        // Armageddon mode buffs every player-sent mob with +25% health and movement speed.
+        double armageddonMult = match.isArmageddonActive() ? 1.25 : 1.0;
+
         // Pass immuneToSlow=false here so spawnMob doesn't blanket-set both immunity keys; we set the
         // freeze and slow keys independently below. (spawnMob still applies the temporary SLOW_SHIELD
         // sabotage blanket immunity on its own.)
-        Mob entity = spawnMob(match, arena, profile.getEntityType(), profile.getSpeed(), profile.getHp(),
-                0.0, false, fireImmune, killGold, xpReward, presetKey);
+        Mob entity = spawnMob(match, arena, profile.getEntityType(), profile.getSpeed() * armageddonMult,
+                profile.getHp() * armageddonMult, 0.0, false, fireImmune, killGold, xpReward, presetKey);
         if (entity == null) return;
 
         // Apply the decoupled immunities: ICE -> Ice Tower/Freeze proof, SLOW -> Prismarine proof.
@@ -699,6 +702,7 @@ public class MobManager {
                             for (TDMob ally : match.getActiveMobs()) {
                                 org.bukkit.entity.Mob allyEnt = ally.getEntity();
                                 if (allyEnt == null || allyEnt.isDead() || !allyEnt.isValid()) continue;
+                                if (allyEnt.equals(witchHealer)) continue; // witches no longer heal themselves
                                 if (!ally.getArena().equals(mob.getArena())) continue;
                                 if (allyEnt.getLocation().distanceSquared(witchHealer.getLocation()) >= 25.0) continue;
                                 org.bukkit.attribute.AttributeInstance maxHpAttr = allyEnt.getAttribute(Attribute.MAX_HEALTH);
@@ -708,6 +712,29 @@ public class MobManager {
                                 if (Double.isNaN(maxHp) || Double.isNaN(curHp)) continue;
                                 allyEnt.setHealth(Math.max(0.0, Math.min(maxHp, curHp + healAmount)));
                                 allyEnt.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, allyEnt.getLocation().add(0, 1, 0), 5);
+                            }
+                        }
+
+                        // Warden (Siege Commander): a slow damage sponge that emits a 5-block aura
+                        // buffing the movement speed and armor (damage resistance) of all smaller mobs
+                        // around it, so the swarm rushes past towers unless players focus the Warden first.
+                        if (mob.getEntity() instanceof org.bukkit.entity.Warden warden && tickCounter % 20 == 0) {
+                            double auraRadius = 5.0;
+                            warden.getWorld().spawnParticle(org.bukkit.Particle.SCULK_SOUL,
+                                    warden.getLocation().add(0, 1.2, 0), 12, auraRadius * 0.5, 0.6, auraRadius * 0.5, 0.0);
+                            for (TDMob ally : match.getActiveMobs()) {
+                                org.bukkit.entity.Mob allyEnt = ally.getEntity();
+                                if (allyEnt == null || allyEnt.isDead() || !allyEnt.isValid()) continue;
+                                if (allyEnt.equals(warden)) continue;
+                                if (allyEnt instanceof org.bukkit.entity.Warden) continue; // only buff smaller mobs
+                                if (!ally.getArena().equals(mob.getArena())) continue;
+                                if (allyEnt.getLocation().distanceSquared(warden.getLocation()) > auraRadius * auraRadius) continue;
+                                // Refreshed each second (duration 40t > 20t interval) so the buff is
+                                // continuous while in range and fades shortly after leaving the aura.
+                                allyEnt.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                                        org.bukkit.potion.PotionEffectType.SPEED, 40, 1, true, false, true));
+                                allyEnt.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                                        org.bukkit.potion.PotionEffectType.RESISTANCE, 40, 1, true, false, true));
                             }
                         }
 
@@ -752,10 +779,16 @@ public class MobManager {
 
         String mobArena = mob.getArena();
 
-        // Witches will otherwise stop walking to drink potions — a hardcoded vanilla mechanic that
-        // applies a heavy internal slowness while the drink animation plays. Continuously strip any
-        // held potion and wipe the target so they never enter the drinking state.
+        // Witches will otherwise periodically stop walking to drink potions — a hardcoded vanilla
+        // mechanic that applies a heavy movement-speed penalty while the drink animation plays, which
+        // stutters their velocity-driven travel. Cancel the drink state outright every tick (rather
+        // than stripping the held potion after the fact) so they never enter the slowed use-state and
+        // glide continuously along the track.
         if (mob.getEntity() instanceof org.bukkit.entity.Witch witch) {
+            if (witch.isDrinkingPotion() || witch.getPotionUseTimeLeft() > 0) {
+                witch.setPotionUseTimeLeft(0);
+                witch.setDrinkingPotion(new org.bukkit.inventory.ItemStack(org.bukkit.Material.AIR));
+            }
             org.bukkit.inventory.EntityEquipment eq = witch.getEquipment();
             if (eq != null) {
                 org.bukkit.inventory.ItemStack mainHand = eq.getItemInMainHand();
@@ -1374,7 +1407,7 @@ public class MobManager {
         String mech = profile.getSpecialMechanics();
         if (mech != null && !mech.isEmpty() && !mech.equals("None")) {
             List<String> explain = new ArrayList<>();
-            if (mech.contains("Heals other mobs")) explain.add(ChatColor.GRAY + "- Heals nearby allies every 3 seconds (scales with tier)");
+            if (mech.contains("Heals other mobs")) explain.add(ChatColor.GRAY + "- Heals nearby allied mobs for 5 HP every 30 seconds (cannot heal itself)");
             if (mech.contains("Teleport Dodge")) explain.add(ChatColor.GRAY + "- 30% chance to dodge an attack and teleport");
             if (mech.contains("Deflects Projectiles") || mech.contains("High Deflection") || mech.contains("High Dodge Chance"))
                 explain.add(ChatColor.GRAY + "- Frequently deflects or dodges projectiles");

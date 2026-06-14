@@ -44,6 +44,13 @@ public class Match {
     private final Map<UUID, Integer> totalGoldEarned = new HashMap<>();
     private final Map<UUID, Integer> totalExpEarned = new HashMap<>();
 
+    // Armageddon mode (triggered late-game): flag, the last countdown threshold already announced
+    // (seconds-before-start; Long.MAX_VALUE = none announced yet), and the UUIDs of the spawned
+    // Wither bosses so they can be ticked and cleaned up.
+    private boolean armageddonActive = false;
+    private long armageddonLastWarn = Long.MAX_VALUE;
+    private final List<UUID> armageddonWithers = new ArrayList<>();
+
     public Match(TowerDefense plugin, MapManager.MapData mapData) {
         this.matchId = UUID.randomUUID();
         this.plugin = plugin;
@@ -85,6 +92,12 @@ public class Match {
     public Map<UUID, Double> getDamageDealt() { return damageDealt; }
     public Map<UUID, Integer> getTotalGoldEarned() { return totalGoldEarned; }
     public Map<UUID, Integer> getTotalExpEarned() { return totalExpEarned; }
+
+    public boolean isArmageddonActive() { return armageddonActive; }
+    public void setArmageddonActive(boolean armageddonActive) { this.armageddonActive = armageddonActive; }
+    public long getArmageddonLastWarn() { return armageddonLastWarn; }
+    public void setArmageddonLastWarn(long armageddonLastWarn) { this.armageddonLastWarn = armageddonLastWarn; }
+    public List<UUID> getArmageddonWithers() { return armageddonWithers; }
 
     public void addPlayer(Player player, String arena) {
         players.add(player.getUniqueId());

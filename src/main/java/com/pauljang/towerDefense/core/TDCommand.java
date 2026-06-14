@@ -33,7 +33,7 @@ public class TDCommand implements CommandExecutor {
         Player player = (Player) sender;
 
         if (args.length == 0) {
-            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|saveconfig|loadworld|unloadworld|spawnmob|gui|upgrades|giveitems|givegold|givexp|setarena|challenge|accept|lobby|forfeit|forcestart>");
+            player.sendMessage(ChatColor.RED + "Usage: /td <list|start|stop|status|plotmode [arena]|deleteplotmode [arena]|waypointmode [arena]|wand|clearwaypoints [arena]|saveconfig|loadworld|unloadworld|spawnmob|gui|upgrades|giveitems|givegold|givexp|setarena|challenge|accept|lobby|forfeit|forcestart|armageddon>");
             return true;
         }
 
@@ -66,10 +66,28 @@ public class TDCommand implements CommandExecutor {
                 player.sendMessage(ChatColor.YELLOW + "/td spawnmob [type] " + ChatColor.WHITE + "- Spawn a custom test mob");
                 player.sendMessage(ChatColor.YELLOW + "/td gui " + ChatColor.WHITE + "- Open the Mob Spawner GUI");
                 player.sendMessage(ChatColor.YELLOW + "/td upgrades " + ChatColor.WHITE + "- Open the Player Upgrades GUI");
+                player.sendMessage(ChatColor.YELLOW + "/td armageddon " + ChatColor.WHITE + "- Force Armageddon mode in your match for testing (Admin)");
                 break;
 
             case "gui":
                 plugin.getMobManager().openMobSpawnerGUI(player);
+                break;
+
+            case "armageddon":
+                if (!player.hasPermission("towerdefense.admin")) {
+                    player.sendMessage(ChatColor.RED + "No permission.");
+                    break;
+                }
+                Match armageddonMatch = gameManager.getPlayerMatch(player.getUniqueId());
+                if (armageddonMatch == null) {
+                    player.sendMessage(ChatColor.RED + "You must be in an active match to trigger Armageddon.");
+                    break;
+                }
+                if (gameManager.forceArmageddon(armageddonMatch)) {
+                    player.sendMessage(ChatColor.GREEN + "Forced Armageddon mode for your match.");
+                } else {
+                    player.sendMessage(ChatColor.RED + "Could not start Armageddon (match not active, or already in Armageddon).");
+                }
                 break;
 
             case "wand":
