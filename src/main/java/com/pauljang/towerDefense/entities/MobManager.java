@@ -86,8 +86,12 @@ public class MobManager {
         return upgradeRegistry;
     }
 
-    // Slot → chain index mapping for the main GUI: a centered 3x5 grid for the 15 mob chains.
-    private static final int[] MOB_SLOTS = {11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 29, 30, 31, 32, 33};
+    // Slot → chain index mapping for the main GUI: the full 3x7 inner area (rows 1-3, columns 1-7).
+    // 21 slots so every mob chain fits on a single page even as new chains are added.
+    private static final int[] MOB_SLOTS = {
+            10, 11, 12, 13, 14, 15, 16,
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34};
 
     /**
      * Chains shown in the spawner GUI. The standalone Endermite is hidden — players can no longer

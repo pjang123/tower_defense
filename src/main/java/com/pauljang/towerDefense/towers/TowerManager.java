@@ -435,6 +435,11 @@ public class TowerManager {
         if (tower.getType() == TowerType.REDSTONE) {
             lines.add(ChatColor.RED + "✦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
                       ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% ⚡");
+        } else if (tower.getType() == TowerType.GOLD) {
+            // Economy tower: never attacks, so show its bounty bonus instead of a (zero) damage stat.
+            int bonusPct = (int) Math.round(getGoldTowerBonusFraction(tower.getLevel()) * 100);
+            lines.add(ChatColor.GREEN + "✦ " + ChatColor.GRAY + "Range: " + ChatColor.GREEN + tower.getRange() + "m" +
+                      ChatColor.GRAY + " | " + ChatColor.GOLD + "+" + bonusPct + "% bounty gold");
         } else {
             // ❤ DMG | ⚡  Speed | ✦ Range
             lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" +
@@ -2258,9 +2263,10 @@ public class TowerManager {
     // The buy-tower content slots, and the tower placed in each by the original (hand-authored) layout.
     // The GUI builds every tower's item at its original slot, then re-sorts them across these slots by
     // ascending base cost; the click handler maps a clicked slot back to a type via the same sorted order.
-    // Display slots, in reading order, laid out as three rows of five for the 15 buyable towers. The
-    // click handler resolves a clicked slot to a tower via this same array + getBuyTowerOrder().
-    private static final int[] BUY_TOWER_SLOTS = {10, 11, 12, 13, 14, 19, 20, 21, 22, 23, 28, 29, 30, 31, 32};
+    // Display slots, in reading order, for the 15 buyable towers: two full-width rows of seven that span
+    // the entire inner area edge-to-edge inside the border (rows 1-2), with the 15th tower centered on
+    // row 3. The click handler resolves a clicked slot to a tower via this same array + getBuyTowerOrder().
+    private static final int[] BUY_TOWER_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 31};
     // Source slots the openBuyTowerGUI build section writes each BUY_TOWER_ORIGINAL[i] item to before the
     // cost-sort re-lays them out. Kept separate from the display slots so the hardcoded build positions
     // don't have to change when the display layout does.
