@@ -478,11 +478,18 @@ public class MobListener implements Listener {
             return;
         }
 
+        // The queue Map Vote paper is locked in place: it can't be moved within or out of the inventory.
+        if (plugin.getQueueManager().isVoteItem(event.getCurrentItem())
+                || plugin.getQueueManager().isVoteItem(event.getCursor())) {
+            event.setCancelled(true);
+            return;
+        }
+
         if (event.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY) {
             int hotbarSlot = event.getHotbarButton();
             if (hotbarSlot >= 0 && hotbarSlot < 9) {
                 org.bukkit.inventory.ItemStack hotbarItem = event.getWhoClicked().getInventory().getItem(hotbarSlot);
-                if (isLobbyCompass(hotbarItem)) {
+                if (isLobbyCompass(hotbarItem) || plugin.getQueueManager().isVoteItem(hotbarItem)) {
                     event.setCancelled(true);
                     return;
                 }
@@ -540,12 +547,11 @@ public class MobListener implements Listener {
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             int slot = event.getRawSlot();
-            // Map options are in slots 11, 12, 13
-            if (slot >= 11 && slot <= 13) {
-                int mapIndex = slot - 11;
-                com.pauljang.towerDefense.core.QueueManager.VotingSession session =
-                    plugin.getQueueManager().getSession(player.getUniqueId());
-                if (session != null) {
+            com.pauljang.towerDefense.core.QueueManager.VotingSession session =
+                plugin.getQueueManager().getSession(player.getUniqueId());
+            if (session != null) {
+                int mapIndex = session.slotToOption(slot);
+                if (mapIndex >= 0) {
                     session.castVote(player.getUniqueId(), mapIndex);
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Vote cast!");
                 }
@@ -559,8 +565,23 @@ public class MobListener implements Listener {
             if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
 
             int slot = event.getRawSlot();
-            String chainName = plugin.getMobManager().getChainForSlot(slot);
 
+            // Sort buttons (row 4): set the player's sort mode, or reset it if the active one is re-clicked.
+            com.pauljang.towerDefense.entities.MobManager.SortMode clickedSort = null;
+            if (slot == 38) clickedSort = com.pauljang.towerDefense.entities.MobManager.SortMode.GOLD_HP;
+            else if (slot == 40) clickedSort = com.pauljang.towerDefense.entities.MobManager.SortMode.GOLD_XP;
+            else if (slot == 42) clickedSort = com.pauljang.towerDefense.entities.MobManager.SortMode.GOLD_SPEED;
+            if (clickedSort != null) {
+                com.pauljang.towerDefense.entities.MobManager mm = plugin.getMobManager();
+                boolean alreadyActive = mm.getSpawnerSort(player.getUniqueId()) == clickedSort;
+                mm.setSpawnerSort(player.getUniqueId(),
+                        alreadyActive ? com.pauljang.towerDefense.entities.MobManager.SortMode.NONE : clickedSort);
+                mm.openMobSpawnerGUI(player);
+                player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.6f, 1.2f);
+                return;
+            }
+
+            String chainName = plugin.getMobManager().getChainForSlot(player.getUniqueId(), slot);
             if (chainName != null) {
                 // The main menu strictly navigates to the tier sub-GUI; all queueing and dequeueing
                 // (including shift-click bulk actions) happens inside that tier menu.
@@ -568,7 +589,7 @@ public class MobListener implements Listener {
                 return;
             }
 
-            if (slot == 38) { // Clear Queue and refund
+            if (slot == 47) { // Clear Queue and refund
                 java.util.Map<String, java.util.Map<Integer, Integer>> queue =
                         plugin.getMobManager().getQueueByTier(player.getUniqueId());
                 int totalRefund = 0;
@@ -585,11 +606,18 @@ public class MobListener implements Listener {
                 player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 0.8f, 0.8f);
                 player.sendMessage(org.bukkit.ChatColor.RED + "Queue cleared. Refunded " + totalRefund + " Gold.");
                 plugin.getMobManager().openMobSpawnerGUI(player);
-            } else if (slot == 40) { // Send Wave
+            } else if (slot == 49) { // Send Wave
+                com.pauljang.towerDefense.core.Match m = plugin.getGameManager().getPlayerMatch(player.getUniqueId());
+                if (m != null && m.isInGracePeriod()) {
+                    long secs = Math.max(1, (m.getGraceUntil() - System.currentTimeMillis() + 999) / 1000);
+                    player.sendMessage(org.bukkit.ChatColor.RED + "Build phase! You can send mobs in " + secs + "s.");
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    return;
+                }
                 plugin.getMobManager().sendQueue(player.getUniqueId());
                 player.closeInventory();
                 player.sendMessage(org.bukkit.ChatColor.GREEN + "Sending the mob wave!");
-            } else if (slot == 42) { // Open upgrades screen
+            } else if (slot == 51) { // Open upgrades screen
                 player.closeInventory();
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     plugin.getGameManager().openUpgradesGUI(player);
@@ -718,22 +746,13 @@ public class MobListener implements Listener {
             String plotId = holder.getData();
             int slot = event.getRawSlot();
 
+            // Slots are laid out by ascending cost; resolve the clicked slot to a type via the same order.
             com.pauljang.towerDefense.towers.TowerType type = null;
-            switch (slot) {
-                case 10 -> type = com.pauljang.towerDefense.towers.TowerType.ARCHER;
-                case 11 -> type = com.pauljang.towerDefense.towers.TowerType.FIRE;
-                case 12 -> type = com.pauljang.towerDefense.towers.TowerType.PRISMARINE;
-                case 13 -> type = com.pauljang.towerDefense.towers.TowerType.CHORUS;
-                case 14 -> type = com.pauljang.towerDefense.towers.TowerType.REDSTONE;
-                case 15 -> type = com.pauljang.towerDefense.towers.TowerType.POISON;
-                case 16 -> type = com.pauljang.towerDefense.towers.TowerType.ICE;
-                case 28 -> type = com.pauljang.towerDefense.towers.TowerType.GOLEM;
-                case 29 -> type = com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST;
-                case 30 -> type = com.pauljang.towerDefense.towers.TowerType.DRIPSTONE;
-                case 31 -> type = com.pauljang.towerDefense.towers.TowerType.THUNDER;
-                case 32 -> type = com.pauljang.towerDefense.towers.TowerType.TURRET;
-                case 33 -> type = com.pauljang.towerDefense.towers.TowerType.BOMBARDIER;
-                case 34 -> type = com.pauljang.towerDefense.towers.TowerType.BEEHIVE;
+            int buyIdx = plugin.getTowerManager().buyTowerSlotIndex(slot);
+            if (buyIdx >= 0) {
+                java.util.List<com.pauljang.towerDefense.towers.TowerType> order =
+                        plugin.getTowerManager().getBuyTowerOrder();
+                if (buyIdx < order.size()) type = order.get(buyIdx);
             }
 
             if (type != null) {
@@ -832,6 +851,36 @@ public class MobListener implements Listener {
             }
 
             int slot = event.getRawSlot();
+
+            // Withered (Wither-disabled) towers show the re-enable menu: slot 11 pays Gold, slot 15 pays
+            // TD XP, to bring the tower back online for the rest of the match.
+            if (tower.isArmageddonDisabled()) {
+                int goldCost = plugin.getTowerManager().getReenableGoldCost(tower);
+                int xpCost = plugin.getTowerManager().getReenableXpCost(tower);
+                if (slot == 11) {
+                    if (plugin.getGameManager().removeGold(player.getUniqueId(), goldCost)) {
+                        plugin.getTowerManager().reenableTower(tower);
+                        player.closeInventory();
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Tower re-enabled for " + goldCost + " Gold!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough Gold! Requires " + goldCost + " Gold.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                } else if (slot == 15) {
+                    if (plugin.getGameManager().removeExp(player.getUniqueId(), xpCost)) {
+                        plugin.getTowerManager().reenableTower(tower);
+                        player.closeInventory();
+                        player.sendMessage(org.bukkit.ChatColor.GREEN + "Tower re-enabled for " + xpCost + " TD XP!");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+                    } else {
+                        player.sendMessage(org.bukkit.ChatColor.RED + "Not enough TD XP! Requires " + xpCost + " XP.");
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8f, 1.0f);
+                    }
+                }
+                return;
+            }
+
             switch (slot) {
                 case 15 -> { // Return Ghast to Tower
                     if (tower.getType() == com.pauljang.towerDefense.towers.TowerType.HAPPY_GHAST) {
@@ -1196,6 +1245,21 @@ public class MobListener implements Listener {
         org.bukkit.inventory.ItemStack item = event.getItem();
         if (item == null) return;
 
+        // Queue Map Vote paper: any click opens the player's active map-vote panel (or tells them it
+        // hasn't started yet). The item is only held while in the multiplayer queue.
+        if (plugin.getQueueManager().isVoteItem(item)) {
+            event.setCancelled(true);
+            com.pauljang.towerDefense.core.QueueManager.VotingSession session =
+                    plugin.getQueueManager().getSession(player.getUniqueId());
+            if (session != null) {
+                session.openGUI(player);
+                player.playSound(player.getLocation(), org.bukkit.Sound.UI_BUTTON_CLICK, 0.7f, 1.2f);
+            } else {
+                player.sendMessage(org.bukkit.ChatColor.YELLOW + "Map voting hasn't started yet — waiting for more players to join the queue.");
+            }
+            return;
+        }
+
         // Custom bow / crossbow shooting with zero arrows in inventory
         if (item.getType() == org.bukkit.Material.BOW || item.getType() == org.bukkit.Material.CROSSBOW) {
             org.bukkit.event.block.Action action = event.getAction();
@@ -1274,6 +1338,10 @@ public class MobListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (plugin.getQueueManager().isVoteItem(item)) {
+            event.setCancelled(true);
+            return;
+        }
         if (item.hasItemMeta()) {
             org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
             if (meta != null && meta.hasDisplayName()) {
@@ -1332,9 +1400,19 @@ public class MobListener implements Listener {
             return;
         }
 
-        // ALWAYS block damage to mounts (any entity serving as a vehicle)
-        // Check if victim is carrying a passenger (rider) - if so, it's a mount
-        if (!victim.getPassengers().isEmpty()) {
+        // Block damage to MOUNTS: if this victim carries a TD-mob rider, it's the mount (e.g. a horse a
+        // skeleton rides) and players must hit the rider instead. Do NOT blanket-cancel on ANY passenger,
+        // or invisible mobs (which carry an armor-stand health bar) and spiders that spawn with a vanilla
+        // skeleton jockey become undamageable — the reported "can't hit the first spider" bug. Only a
+        // passenger that is itself a TD mob marks the victim as a mount to protect.
+        boolean carriesTdRider = false;
+        for (org.bukkit.entity.Entity passenger : victim.getPassengers()) {
+            if (passenger.getPersistentDataContainer().has(tdKey, PersistentDataType.BYTE)) {
+                carriesTdRider = true;
+                break;
+            }
+        }
+        if (carriesTdRider) {
             event.setCancelled(true);
             return;
         }

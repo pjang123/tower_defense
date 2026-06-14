@@ -295,30 +295,52 @@ public class PlotConfigManager {
             plugin.getTowerManager().removeTower(plotId);
         }
 
-        // Find which world this plot belongs to
+        // Find which world this plot belongs to (try the stored name, then the normalized alias).
         String worldName = config.getString("plots." + plotId + ".pos1.world");
-        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
-
-        config.set("plots." + plotId, null);
-
-        if (world != null) {
-            File worldFolder = world.getWorldFolder();
-            boolean isTemplateWorld = worldFolder.getAbsolutePath().contains("GAME_WORLD_TEMPLATES");
-
-            if (isTemplateWorld) {
-                // Save directly to template world
-                File targetFile = new File(worldFolder, "plots.yml");
-                try {
-                    config.save(targetFile);
-                    plugin.getLogger().info("Deleted plot from template world: " + targetFile.getAbsolutePath());
-                } catch (IOException e) {
-                    plugin.getLogger().severe("Could not delete plot from " + targetFile.getAbsolutePath());
-                    e.printStackTrace();
-                }
-            }
+        org.bukkit.World world = worldName != null ? org.bukkit.Bukkit.getWorld(worldName) : null;
+        if (world == null && worldName != null) {
+            world = org.bukkit.Bukkit.getWorld(normalizeWorldName(worldName));
         }
 
-        saveFile(); // Also save to global config for backwards compatibility
+        // Always drop it from the in-memory working set so overlap/placement checks update immediately.
+        config.set("plots." + plotId, null);
+
+        if (world == null) {
+            plugin.getLogger().warning("deletePlot: world '" + worldName + "' for plot " + plotId
+                + "' is not loaded; removed from in-memory config only.");
+            return;
+        }
+
+        File worldFolder = world.getWorldFolder();
+        boolean isTemplateWorld = worldFolder.getAbsolutePath().contains("GAME_WORLD_TEMPLATES");
+
+        // Mirror savePlot: a world loaded via /td loadworld is a copy, so resolve its source template
+        // folder and persist the deletion there (otherwise the plot reappears on reload).
+        File templateSource = plugin.getCommand("td") != null ?
+            ((com.pauljang.towerDefense.core.TDCommand) plugin.getCommand("td").getExecutor()).getTemplateSource(world.getName()) : null;
+        if (templateSource != null) {
+            worldFolder = templateSource;
+            isTemplateWorld = true;
+        }
+
+        if (isTemplateWorld) {
+            // Persist against the on-disk file (load fresh, remove, save) so we never write the
+            // in-memory config's remapped world names back into the template. Mirrors savePlot.
+            File targetFile = new File(worldFolder, "plots.yml");
+            FileConfiguration targetConfig = YamlConfiguration.loadConfiguration(targetFile);
+            targetConfig.set("plots." + plotId, null);
+            try {
+                targetConfig.save(targetFile);
+                config = targetConfig; // keep the in-memory working set in sync (mirrors savePlot)
+                plugin.getLogger().info("Deleted plot " + plotId + " from template: " + targetFile.getAbsolutePath());
+            } catch (IOException e) {
+                plugin.getLogger().severe("Could not delete plot from " + targetFile.getAbsolutePath());
+                e.printStackTrace();
+            }
+        } else {
+            plugin.getLogger().info("deletePlot: '" + world.getName()
+                + "' is not a template world; removed from in-memory config only (persist via /td saveconfig).");
+        }
     }
 
     /**

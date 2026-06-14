@@ -9,11 +9,11 @@ Spider,2,SPIDER,45,1.0,224,2.0,32,None,None,None,None
 Spider,3,CAVE_SPIDER,54,1.5,314,1.6,36,None,None,None,None
 Spider,4,CAVE_SPIDER,64,1.0,444,1.6,38,None,None,None,Invisible
 Spider,5,CAVE_SPIDER,78,1.5,614,1.6,44,None,None,None,Invisible
-Skeleton,1,SKELETON,90,1.0,700,1.6,60,None,None,None,None
-Skeleton,2,SKELETON,216,1.0,980,1.2,66,None,ZOMBIE_HORSE,None,None
-Skeleton,3,SKELETON,259,1.0,1372,1.2,72,None,SKELETON_HORSE,None,None
-Skeleton,4,WITHER_SKELETON,310,2.0,1920,1.2,80,"FIRE",ZOMBIE_HORSE,None,None
-Skeleton,5,WITHER_SKELETON,373,2.5,2690,0.9,80,"FIRE",SKELETON_HORSE,None,None
+Skeleton,1,SKELETON,90,1.0,400,1.6,60,None,None,None,None
+Skeleton,2,SKELETON,145,1.0,650,1.2,66,None,ZOMBIE_HORSE,None,None
+Skeleton,3,SKELETON,235,1.0,1050,1.2,72,None,SKELETON_HORSE,None,None
+Skeleton,4,WITHER_SKELETON,385,2.0,1650,1.2,80,"FIRE",ZOMBIE_HORSE,None,None
+Skeleton,5,WITHER_SKELETON,620,2.5,2600,0.9,80,"FIRE",SKELETON_HORSE,None,None
 Creeper,1,CREEPER,450,1.0,900,1.2,45,None,None,None,None
 Creeper,2,CREEPER,540,1.0,1260,1.2,49,None,None,None,Regenerates Health
 Creeper,3,CREEPER,648,1.0,1764,1.2,54,None,PIG,None,Regenerates Health
