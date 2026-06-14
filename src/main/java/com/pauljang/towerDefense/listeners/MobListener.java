@@ -136,6 +136,23 @@ public class MobListener implements Listener {
                 }
             }
 
+            // Evoker shield: while its spinning ring still has HP, it soaks ALL incoming damage. The
+            // shield pool drains by the damage that would have hit the evoker; at 0 it shatters and
+            // resummons at full strength after 60 seconds.
+            if (mob.getType() == org.bukkit.entity.EntityType.EVOKER) {
+                com.pauljang.towerDefense.entities.TDMob evTd = plugin.getMobManager().findTDMob(mob);
+                if (evTd != null && evTd.isShieldActive()) {
+                    evTd.setShieldHp(evTd.getShieldHp() - event.getFinalDamage());
+                    event.setCancelled(true);
+                    mob.getWorld().playSound(mob.getLocation(), org.bukkit.Sound.ITEM_SHIELD_BLOCK, 0.8f, 1.0f);
+                    mob.getWorld().spawnParticle(org.bukkit.Particle.CRIT, mob.getLocation().add(0, 1, 0), 6, 0.4, 0.5, 0.4, 0.1);
+                    if (evTd.getShieldHp() <= 0) {
+                        plugin.getMobManager().breakEvokerShield(evTd);
+                    }
+                    return;
+                }
+            }
+
             // Slime / Magma Cube Shrinking on lethal damage (3 sizes: largest 4, medium 2, smallest 1)
             double damage = event.getFinalDamage();
             double health = mob.getHealth();
@@ -324,6 +341,8 @@ public class MobListener implements Listener {
                         plugin.getGameManager().recordMobKilled(player.getUniqueId());
                     }
                 }
+                // Gold Towers covering the death spot pay their owners a bonus cut of the bounty.
+                plugin.getTowerManager().awardGoldTowerBonusOnDeath(mobArena, entity.getLocation(), reward);
             }
 
             // Award experience only to the player who sent the mob (on the opposite track)
@@ -336,6 +355,12 @@ public class MobListener implements Listener {
                         plugin.getGameManager().addExp(player.getUniqueId(), xpReward);
                     }
                 }
+            }
+
+            // Tier 5 Charged Creeper: its supercharged death blast EMPs nearby towers on its own track
+            // for a few seconds (only the Tier 5 creeper spawns powered).
+            if (entity instanceof org.bukkit.entity.Creeper creeper && creeper.isPowered()) {
+                plugin.getTowerManager().empTowersNear(mobArena, entity.getLocation(), 8.0, 5000L);
             }
 
             // Slime / Magma Cube Split Handling

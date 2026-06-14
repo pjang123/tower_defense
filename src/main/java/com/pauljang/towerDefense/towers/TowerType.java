@@ -16,7 +16,9 @@ public enum TowerType {
     THUNDER("Thunder Tower", Material.LIGHTNING_ROD, Material.COPPER_BLOCK, Material.COPPER_BLOCK, ChatColor.YELLOW, 12.0, 5.0, 80L, 200),
     TURRET("Turret", Material.OBSERVER, Material.IRON_BLOCK, Material.IRON_BARS, ChatColor.WHITE, 12.0, 0.3, 5L, 250),
     BOMBARDIER("Bombardier", Material.TNT, Material.BRICKS, Material.BRICK_WALL, ChatColor.DARK_RED, 10.0, 2.5, 50L, 175),
-    BEEHIVE("Beehive", Material.BEE_NEST, Material.HONEYCOMB_BLOCK, Material.HONEY_BLOCK, ChatColor.GOLD, 7.0, 4.0, 40L, 150);
+    BEEHIVE("Beehive", Material.BEE_NEST, Material.HONEYCOMB_BLOCK, Material.HONEY_BLOCK, ChatColor.GOLD, 7.0, 4.0, 40L, 150),
+    // Economy tower: deals zero damage. Mobs that die within its radius pay its owner bonus gold.
+    GOLD("Gold Tower", Material.GOLD_BLOCK, Material.RAW_GOLD_BLOCK, Material.GOLD_BLOCK, ChatColor.GOLD, 8.0, 0.0, 100L, 300);
 
     private final String displayName;
     private final Material blockMaterial;

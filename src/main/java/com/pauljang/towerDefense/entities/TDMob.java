@@ -7,6 +7,7 @@ import com.pauljang.towerDefense.data.TDWaypoint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class TDMob {
 
@@ -23,6 +24,21 @@ public class TDMob {
     private boolean settledAtEnd = false; // true once the mob has walked to its fan-out spot at the end
     private int endFanTicks = 0; // ticks spent trying to reach the fan-out spot (settle timeout safety net)
     private long teleportedUntil = 0; // Timestamp to pause movement after Chorus teleport
+
+    // Vex splitting: generation 0 = original. A vex splits (spawning one copy and incrementing both to
+    // the next generation) when slowed/frozen/teleported, capped at generation 4 so a lineage tops out
+    // at 16 leaf vexes that can no longer split. lastVexSplit debounces a single AoE pulse.
+    private int vexGeneration = 0;
+    private long lastVexSplit = 0L;
+
+    // Evoker shield: a spinning ring of invisible armor stands that absorbs incoming damage as one HP
+    // pool. When it hits 0 the ring vanishes and shieldRespawnAt is set to (now + 60s); the ticker
+    // refills the shield and respawns the ring at that time. shieldAngle drives the slow rotation.
+    private double shieldHp = 0.0;
+    private double shieldMaxHp = 0.0;
+    private long shieldRespawnAt = 0L;
+    private double shieldAngle = 0.0;
+    private final List<UUID> shieldStands = new ArrayList<>();
 
     public TDMob(Mob entity, Map<String, TDWaypoint> waypointGraph) {
         this.entity = entity;
@@ -194,4 +210,22 @@ public class TDMob {
     public boolean isTeleported() {
         return System.currentTimeMillis() < teleportedUntil;
     }
+
+    // --- Vex splitting ---
+    public int getVexGeneration() { return vexGeneration; }
+    public void setVexGeneration(int vexGeneration) { this.vexGeneration = vexGeneration; }
+    public long getLastVexSplit() { return lastVexSplit; }
+    public void setLastVexSplit(long lastVexSplit) { this.lastVexSplit = lastVexSplit; }
+
+    // --- Evoker shield ---
+    public double getShieldHp() { return shieldHp; }
+    public void setShieldHp(double shieldHp) { this.shieldHp = shieldHp; }
+    public double getShieldMaxHp() { return shieldMaxHp; }
+    public void setShieldMaxHp(double shieldMaxHp) { this.shieldMaxHp = shieldMaxHp; }
+    public long getShieldRespawnAt() { return shieldRespawnAt; }
+    public void setShieldRespawnAt(long shieldRespawnAt) { this.shieldRespawnAt = shieldRespawnAt; }
+    public double getShieldAngle() { return shieldAngle; }
+    public void setShieldAngle(double shieldAngle) { this.shieldAngle = shieldAngle; }
+    public List<UUID> getShieldStands() { return shieldStands; }
+    public boolean isShieldActive() { return shieldHp > 0.0; }
 }
