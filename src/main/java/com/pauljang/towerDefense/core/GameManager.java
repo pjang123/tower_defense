@@ -2258,15 +2258,22 @@ public class GameManager {
         // Strip the lobby matchmaking compass; the world-appropriate compass is granted via ensureCompass.
         player.getInventory().remove(Material.COMPASS);
 
-        // Give Mob Spawner Menu Item in slot 7 (index 7)
-        org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
-        org.bukkit.inventory.meta.ItemMeta spawnerMeta = spawnerItem.getItemMeta();
-        if (spawnerMeta != null) {
-            spawnerMeta.setDisplayName(ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Mob Spawner Menu");
-            spawnerMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Mob Spawner GUI."));
-            spawnerItem.setItemMeta(spawnerMeta);
+        // Give Mob Spawner Menu Item in slot 7 (index 7). Single player has no opponent lane to send
+        // mobs to, so the spawner is omitted there and the slot is left empty.
+        Match playerMatch = getPlayerMatch(uuid);
+        boolean singlePlayer = playerMatch != null && playerMatch.getMapData().isSinglePlayer();
+        if (!singlePlayer) {
+            org.bukkit.inventory.ItemStack spawnerItem = new org.bukkit.inventory.ItemStack(Material.NETHER_STAR);
+            org.bukkit.inventory.meta.ItemMeta spawnerMeta = spawnerItem.getItemMeta();
+            if (spawnerMeta != null) {
+                spawnerMeta.setDisplayName(ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Mob Spawner Menu");
+                spawnerMeta.setLore(java.util.Arrays.asList(ChatColor.GRAY + "Right-click to open the Mob Spawner GUI."));
+                spawnerItem.setItemMeta(spawnerMeta);
+            }
+            player.getInventory().setItem(7, spawnerItem);
+        } else {
+            player.getInventory().setItem(7, null);
         }
-        player.getInventory().setItem(7, spawnerItem);
 
         // Give Player Upgrades Menu Item in slot 8 (index 8)
         org.bukkit.inventory.ItemStack upgradeItem = new org.bukkit.inventory.ItemStack(Material.EMERALD);

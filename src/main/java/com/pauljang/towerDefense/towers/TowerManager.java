@@ -436,10 +436,12 @@ public class TowerManager {
             lines.add(ChatColor.RED + "✦ " + ChatColor.GRAY + "Boost Range: " + ChatColor.GREEN + tower.getRange() + "m" +
                       ChatColor.GRAY + " | " + ChatColor.AQUA + "Boost: " + ChatColor.RED + "30% ⚡");
         } else if (tower.getType() == TowerType.GOLD) {
-            // Economy tower: never attacks, so show its bounty bonus instead of a (zero) damage stat.
-            int bonusPct = (int) Math.round(getGoldTowerBonusFraction(tower.getLevel()) * 100);
+            // Economy tower: never attacks, so show its barrel economy instead of a (zero) damage stat.
+            int gpb = plugin.getTowerConfigManager().getStat(TowerType.GOLD, tower.getPathId(), tower.getLevel(), "gold_per_barrel", 100);
+            boolean gambling = plugin.getTowerConfigManager().getStat(TowerType.GOLD, tower.getPathId(), tower.getLevel(), "gambling", false);
+            String payout = gambling ? ChatColor.LIGHT_PURPLE + "??? gold" : ChatColor.GOLD + "" + gpb + " gold/barrel";
             lines.add(ChatColor.GREEN + "✦ " + ChatColor.GRAY + "Range: " + ChatColor.GREEN + tower.getRange() + "m" +
-                      ChatColor.GRAY + " | " + ChatColor.GOLD + "+" + bonusPct + "% bounty gold");
+                      ChatColor.GRAY + " | " + payout);
         } else {
             // ❤ DMG | ⚡  Speed | ✦ Range
             lines.add(ChatColor.RED + "❤ " + String.format("%.1f", tower.getDamage()) + " DMG" +
@@ -542,6 +544,12 @@ public class TowerManager {
                 if (display != null && display.isValid()) display.remove();
             }
             tower.getHazardDisplays().clear();
+
+            // Clean up any uncollected Gold Tower barrels (BlockDisplay + Interaction pairs).
+            for (GoldBarrel barrel : tower.getGoldBarrels()) {
+                barrel.remove();
+            }
+            tower.getGoldBarrels().clear();
 
             // Clean up hologram ArmorStands
             for (ArmorStand hologram : tower.getHolograms()) {
@@ -729,9 +737,10 @@ public class TowerManager {
                         continue;
                     }
 
-                    // Gold Tower: pure economy structure — it never attacks. Its payout is handled in
-                    // MobListener.onMobDeath, which rewards the owner when a mob dies inside its radius.
+                    // Gold Tower: pure economy structure — it never attacks. It spawns collectible
+                    // barrels on the track and (on the syndicate path) auto-collects them.
                     if (tower.getType() == TowerType.GOLD) {
+                        tickGoldTower(tower, tick);
                         continue;
                     }
 
@@ -2322,45 +2331,311 @@ public class TowerManager {
             TowerType.POISON, TowerType.ICE, TowerType.GOLEM, TowerType.HAPPY_GHAST, TowerType.DRIPSTONE,
             TowerType.THUNDER, TowerType.TURRET, TowerType.BOMBARDIER, TowerType.BEEHIVE, TowerType.GOLD};
 
-    /** Fraction of a slain mob's gold bounty that a Gold Tower of the given level pays its owner. */
-    public double getGoldTowerBonusFraction(int level) {
-        // Default scaling: +25% at L1, +40% at L2, +55% at L3. Overridable via towers config "bonus_fraction".
-        double def = 0.25 + 0.15 * (level - 1);
-        return plugin.getTowerConfigManager().getStat(TowerType.GOLD, level, "bonus_fraction", def);
+    // ===================== GOLD TOWER: gold-bundle barrels =====================
+    // The Gold Tower spawns barrels (BlockDisplay + Interaction) on the track; the player clicks them to
+    // claim gold. Three paths: high_roller (big payout, tight despawn), syndicate (auto-collect, taxed),
+    // gambling (random 1-10000 payout or a random good/bad event). See towers.yaml.
+
+    private org.bukkit.NamespacedKey barrelKey() { return new org.bukkit.NamespacedKey(plugin, "td_gold_barrel"); }
+    private org.bukkit.NamespacedKey barrelPlotKey() { return new org.bukkit.NamespacedKey(plugin, "td_gold_barrel_plot"); }
+
+    /** True if the entity is a Gold Tower barrel's Interaction hitbox. */
+    public boolean isGoldBarrel(org.bukkit.entity.Entity entity) {
+        return entity instanceof org.bukkit.entity.Interaction
+                && entity.getPersistentDataContainer().has(barrelKey(), org.bukkit.persistence.PersistentDataType.BYTE);
+    }
+
+    private void tickGoldTower(Tower tower, long tick) {
+        TowerType T = TowerType.GOLD;
+        String path = tower.getPathId();
+        int level = tower.getLevel();
+        TowerConfigManager cfg = plugin.getTowerConfigManager();
+
+        int goldPer = cfg.getStat(T, path, level, "gold_per_barrel", 100);
+        long despawnTicks = cfg.getStat(T, path, level, "despawn_ticks", 0L);
+        int maxBarrels = cfg.getStat(T, path, level, "max_barrels", 3);
+        boolean autoCollect = cfg.getStat(T, path, level, "auto_collect", false);
+        long autoTicks = cfg.getStat(T, path, level, "auto_collect_ticks", 40L);
+        boolean gambling = cfg.getStat(T, path, level, "gambling", false);
+
+        // 1. Process existing barrels: detect clicks/attacks, auto-collect, despawn, and animate.
+        java.util.Iterator<GoldBarrel> it = tower.getGoldBarrels().iterator();
+        while (it.hasNext()) {
+            GoldBarrel b = it.next();
+            if (!b.isValid()) { b.remove(); it.remove(); continue; }
+
+            // Left-click "attack" on the Interaction: the server records it even though we cancel damage.
+            org.bukkit.entity.Interaction.PreviousInteraction atk = b.interaction.getLastAttack();
+            if (atk != null && atk.getTimestamp() > b.spawnMillis && atk.getPlayer() != null) {
+                org.bukkit.entity.Player clicker = atk.getPlayer().getPlayer();
+                if (clicker != null && (tower.getOwnerId() == null || tower.getOwnerId().equals(clicker.getUniqueId()))) {
+                    it.remove();
+                    collectBarrel(tower, b, clicker);
+                    continue;
+                }
+            }
+
+            if (autoCollect && b.autoCollectTick > 0 && tick >= b.autoCollectTick) {
+                it.remove();
+                autoCollectBarrel(tower, b);
+                continue;
+            }
+
+            if (b.despawnTick > 0 && tick >= b.despawnTick) {
+                Location l = b.interaction.getLocation();
+                l.getWorld().spawnParticle(org.bukkit.Particle.SMOKE, l.clone().add(0, 0.6, 0), 12, 0.2, 0.3, 0.2, 0.02);
+                l.getWorld().playSound(l, Sound.ENTITY_ITEM_BREAK, 0.7f, 0.8f);
+                b.remove();
+                it.remove();
+                continue;
+            }
+
+            // Urgency cue in the final 3 seconds before despawn (high_roller path mostly).
+            if (b.despawnTick > 0 && (b.despawnTick - tick) <= 60) {
+                if (!b.warned) {
+                    b.warned = true;
+                    Location l = b.interaction.getLocation();
+                    l.getWorld().playSound(l, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.8f);
+                }
+                if (tick % 4 == 0) {
+                    Location l = b.interaction.getLocation();
+                    l.getWorld().spawnParticle(org.bukkit.Particle.LAVA, l.clone().add(0, 0.6, 0), 2, 0.2, 0.2, 0.2, 0.0);
+                    l.getWorld().spawnParticle(org.bukkit.Particle.DUST, l.clone().add(0, 1.0, 0), 6, 0.3, 0.3, 0.3,
+                            new org.bukkit.Particle.DustOptions(org.bukkit.Color.RED, 1.4f));
+                }
+            } else if (tick % 20 == 0) {
+                Location l = b.interaction.getLocation();
+                org.bukkit.Particle ambient = gambling ? org.bukkit.Particle.WITCH : org.bukkit.Particle.HAPPY_VILLAGER;
+                l.getWorld().spawnParticle(ambient, l.clone().add(0, 1.0, 0), 4, 0.25, 0.3, 0.25, 0.0);
+            }
+        }
+
+        // 2. Spawn a new barrel once the spawn interval (cooldown) elapses and we're under the cap.
+        if (tower.getGoldBarrels().size() < maxBarrels && tick - tower.getLastAttackTick() >= tower.getCooldown()) {
+            if (spawnGoldBarrel(tower, tick, goldPer, despawnTicks, autoCollect ? autoTicks : 0L, gambling)) {
+                tower.setLastAttackTick(tick);
+            }
+        }
+    }
+
+    private boolean spawnGoldBarrel(Tower tower, long tick, int gold, long despawnTicks, long autoTicks, boolean gambling) {
+        java.util.List<Location> track = getTrackLocationsWithinRange(tower);
+        if (track.isEmpty()) return false;
+        Location chosen = track.get(new java.util.Random().nextInt(track.size()));
+        org.bukkit.World world = chosen.getWorld();
+        if (world == null) return false;
+
+        // Sit the barrel one block above the path tile so it rests on the track instead of inside it.
+        Location displayLoc = new Location(world,
+                Math.floor(chosen.getX()), Math.floor(chosen.getY()) + 1, Math.floor(chosen.getZ()));
+        Location interLoc = displayLoc.clone().add(0.5, 0, 0.5);
+
+        org.bukkit.entity.BlockDisplay display = world.spawn(displayLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
+            bd.setBlock(Material.BARREL.createBlockData());
+            bd.setPersistent(false);
+            bd.setGlowing(gambling); // gambling barrels shimmer to flag the risk
+            if (gambling) bd.setGlowColorOverride(org.bukkit.Color.PURPLE);
+        });
+        org.bukkit.entity.Interaction interaction = world.spawn(interLoc, org.bukkit.entity.Interaction.class, in -> {
+            in.setInteractionWidth(1.0f);
+            in.setInteractionHeight(1.2f);
+            in.setResponsive(true);
+            in.setPersistent(false);
+            in.getPersistentDataContainer().set(barrelKey(), org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+            in.getPersistentDataContainer().set(barrelPlotKey(), org.bukkit.persistence.PersistentDataType.STRING, tower.getPlotId());
+        });
+
+        long despawnTick = despawnTicks > 0 ? tick + despawnTicks : 0L;
+        long autoCollectTick = autoTicks > 0 ? tick + autoTicks : 0L;
+        tower.getGoldBarrels().add(new GoldBarrel(display, interaction, gold, gambling,
+                tick, despawnTick, autoCollectTick, System.currentTimeMillis()));
+
+        world.spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, displayLoc.clone().add(0.5, 0.5, 0.5), 10, 0.3, 0.4, 0.3, 0.0);
+        world.playSound(displayLoc, Sound.BLOCK_BARREL_OPEN, 0.6f, 1.4f);
+        return true;
+    }
+
+    /** Player clicked a barrel's Interaction (right-click). Returns true if it was a barrel we handled. */
+    public boolean handleBarrelClick(org.bukkit.entity.Player player, org.bukkit.entity.Entity clicked) {
+        if (!isGoldBarrel(clicked)) return false;
+        org.bukkit.entity.Interaction inter = (org.bukkit.entity.Interaction) clicked;
+        String plotId = inter.getPersistentDataContainer().get(barrelPlotKey(), org.bukkit.persistence.PersistentDataType.STRING);
+        Tower tower = plotId == null ? null : placedTowers.get(plotId);
+        if (tower == null) { inter.remove(); return true; }
+        // Only the tower's owner may claim its gold.
+        if (tower.getOwnerId() != null && !tower.getOwnerId().equals(player.getUniqueId())) return true;
+        GoldBarrel found = null;
+        for (GoldBarrel b : tower.getGoldBarrels()) {
+            if (inter.equals(b.interaction)) { found = b; break; }
+        }
+        if (found == null) { inter.remove(); return true; }
+        tower.getGoldBarrels().remove(found);
+        collectBarrel(tower, found, player);
+        return true;
+    }
+
+    private void collectBarrel(Tower tower, GoldBarrel barrel, org.bukkit.entity.Player player) {
+        Location loc = barrel.interaction.getLocation();
+        barrel.remove();
+        if (barrel.gambling) {
+            applyGamblingOutcome(tower, player, loc);
+        } else {
+            awardBarrelGold(player, barrel.gold, loc, false);
+        }
+    }
+
+    /** Syndicate path: the tower pulls the barrel in itself and pays the (offline-safe) owner. */
+    private void autoCollectBarrel(Tower tower, GoldBarrel barrel) {
+        Location loc = barrel.interaction.getLocation();
+        // Particle beam from the tower to the barrel right before it's pulled in.
+        Location towerTop = tower.getCenterLocation().clone().add(0, 2.5, 0);
+        drawParticleLine(towerTop, loc.clone().add(0, 0.6, 0), org.bukkit.Particle.ENCHANT);
+        barrel.remove();
+        if (tower.getOwnerId() == null) return;
+        plugin.getGameManager().addGold(tower.getOwnerId(), barrel.gold, true);
+        org.bukkit.entity.Player owner = org.bukkit.Bukkit.getPlayer(tower.getOwnerId());
+        if (owner != null && owner.isOnline()) {
+            owner.sendActionBar(ChatColor.GOLD + "+" + barrel.gold + " gold (Syndicate)");
+            owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.4f, 1.6f);
+        }
+        loc.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, loc.clone().add(0, 0.6, 0), 8, 0.2, 0.3, 0.2, 0.0);
+    }
+
+    private void awardBarrelGold(org.bukkit.entity.Player player, int gold, Location loc, boolean gambled) {
+        plugin.getGameManager().addGold(player.getUniqueId(), gold, true);
+        String tag = gambled ? "" : ChatColor.GRAY + " (Gold Tower)";
+        player.sendActionBar(ChatColor.GOLD + "+" + gold + " gold" + tag);
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6f, 1.4f);
+        if (loc.getWorld() != null) {
+            loc.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, loc.clone().add(0, 0.6, 0), 10, 0.3, 0.4, 0.3, 0.0);
+        }
     }
 
     /**
-     * Pays out Gold Tower bonuses when a mob dies. For every Gold Tower on the mob's arena whose radius
-     * covers the death location, the tower's owner earns a fraction of the mob's bounty. A single owner
-     * is paid once per kill (using their best-covering tower) so stacking Gold Towers on one chokepoint
-     * doesn't multiply the payout.
+     * Gambling path payout. Rolls a single weighted table: ~70% is a gold payout (1-10000 with sharply
+     * decreasing odds), ~30% is a random event — a tower damage buff (good) or one of several nerfs
+     * (player weakness, tower-cooldown penalty, or mobs sent to the player's own path). Stronger results
+     * (jackpots, big buffs, severe nerfs, large mob waves) are deliberately rare.
      */
-    public void awardGoldTowerBonusOnDeath(String arena, Location deathLoc, int bounty) {
-        if (bounty <= 0 || deathLoc == null || deathLoc.getWorld() == null) return;
-        java.util.Map<java.util.UUID, Double> ownerBest = new java.util.HashMap<>();
-        for (Tower tower : getPlacedTowers().values()) {
-            if (tower.getType() != TowerType.GOLD) continue;
-            if (tower.isDisabled() || tower.isArmageddonDisabled()) continue;
-            if (tower.getOwnerId() == null) continue;
-            String towerArena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
-            if (!arena.equals(towerArena)) continue;
-            Location c = tower.getCenterLocation();
-            if (c == null || c.getWorld() == null || !c.getWorld().equals(deathLoc.getWorld())) continue;
-            if (c.distanceSquared(deathLoc) > tower.getRange() * tower.getRange()) continue;
-            ownerBest.merge(tower.getOwnerId(), getGoldTowerBonusFraction(tower.getLevel()), Math::max);
-        }
-        if (ownerBest.isEmpty()) return;
-        for (java.util.Map.Entry<java.util.UUID, Double> e : ownerBest.entrySet()) {
-            int bonus = Math.max(1, (int) Math.round(bounty * e.getValue()));
-            plugin.getGameManager().addGold(e.getKey(), bonus, true); // quiet; we give our own feedback
-            org.bukkit.entity.Player p = org.bukkit.Bukkit.getPlayer(e.getKey());
-            if (p != null) {
-                p.sendActionBar(ChatColor.GOLD + "+" + bonus + " bonus gold (Gold Tower)");
-                p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);
+    private void applyGamblingOutcome(Tower tower, org.bukkit.entity.Player player, Location loc) {
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        org.bukkit.World world = loc.getWorld();
+        int roll = rng.nextInt(10000);
+
+        // --- Gold payouts (0..6999) ---
+        if (roll < 7000) {
+            int gold;
+            boolean jackpot = false;
+            if (roll < 3000)      gold = rng.nextInt(1, 51);        // 30.0%  small change
+            else if (roll < 4800) gold = rng.nextInt(51, 151);      // 18.0%
+            else if (roll < 5900) gold = rng.nextInt(151, 401);     // 11.0%
+            else if (roll < 6600) gold = rng.nextInt(401, 1001);    //  7.0%
+            else if (roll < 6900) gold = rng.nextInt(1001, 2501);   //  3.0%
+            else if (roll < 6980) gold = rng.nextInt(2501, 6001);   //  0.8%
+            else { gold = rng.nextInt(6001, 10001); jackpot = true; } // 0.2% JACKPOT
+            awardBarrelGold(player, gold, loc, true);
+            if (jackpot) {
+                player.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "JACKPOT!",
+                        ChatColor.YELLOW + "+" + gold + " gold!", 5, 50, 10);
+                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+                if (world != null) world.spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1, 0), 80, 0.6, 0.8, 0.6, 0.3);
+            } else if (gold >= 1001) {
+                player.sendActionBar(ChatColor.GOLD + "" + ChatColor.BOLD + "Big win! +" + gold + " gold!");
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
             }
+            return;
         }
-        deathLoc.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
-                deathLoc.clone().add(0, 0.5, 0), 8, 0.3, 0.4, 0.3, 0.0);
+
+        // --- Events (7000..9999) ---
+        int e = roll - 7000; // 0..2999
+        if (e < 1000) {                         // 10.0%  minor weakness (bad, mild)
+            player.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 120, 0));
+            gamblingEventFeedback(player, loc, ChatColor.RED, "Snake Eyes",
+                    "You feel weakened... (Weakness 6s)", Sound.ENTITY_WITCH_AMBIENT, false);
+        } else if (e < 1700) {                  // 7.0%   minor tower damage buff (good)
+            applyOwnerTowerDamageBuff(tower, 1.25, 15_000L);
+            gamblingEventFeedback(player, loc, ChatColor.GREEN, "Lucky Streak",
+                    "Your towers deal +25% damage for 15s!", Sound.BLOCK_NOTE_BLOCK_BELL, true);
+        } else if (e < 2300) {                  // 6.0%   minor cooldown penalty (bad)
+            applyOwnerTowerCooldownPenalty(tower, 1.5, 12_000L);
+            gamblingEventFeedback(player, loc, ChatColor.RED, "Rusted Gears",
+                    "Your towers fire 50% slower for 12s!", Sound.BLOCK_ANVIL_LAND, false);
+        } else if (e < 2700) {                  // 4.0%   small mob wave to own path (bad)
+            int sent = sendMobsToOwnerPath(tower, 3, 1, 2);
+            gamblingEventFeedback(player, loc, ChatColor.RED, "Bad Beat",
+                    sent + " mob(s) breach your own path!", Sound.ENTITY_ZOMBIE_AMBIENT, false);
+        } else if (e < 2850) {                  // 1.5%   major tower damage buff (good, strong)
+            applyOwnerTowerDamageBuff(tower, 1.75, 25_000L);
+            gamblingEventFeedback(player, loc, ChatColor.GOLD, "Hot Hand",
+                    "Your towers deal +75% damage for 25s!", Sound.UI_TOAST_CHALLENGE_COMPLETE, true);
+        } else if (e < 2950) {                  // 1.0%   major weakness (bad, strong)
+            player.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 240, 1));
+            gamblingEventFeedback(player, loc, ChatColor.DARK_RED, "Cursed",
+                    "A heavy curse saps your strength! (Weakness II 12s)", Sound.ENTITY_WITHER_SPAWN, false);
+        } else if (e < 2990) {                  // 0.4%   severe cooldown penalty (bad, strong)
+            applyOwnerTowerCooldownPenalty(tower, 2.5, 18_000L);
+            gamblingEventFeedback(player, loc, ChatColor.DARK_RED, "Seized Up",
+                    "Your towers grind to a crawl for 18s!", Sound.BLOCK_ANVIL_DESTROY, false);
+        } else {                                // 0.1%   large mob wave (bad, strong)
+            int sent = sendMobsToOwnerPath(tower, 6, 2, 4);
+            gamblingEventFeedback(player, loc, ChatColor.DARK_RED, "House Wins",
+                    sent + " mobs swarm your own path!", Sound.ENTITY_WITHER_SPAWN, false);
+        }
+    }
+
+    private void gamblingEventFeedback(org.bukkit.entity.Player player, Location loc, ChatColor color,
+                                       String title, String subtitle, Sound sound, boolean good) {
+        player.sendTitle(color + "" + ChatColor.BOLD + title, color + subtitle, 5, 40, 10);
+        player.playSound(player.getLocation(), sound, 1.0f, good ? 1.2f : 0.8f);
+        if (loc.getWorld() != null) {
+            org.bukkit.Particle p = good ? org.bukkit.Particle.HAPPY_VILLAGER : org.bukkit.Particle.ANGRY_VILLAGER;
+            loc.getWorld().spawnParticle(p, loc.clone().add(0, 1, 0), 20, 0.4, 0.5, 0.4, 0.0);
+        }
+    }
+
+    /** Applies a temporary damage multiplier to every tower owned by this tower's owner in its arena. */
+    private void applyOwnerTowerDamageBuff(Tower source, double multiplier, long durationMillis) {
+        java.util.UUID owner = source.getOwnerId();
+        if (owner == null) return;
+        String arena = plugin.getPlotConfigManager().getPlotArena(source.getPlotId());
+        for (Tower t : placedTowers.values()) {
+            if (!owner.equals(t.getOwnerId())) continue;
+            if (!arena.equals(plugin.getPlotConfigManager().getPlotArena(t.getPlotId()))) continue;
+            t.applyDamageBuff(multiplier, durationMillis);
+        }
+    }
+
+    /** Applies a temporary cooldown multiplier (>1 = slower) to all of the owner's towers in its arena. */
+    private void applyOwnerTowerCooldownPenalty(Tower source, double multiplier, long durationMillis) {
+        java.util.UUID owner = source.getOwnerId();
+        if (owner == null) return;
+        String arena = plugin.getPlotConfigManager().getPlotArena(source.getPlotId());
+        for (Tower t : placedTowers.values()) {
+            if (!owner.equals(t.getOwnerId())) continue;
+            if (!arena.equals(plugin.getPlotConfigManager().getPlotArena(t.getPlotId()))) continue;
+            t.applyCooldownPenalty(multiplier, durationMillis);
+        }
+    }
+
+    /** Spawns {@code count} mobs of a random chain (tier in [minTier,maxTier]) onto the owner's own path. */
+    private int sendMobsToOwnerPath(Tower tower, int count, int minTier, int maxTier) {
+        java.util.UUID owner = tower.getOwnerId();
+        if (owner == null) return 0;
+        Match match = plugin.getGameManager().getPlayerMatch(owner);
+        if (match == null) return 0;
+        String arena = plugin.getPlotConfigManager().getPlotArena(tower.getPlotId());
+        java.util.List<String> chains = plugin.getMobManager().getUpgradeRegistry().getAvailableChains();
+        if (chains.isEmpty()) return 0;
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        String chain = chains.get(rng.nextInt(chains.size()));
+        int maxTierForChain = plugin.getMobManager().getUpgradeRegistry().getMaxTier(chain);
+        int tier = Math.min(maxTierForChain, rng.nextInt(minTier, maxTier + 1));
+        for (int i = 0; i < count; i++) {
+            // Stagger spawns so they don't all stack on waypoint 0.
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin,
+                    () -> plugin.getMobManager().spawnMobByChain(match, arena, chain, tier), i * 8L);
+        }
+        return count;
     }
 
     /**
@@ -2667,7 +2942,7 @@ public class TowerManager {
         // Build slot 19: Gold Tower (economy)
         int goldCost = plugin.getTowerConfigManager().getCost(TowerType.GOLD, 1, TowerType.GOLD.getCost());
         double goldRange = plugin.getTowerConfigManager().getRange(TowerType.GOLD, 1, TowerType.GOLD.getRange());
-        int goldBonusPct = (int) Math.round(getGoldTowerBonusFraction(1) * 100);
+        int goldPerBarrel = plugin.getTowerConfigManager().getStat(TowerType.GOLD, 1, "gold_per_barrel", 100);
         gui.setItem(19, createGUIItem(
             Material.GOLD_BLOCK,
             ChatColor.GOLD + "" + ChatColor.BOLD + "Gold Tower",
@@ -2675,10 +2950,10 @@ public class TowerManager {
             ChatColor.GRAY + "Range: " + ChatColor.YELLOW + goldRange + " blocks",
             ChatColor.GRAY + "Damage: " + ChatColor.RED + "None",
             "",
-            ChatColor.GRAY + "Deals " + ChatColor.RED + "zero damage" + ChatColor.GRAY + ".",
-            ChatColor.GRAY + "Any mob that dies in its radius pays",
-            ChatColor.GRAY + "you " + ChatColor.YELLOW + "+" + goldBonusPct + "% bonus gold" + ChatColor.GRAY + " of its bounty.",
-            ChatColor.GREEN + "Upgrade for a bigger bonus."
+            ChatColor.GRAY + "Spawns " + ChatColor.YELLOW + "gold barrels" + ChatColor.GRAY + " on the track.",
+            ChatColor.GRAY + "Click a barrel to claim " + ChatColor.YELLOW + goldPerBarrel + " Gold" + ChatColor.GRAY + ".",
+            ChatColor.GREEN + "Branches into High Roller, Syndicate",
+            ChatColor.GREEN + "or Gambling paths at Level 2."
         ));
 
         // Re-sort the just-placed tower items across the content slots by ascending base cost, so the
@@ -2729,7 +3004,8 @@ public class TowerManager {
 
     /** Branching towers carry a shared base Level 1 and split into named paths at Level 2. */
     public static boolean isBranchingType(TowerType type) {
-        return type == TowerType.TURRET || type == TowerType.BOMBARDIER || type == TowerType.BEEHIVE;
+        return type == TowerType.TURRET || type == TowerType.BOMBARDIER || type == TowerType.BEEHIVE
+                || type == TowerType.GOLD;
     }
 
     public void openPathPickerGUI(Player player, String plotId, TowerType type) {
@@ -2751,7 +3027,7 @@ public class TowerManager {
             gui.setItem(i, filler);
         }
 
-        int[] slots = {11, 15};
+        int[] slots = pathPickerSlots(paths.size());
         for (int i = 0; i < paths.size() && i < slots.length; i++) {
             String path = paths.get(i);
             int cost = plugin.getTowerConfigManager().getCost(type, path, targetLevel, type.getCost());
@@ -2782,6 +3058,11 @@ public class TowerManager {
         player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.8f, 1.2f);
     }
 
+    /** Inventory slots the path picker lays its choices across, centered for 2 or 3 paths. */
+    public static int[] pathPickerSlots(int count) {
+        return count >= 3 ? new int[]{11, 13, 15} : new int[]{11, 15};
+    }
+
     private String formatPathName(String path) {
         String[] words = path.split("_");
         StringBuilder sb = new StringBuilder();
@@ -2800,6 +3081,9 @@ public class TowerManager {
             case "landmines" -> Material.STONE_PRESSURE_PLATE;
             case "goliath" -> Material.HONEY_BLOCK;
             case "swarm" -> Material.BEE_SPAWN_EGG;
+            case "high_roller" -> Material.GOLD_INGOT;
+            case "syndicate" -> Material.CHEST;
+            case "gambling" -> Material.SCULK_CATALYST;
             default -> type.getBlockMaterial();
         };
     }
@@ -2816,6 +3100,22 @@ public class TowerManager {
                     + plugin.getTowerConfigManager().getStat(type, path, level, "scale", 2.0) + "x");
             case "swarm" -> lore.add(ChatColor.GRAY + "Max Bees: " + ChatColor.YELLOW
                     + plugin.getTowerConfigManager().getStat(type, path, level, "bee_count", 1));
+            case "high_roller" -> {
+                int gpb = plugin.getTowerConfigManager().getStat(type, path, level, "gold_per_barrel", 150);
+                double despawn = plugin.getTowerConfigManager().getStat(type, path, level, "despawn_ticks", 300) / 20.0;
+                lore.add(ChatColor.GRAY + "Gold per Barrel: " + ChatColor.YELLOW + gpb);
+                lore.add(ChatColor.GRAY + "Despawn Timer: " + ChatColor.RED + String.format("%.0fs", despawn)
+                        + ChatColor.GRAY + " (click fast!)");
+            }
+            case "syndicate" -> {
+                int gpb = plugin.getTowerConfigManager().getStat(type, path, level, "gold_per_barrel", 60);
+                lore.add(ChatColor.GRAY + "Auto-collects: " + ChatColor.YELLOW + gpb + " Gold" + ChatColor.GRAY + " per barrel");
+                lore.add(ChatColor.GRAY + "No clicking required.");
+            }
+            case "gambling" -> {
+                lore.add(ChatColor.GRAY + "Payout: " + ChatColor.YELLOW + "1 - 10,000 Gold" + ChatColor.GRAY + " (long odds)");
+                lore.add(ChatColor.DARK_PURPLE + "Risk: barrels may help " + ChatColor.GRAY + "or " + ChatColor.RED + "harm" + ChatColor.GRAY + " you!");
+            }
         }
     }
 

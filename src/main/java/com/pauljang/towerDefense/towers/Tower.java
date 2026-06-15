@@ -25,6 +25,14 @@ public class Tower {
     private boolean empDisplayed = false;
     private final java.util.List<org.bukkit.entity.Bee> spawnedBees = new java.util.ArrayList<>();
     private final java.util.List<ArmorStand> landmines = new java.util.ArrayList<>();
+    // Gold Tower: the gold-bundle barrels (BlockDisplay + Interaction pairs) it has spawned on the track.
+    private final java.util.List<GoldBarrel> goldBarrels = new java.util.ArrayList<>();
+    // Transient combat modifiers from the Gold Tower's gambling path. Apply to getDamage()/getCooldown()
+    // so every call site respects them; they lapse automatically once the wall-clock deadline passes.
+    private long damageBuffUntil = 0;
+    private double damageBuffMult = 1.0;
+    private long cooldownPenaltyUntil = 0;
+    private double cooldownPenaltyMult = 1.0;
     // Direct references to the spawned Dripstone hazard displays so the ticker never has to scan
     // the world (getNearbyEntities) to find them.
     private final java.util.List<org.bukkit.entity.BlockDisplay> hazardDisplays = new java.util.ArrayList<>();
@@ -103,11 +111,40 @@ public class Tower {
     }
 
     public double getDamage() {
-        return towerConfig().getDamage(type, pathId, level, type.getDamage() + (level - 1) * 1.5);
+        double base = towerConfig().getDamage(type, pathId, level, type.getDamage() + (level - 1) * 1.5);
+        return base * getDamageMultiplierNow();
     }
 
     public long getCooldown() {
-        return towerConfig().getCooldown(type, pathId, level, Math.max(8L, type.getCooldown() - (level - 1) * 2));
+        long base = towerConfig().getCooldown(type, pathId, level, Math.max(8L, type.getCooldown() - (level - 1) * 2));
+        return Math.max(1L, Math.round(base * getCooldownMultiplierNow()));
+    }
+
+    // --- Gold Tower gambling: transient tower-wide buff/penalty applied to all of a player's towers ---
+
+    public java.util.List<GoldBarrel> getGoldBarrels() { return goldBarrels; }
+
+    /** Grants this tower a temporary damage multiplier (>1 = buff) for the given duration in millis. */
+    public void applyDamageBuff(double multiplier, long durationMillis) {
+        this.damageBuffMult = multiplier;
+        this.damageBuffUntil = System.currentTimeMillis() + durationMillis;
+    }
+
+    /** Saddles this tower with a temporary cooldown multiplier (>1 = slower) for the given millis. */
+    public void applyCooldownPenalty(double multiplier, long durationMillis) {
+        this.cooldownPenaltyMult = multiplier;
+        this.cooldownPenaltyUntil = System.currentTimeMillis() + durationMillis;
+    }
+
+    public boolean hasDamageBuff() { return System.currentTimeMillis() < damageBuffUntil && damageBuffMult != 1.0; }
+    public boolean hasCooldownPenalty() { return System.currentTimeMillis() < cooldownPenaltyUntil && cooldownPenaltyMult != 1.0; }
+
+    public double getDamageMultiplierNow() {
+        return System.currentTimeMillis() < damageBuffUntil ? damageBuffMult : 1.0;
+    }
+
+    public double getCooldownMultiplierNow() {
+        return System.currentTimeMillis() < cooldownPenaltyUntil ? cooldownPenaltyMult : 1.0;
     }
 
     public int getUpgradeCost() {

@@ -362,17 +362,21 @@ public class MobListener implements Listener {
                         plugin.getGameManager().recordMobKilled(player.getUniqueId());
                     }
                 }
-                // Gold Towers covering the death spot pay their owners a bonus cut of the bounty.
-                plugin.getTowerManager().awardGoldTowerBonusOnDeath(mobArena, entity.getLocation(), reward);
             }
 
-            // Award experience only to the player who sent the mob (on the opposite track)
+            // Award experience. In multiplayer the XP goes to the player who sent the mob (on the
+            // opposite track). Single player has no opponent, so the defender on this track earns the
+            // XP for each kill instead.
             NamespacedKey xpRewardKey = TDKeys.XP_REWARD;
             if (entity.getPersistentDataContainer().has(xpRewardKey, PersistentDataType.INTEGER)) {
                 int xpReward = entity.getPersistentDataContainer().get(xpRewardKey, PersistentDataType.INTEGER);
                 String senderArena = mobArena.equals("1") ? "2" : "1";
                 for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(senderArena)) {
+                    com.pauljang.towerDefense.core.Match playerMatch =
+                            plugin.getGameManager().getPlayerMatch(player.getUniqueId());
+                    boolean singlePlayer = playerMatch != null && playerMatch.getMapData().isSinglePlayer();
+                    String rewardArena = singlePlayer ? mobArena : senderArena;
+                    if (plugin.getGameManager().getPlayerArena(player.getUniqueId()).equals(rewardArena)) {
                         plugin.getGameManager().addExp(player.getUniqueId(), xpReward);
                     }
                 }
@@ -849,12 +853,14 @@ public class MobListener implements Listener {
                 return;
             }
 
-            // Slots 11 and 15 map to the paths in towers.yaml order (same as the picker layout)
+            // The picker lays paths out across slots in towers.yaml order; map the clicked slot back.
             int slot = event.getRawSlot();
             java.util.List<String> paths = plugin.getTowerManager().getPathNamesInOrder(type);
+            int[] slots = com.pauljang.towerDefense.towers.TowerManager.pathPickerSlots(paths.size());
             String path = null;
-            if (slot == 11 && paths.size() >= 1) path = paths.get(0);
-            else if (slot == 15 && paths.size() >= 2) path = paths.get(1);
+            for (int i = 0; i < paths.size() && i < slots.length; i++) {
+                if (slot == slots[i]) { path = paths.get(i); break; }
+            }
             if (path == null) return;
 
             // The picker is the base Level 1 -> Level 2 upgrade onto a chosen path.
@@ -1575,6 +1581,14 @@ public class MobListener implements Listener {
     @EventHandler
     public void onFoodLevelChange(org.bukkit.event.entity.FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof org.bukkit.entity.Player) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOW)
+    public void onGoldBarrelClick(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        if (event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return; // ignore off-hand duplicate
+        if (plugin.getTowerManager().handleBarrelClick(event.getPlayer(), event.getRightClicked())) {
             event.setCancelled(true);
         }
     }

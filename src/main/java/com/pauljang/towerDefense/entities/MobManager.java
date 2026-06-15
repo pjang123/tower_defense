@@ -1265,17 +1265,25 @@ public class MobManager {
         }
 
         // Vexes fly and would otherwise glide into/through the castle walls on the final leg, ending up
-        // inside the castle where melee players can't hit them. Stop a vex one node early: as soon as the
-        // node it's heading toward is the final node (the castle door), treat it as arrived at its current
-        // (second-to-last) waypoint — out on the open path — and let the siege logic damage the castle from
-        // there. settledAtEnd is forced so it never fans out toward the door offset (which is inside the walls).
+        // inside the castle where melee players can't hit them. So while a vex is heading toward the final
+        // node (the castle door), let it keep advancing along the open path but stop it ~2 blocks short of
+        // that node: once within 2 blocks (X/Z) of the door, treat it as arrived and let the siege logic
+        // damage the castle from there. settledAtEnd is forced so it never fans out toward the door offset
+        // (which is inside the walls). The bottom reach-check below skips vexes at the final node so it
+        // can't auto-advance them past this stop point.
         if (mob.getEntity().getType() == EntityType.VEX && mob.getCurrentWaypointId() != null) {
             TDWaypoint headingTo = mob.getWaypointGraph().get(mob.getCurrentWaypointId());
-            if (headingTo != null && headingTo.getNextIds().isEmpty()) {
-                mob.setCurrentWaypointId(null); // hasReachedFinalWaypoint() is now true
-                mob.setSettledAtEnd(true);      // skip the fan-out toward the door
-                mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-                return;
+            if (headingTo != null && headingTo.getNextIds().isEmpty() && headingTo.getLocation() != null) {
+                Location finalLoc = headingTo.getLocation();
+                Location vexLoc = mob.getEntity().getLocation();
+                double dx = vexLoc.getX() - finalLoc.getX();
+                double dz = vexLoc.getZ() - finalLoc.getZ();
+                if (dx * dx + dz * dz <= 4.0) { // within ~2 blocks of the door
+                    mob.setCurrentWaypointId(null); // hasReachedFinalWaypoint() is now true
+                    mob.setSettledAtEnd(true);      // skip the fan-out toward the door
+                    mob.getEntity().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                    return;
+                }
             }
         }
 
@@ -1372,8 +1380,11 @@ public class MobManager {
         // physically blocked by the castle structure from getting within ~0.7 blocks of the end node, so
         // they'd stall just short and never trigger the castle siege. A 2.5-block radius lets them reach
         // "final" reliably and start attacking.
+        // Vexes are excluded: the vex block above stops them ~2 blocks short of the final node, so we
+        // must not let this larger acceptance radius auto-advance them to "final" (and into the
+        // inside-the-walls fan-out) at 2.5 blocks before that stop fires.
         String curWp = mob.getCurrentWaypointId();
-        if (curWp != null) {
+        if (curWp != null && mob.getEntity().getType() != EntityType.VEX) {
             TDWaypoint curNode = mob.getWaypointGraph().get(curWp);
             if (curNode != null && curNode.getNextIds().isEmpty()) {
                 reachThreshold = 6.25; // (2.5 blocks)^2
@@ -1589,6 +1600,12 @@ public class MobManager {
     }
 
     public void openMobSpawnerGUI(Player player) {
+        // Single player has no opponent lane to send mobs to, so the spawner GUI is disabled entirely.
+        com.pauljang.towerDefense.core.Match playerMatch = plugin.getGameManager().getPlayerMatch(player.getUniqueId());
+        if (playerMatch != null && playerMatch.getMapData().isSinglePlayer()) {
+            return;
+        }
+
         com.pauljang.towerDefense.ui.TDMenuHolder holder =
                 new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.MOB_SPAWNER);
         org.bukkit.inventory.Inventory gui = org.bukkit.Bukkit.createInventory(holder, 54, ChatColor.DARK_RED + "TD Mob Spawner");

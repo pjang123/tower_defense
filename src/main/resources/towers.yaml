@@ -424,9 +424,15 @@ beehive:
         cooldown: 40
         bee_count: 9
 
-# Economy tower: deals zero damage. When a mob dies inside its radius, the owner is paid
-# bonus_fraction of that mob's gold bounty (see TowerManager.getGoldTowerBonusFraction /
-# awardGoldTowerBonusOnDeath). damage/cooldown are unused — it never attacks.
+# Economy tower: deals zero damage and never attacks. It periodically spawns a "gold bundle"
+# (a BlockDisplay barrel + an Interaction hitbox) on the track within its range. The tower branches
+# at Level 2 into three paths (see TowerManager.tickGoldTower):
+#   - high_roller: big payouts but a tightening despawn timer (active micro-management)
+#   - syndicate:   the tower auto-collects barrels for a smaller, taxed yield (passive)
+#   - gambling:    each barrel rolls a random payout (1-10000, decreasing odds) with a chance of a
+#                  good/bad event instead (see TowerManager.applyGamblingOutcome)
+# Per-level extras: cooldown = barrel spawn interval (ticks), gold_per_barrel, despawn_ticks
+# (0 = never), max_barrels (concurrent cap), auto_collect / auto_collect_ticks, gambling.
 gold:
   name: "Gold Tower"
   structure_file: "gold"
@@ -437,16 +443,85 @@ gold:
       range: 8.0
       damage: 0.0
       cooldown: 100
-      bonus_fraction: 0.25
-    2:
-      cost: 500
-      range: 9.0
-      damage: 0.0
-      cooldown: 100
-      bonus_fraction: 0.40
-    3:
-      cost: 800
-      range: 10.0
-      damage: 0.0
-      cooldown: 100
-      bonus_fraction: 0.55
+      gold_per_barrel: 100
+      despawn_ticks: 400
+      max_barrels: 3
+  paths:
+    high_roller:
+      2:
+        cost: 400
+        range: 8.0
+        damage: 0.0
+        cooldown: 100
+        gold_per_barrel: 150
+        despawn_ticks: 300
+        max_barrels: 4
+      3:
+        cost: 600
+        range: 9.0
+        damage: 0.0
+        cooldown: 90
+        gold_per_barrel: 200
+        despawn_ticks: 200
+        max_barrels: 4
+      4:
+        cost: 900
+        range: 10.0
+        damage: 0.0
+        cooldown: 80
+        gold_per_barrel: 300
+        despawn_ticks: 100
+        max_barrels: 5
+    syndicate:
+      2:
+        cost: 400
+        range: 9.0
+        damage: 0.0
+        cooldown: 100
+        gold_per_barrel: 60
+        auto_collect: true
+        auto_collect_ticks: 40
+        max_barrels: 4
+      3:
+        cost: 550
+        range: 10.0
+        damage: 0.0
+        cooldown: 85
+        gold_per_barrel: 75
+        auto_collect: true
+        auto_collect_ticks: 40
+        max_barrels: 5
+      4:
+        cost: 800
+        range: 11.0
+        damage: 0.0
+        cooldown: 85
+        gold_per_barrel: 100
+        auto_collect: true
+        auto_collect_ticks: 40
+        max_barrels: 5
+    gambling:
+      2:
+        cost: 500
+        range: 8.0
+        damage: 0.0
+        cooldown: 120
+        gambling: true
+        despawn_ticks: 300
+        max_barrels: 3
+      3:
+        cost: 800
+        range: 9.0
+        damage: 0.0
+        cooldown: 110
+        gambling: true
+        despawn_ticks: 260
+        max_barrels: 4
+      4:
+        cost: 1200
+        range: 10.0
+        damage: 0.0
+        cooldown: 100
+        gambling: true
+        despawn_ticks: 220
+        max_barrels: 4
