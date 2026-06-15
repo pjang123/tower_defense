@@ -2053,17 +2053,45 @@ public class TowerManager {
                 if (next != null && next.getLocation() != null && loc != null
                         && loc.getWorld() != null
                         && loc.getWorld().equals(center.getWorld())
-                        && loc.getWorld().equals(next.getLocation().getWorld())
-                        // Include the segment if EITHER endpoint is in range, so long segments that
-                        // only partly cross the radius still count. Callers range-check the final point.
-                        && (loc.distanceSquared(center) <= rangeSq
-                            || next.getLocation().distanceSquared(center) <= rangeSq)) {
-                    result.add(new Location[]{loc.clone(), next.getLocation().clone()});
+                        && loc.getWorld().equals(next.getLocation().getWorld())) {
+                    // Clip the segment to the slice that actually lies within range and return that
+                    // sub-segment. A tower placed mid-segment, with NEITHER waypoint in range, still
+                    // gets the part of the path crossing its radius — so callers (gold barrels,
+                    // dripstone, landmines) that pick a random point along the returned segment can
+                    // land anywhere on the in-range path, not just next to waypoints.
+                    Location[] clipped = clipSegmentToRange(loc, next.getLocation(), center, rangeSq);
+                    if (clipped != null) result.add(clipped);
                 }
                 queue.add(nextId);
             }
         }
         return result;
+    }
+
+    /**
+     * Clips the path segment A→B to the portion inside the sphere centred at {@code center} with the
+     * given squared radius, returning the in-range endpoints (cloned) or {@code null} if the segment
+     * never enters range. Solves |A + t·(B−A) − center|² ≤ rangeSq for t ∈ [0, 1].
+     */
+    private Location[] clipSegmentToRange(Location a, Location b, Location center, double rangeSq) {
+        org.bukkit.util.Vector d = b.toVector().subtract(a.toVector());
+        org.bukkit.util.Vector f = a.toVector().subtract(center.toVector());
+        double aa = d.dot(d);
+        if (aa < 1.0e-9) {
+            // Degenerate segment (coincident waypoints): treat it as a single point.
+            return f.dot(f) <= rangeSq ? new Location[]{a.clone(), b.clone()} : null;
+        }
+        double bb = 2.0 * f.dot(d);
+        double cc = f.dot(f) - rangeSq;
+        double disc = bb * bb - 4.0 * aa * cc;
+        if (disc < 0) return null; // the segment's line never reaches the sphere
+        double sqrt = Math.sqrt(disc);
+        double t0 = Math.max(0.0, (-bb - sqrt) / (2.0 * aa));
+        double t1 = Math.min(1.0, (-bb + sqrt) / (2.0 * aa));
+        if (t0 > t1) return null; // the in-range interval lies outside [0, 1]
+        Location start = a.clone().add(d.clone().multiply(t0));
+        Location end = a.clone().add(d.clone().multiply(t1));
+        return new Location[]{start, end};
     }
 
     /**
@@ -2419,16 +2447,39 @@ public class TowerManager {
     }
 
     private boolean spawnGoldBarrel(Tower tower, long tick, int gold, long despawnTicks, long autoTicks, boolean gambling) {
-        java.util.List<Location> track = getTrackLocationsWithinRange(tower);
-        if (track.isEmpty()) return false;
-        Location chosen = track.get(new java.util.Random().nextInt(track.size()));
+        // Scatter barrels along the path like Bombardier landmines / Dripstone hazards: pick a random
+        // in-range segment, a random point along it, then jitter perpendicular so they spread across the
+        // lane instead of snapping to discrete waypoint tiles.
+        java.util.List<Location[]> segments = getTrackSegmentsWithinRange(tower);
+        if (segments.isEmpty()) return false;
+
+        Location[] segment = segments.get(new Random().nextInt(segments.size()));
+        double t = Math.random();
+        Location chosen = segment[0].clone().add(
+                segment[1].clone().subtract(segment[0]).toVector().multiply(t));
+        chosen.add((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);
         org.bukkit.World world = chosen.getWorld();
         if (world == null) return false;
 
-        // Sit the barrel one block above the path tile so it rests on the track instead of inside it.
+        // Keep the jittered point inside the tower's range so barrels never land off the reachable path.
+        if (chosen.distanceSquared(tower.getCenterLocation()) > tower.getRange() * tower.getRange()) {
+            return false;
+        }
+
+        // Don't stack barrels: skip a spot too close to an existing one so the field spreads out.
+        for (GoldBarrel existing : tower.getGoldBarrels()) {
+            if (existing.isValid()
+                    && existing.interaction.getLocation().distanceSquared(chosen) < 3.0) {
+                return false;
+            }
+        }
+
+        // Sit the barrel one block above the path so it rests on the track instead of inside it. A
+        // BlockDisplay renders from its lower-NW corner, so offset by -0.5 to centre the block on the
+        // chosen point; the interaction hitbox stays centred there.
         Location displayLoc = new Location(world,
-                Math.floor(chosen.getX()), Math.floor(chosen.getY()) + 1, Math.floor(chosen.getZ()));
-        Location interLoc = displayLoc.clone().add(0.5, 0, 0.5);
+                chosen.getX() - 0.5, Math.floor(chosen.getY()) + 1, chosen.getZ() - 0.5);
+        Location interLoc = new Location(world, chosen.getX(), displayLoc.getY(), chosen.getZ());
 
         org.bukkit.entity.BlockDisplay display = world.spawn(displayLoc, org.bukkit.entity.BlockDisplay.class, bd -> {
             bd.setBlock(Material.BARREL.createBlockData());

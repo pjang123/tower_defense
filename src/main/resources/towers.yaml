@@ -439,89 +439,89 @@ gold:
   base_material: RAW_GOLD_BLOCK
   levels:
     1:
-      cost: 300
+      cost: 1150
       range: 8.0
       damage: 0.0
-      cooldown: 100
+      cooldown: 400
       gold_per_barrel: 100
       despawn_ticks: 400
       max_barrels: 3
   paths:
     high_roller:
       2:
-        cost: 400
+        cost: 1500
         range: 8.0
         damage: 0.0
-        cooldown: 100
+        cooldown: 400
         gold_per_barrel: 150
         despawn_ticks: 300
         max_barrels: 4
       3:
-        cost: 600
+        cost: 2250
         range: 9.0
         damage: 0.0
-        cooldown: 90
+        cooldown: 360
         gold_per_barrel: 200
         despawn_ticks: 200
         max_barrels: 4
       4:
-        cost: 900
+        cost: 3400
         range: 10.0
         damage: 0.0
-        cooldown: 80
+        cooldown: 320
         gold_per_barrel: 300
         despawn_ticks: 100
         max_barrels: 5
     syndicate:
       2:
-        cost: 400
+        cost: 1500
         range: 9.0
         damage: 0.0
-        cooldown: 100
+        cooldown: 400
         gold_per_barrel: 60
         auto_collect: true
         auto_collect_ticks: 40
         max_barrels: 4
       3:
-        cost: 550
+        cost: 2050
         range: 10.0
         damage: 0.0
-        cooldown: 85
+        cooldown: 340
         gold_per_barrel: 75
         auto_collect: true
         auto_collect_ticks: 40
         max_barrels: 5
       4:
-        cost: 800
+        cost: 3000
         range: 11.0
         damage: 0.0
-        cooldown: 85
+        cooldown: 340
         gold_per_barrel: 100
         auto_collect: true
         auto_collect_ticks: 40
         max_barrels: 5
     gambling:
       2:
-        cost: 500
+        cost: 1900
         range: 8.0
         damage: 0.0
-        cooldown: 120
+        cooldown: 480
         gambling: true
         despawn_ticks: 300
         max_barrels: 3
       3:
-        cost: 800
+        cost: 3000
         range: 9.0
         damage: 0.0
-        cooldown: 110
+        cooldown: 440
         gambling: true
         despawn_ticks: 260
         max_barrels: 4
       4:
-        cost: 1200
+        cost: 4500
         range: 10.0
         damage: 0.0
-        cooldown: 100
+        cooldown: 400
         gambling: true
         despawn_ticks: 220
         max_barrels: 4

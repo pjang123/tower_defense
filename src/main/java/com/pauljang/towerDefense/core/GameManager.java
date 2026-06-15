@@ -1472,6 +1472,8 @@ public class GameManager {
                 if (!(spawned instanceof org.bukkit.entity.Wither wither)) continue;
                 wither.setInvulnerable(true);
                 wither.setInvulnerabilityTicks(0);
+                // Hide the vanilla purple boss health bar; the wither is a swarm mob here, not a fight.
+                if (wither.getBossBar() != null) wither.getBossBar().setVisible(false);
                 org.bukkit.attribute.AttributeInstance scale = wither.getAttribute(org.bukkit.attribute.Attribute.SCALE);
                 if (scale != null) scale.setBaseValue(3.0); // +200% size
                 org.bukkit.attribute.AttributeInstance step = wither.getAttribute(org.bukkit.attribute.Attribute.STEP_HEIGHT);
