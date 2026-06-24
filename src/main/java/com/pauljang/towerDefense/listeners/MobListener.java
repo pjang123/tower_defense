@@ -470,7 +470,15 @@ public class MobListener implements Listener {
     @EventHandler
     public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
         org.bukkit.entity.Player player = event.getPlayer();
-        
+
+        // Ephemeral match-server container: the proxy transfers players straight into the hosted match,
+        // so route them into it instead of the lobby. GameManager handles the (async) world-not-ready
+        // race by holding them in the lobby until the match world exists.
+        if (plugin.getGameManager().isMatchServerMode()) {
+            plugin.getGameManager().handleMatchServerJoin(player);
+            return;
+        }
+
         org.bukkit.World lobbyWorld = org.bukkit.Bukkit.getWorld("lobby_world");
         org.bukkit.Location lobbySpawn = lobbyWorld != null ? lobbyWorld.getSpawnLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
         player.teleport(lobbySpawn);

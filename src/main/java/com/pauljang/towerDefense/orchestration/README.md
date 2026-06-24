@@ -54,9 +54,17 @@ Done:
 - **Velocity forwarding secret** passed through to the container (`orchestration.velocity-secret`).
 - **Velocity-side consumer** scaffolded in `velocity-plugin/` (not compile-verified offline).
 
+Done (match-server side):
+- The container **auto-starts the specific match it was provisioned for**. On boot the plugin reads
+  `TD_MATCH_ID` / `TD_MAP_ID` (`GameManager.maybeStartAsMatchServer`, called from `onEnable`),
+  resolves the `MapData`, clones that one map and waits. The Velocity proxy transfers the routed
+  players in and each is slotted into the match as they connect (`MobListener.onPlayerJoin` →
+  `GameManager.handleMatchServerJoin`); the first arrival wakes the match (ACTIVE + build-phase grace
+  + single-player waves). It then ends via the normal `[TD-LIFECYCLE] ENDED` path, so the watchdog
+  stops the server. All gated on the env vars, so the single-server lobby flow is untouched.
+
 Still required for a real deployment:
 - A live Redis + Docker host, and the match image built (`docker/match-server`).
-- The container **auto-starting the specific match it was provisioned for** — `TD_MATCH_ID` /
-  `TD_MAP_ID` env are passed in but the match-server plugin does not consume them yet, so routed
-  players currently land in that server's lobby rather than a running match.
+- Passing the routed players' **UUIDs** to the container (today only `matchId`/`mapId` are sent), so
+  the match can pre-assign teams and know its full roster instead of activating on the first join.
 - Verifying the partial `paper-global.yml` against your Paper build (see `docker/match-server`).

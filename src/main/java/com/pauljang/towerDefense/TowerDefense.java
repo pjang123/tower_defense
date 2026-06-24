@@ -84,6 +84,10 @@ public final class TowerDefense extends JavaPlugin {
         // Set the default state
         this.gameManager.setGameState(GameState.LOBBY);
 
+        // If this JVM was launched as an ephemeral match-server container (TD_MATCH_ID/TD_MAP_ID set),
+        // auto-start the requested match instead of idling in the lobby; otherwise this is a no-op.
+        this.gameManager.maybeStartAsMatchServer();
+
         getLogger().info("TowerDefense successfully enabled!");
     }
 

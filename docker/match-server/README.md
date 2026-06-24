@@ -31,6 +31,7 @@ docker run --rm -p 25565:25565 \
 | Inject plugin | `Dockerfile` | `target/tower-defense-*.jar` → `plugins/Tower_Defense.jar`. |
 | Maps | bind mount | Host `GAME_WORLD_TEMPLATES/` → `/opt/td-server/GAME_WORLD_TEMPLATES` (`:ro`). Each map is `{SINGLE_PLAYER,MULTI_PLAYER}/<id>/` with `map.yml` + world data. |
 | Velocity forwarding | `entrypoint.sh` | If `TD_VELOCITY_SECRET` is set, writes the modern-forwarding `proxies.velocity` section into `config/paper-global.yml`. |
+| Auto-start match | plugin `onEnable` | Reads `TD_MATCH_ID` / `TD_MAP_ID` (and the optional `TD_PLAYER_UUIDS` roster), resolves the map, clones it and waits. Proxy-routed players are slotted into the match as they join with their pre-assigned team; the match wakes once the full roster arrives (or on the first join when no roster was passed, or after a ~45s safety deadline). See `GameManager.maybeStartAsMatchServer`. |
 | Auto-shutdown | `entrypoint.sh` | Tails the server log; on match `ENDED`, types `stop` into the console FIFO. |
 
 ## Build args (override with `--build-arg`)

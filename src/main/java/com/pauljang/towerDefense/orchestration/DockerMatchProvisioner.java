@@ -78,6 +78,13 @@ public final class DockerMatchProvisioner implements MatchProvisioner {
         }
         cmd.add("-e"); cmd.add("TD_MATCH_ID=" + request.matchId());
         cmd.add("-e"); cmd.add("TD_MAP_ID=" + request.mapId());
+        // The routed roster (comma-separated UUIDs), so the match server can pre-assign teams and wait
+        // for everyone to arrive before starting rather than activating on the first join.
+        if (!request.players().isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (var player : request.players()) ids.add(player.toString());
+            cmd.add("-e"); cmd.add("TD_PLAYER_UUIDS=" + String.join(",", ids));
+        }
         if (velocitySecret != null && !velocitySecret.isBlank()) {
             cmd.add("-e"); cmd.add("TD_VELOCITY_SECRET=" + velocitySecret);
         }

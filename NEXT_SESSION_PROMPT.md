@@ -31,22 +31,33 @@ match container self-destructs when the game ends. The original spec was `junk/g
   `velocity-api` in the offline `.m2`); its pure-JDK files were javac-checked.
 - **Velocity forwarding secret** — `orchestration.velocity-secret` → container env
   `TD_VELOCITY_SECRET` → entrypoint writes the `proxies.velocity` section into `config/paper-global.yml`.
+- **Container auto-start (DONE this session)** — on boot the plugin reads `TD_MATCH_ID` / `TD_MAP_ID`
+  (`GameManager.maybeStartAsMatchServer`, called from `onEnable`), resolves the `MapData`, clones that
+  one map and waits in `STARTING`. Proxy-routed players are slotted into the match as they connect
+  (`MobListener.onPlayerJoin` → `GameManager.handleMatchServerJoin` →
+  `slotPlayerIntoMatchServerMatch`); the first arrival wakes the match (`activateMatchServerMatch`:
+  ACTIVE + 10s build grace + HUD + single-player waves). Handles the race where a player connects
+  before the async clone finishes (held in lobby, then slotted on world-ready). Refactor: extracted
+  `cloneMatchWorldAsync` + `prepareMatchWorld` so the lobby and match-server paths share the world
+  clone/load with no change to the lobby flow. All gated on the env vars; compiles clean.
 
-## NEXT TASK — close the container auto-start gap
-The match-server container currently boots Paper + plugin sitting in **LOBBY** state. The provisioner
-passes `TD_MATCH_ID` and `TD_MAP_ID` env vars, but the plugin never reads them, so players routed in
-land in that server's lobby instead of a running game.
+- **Routed roster pass-through (DONE this session)** — `DockerMatchProvisioner.buildRunCommand` now adds
+  `-e TD_PLAYER_UUIDS=<csv>` from `request.players()`. The plugin reads it
+  (`GameManager.parseMatchServerRoster`), pre-assigns each player their lobby-order team, and waits for
+  the full roster before waking the match — with a ~45s safety deadline (`MATCH_SERVER_PLAYER_WAIT_SECONDS`)
+  that starts with whoever showed up. Empty/absent roster falls back to first-join activation (older
+  provisioner). Compiles clean.
 
-Make the plugin, on startup **when it's running as a match server** (i.e. those env vars are present),
-read them and immediately start that specific match (resolve the `MapData` by id via `MapManager`,
-single- vs multiplayer), with players placed into it as they connect through the proxy. Relevant
-existing code: `GameManager.startMatch(List<UUID>, MapData, Difficulty)`, `QueueManager`,
-`MobListener.onPlayerJoin`, `WorldUnloadListener`. Players arrive asynchronously, so the match
-probably starts in a waiting state and players are slotted in on join.
+## NEXT TASK — finish the distributed loop (needs live infra)
+1. **Verify the partial `paper-global.yml`** against a live Paper boot (add `_version` if Paper rejects
+   it — see `docker/match-server`).
+2. **End-to-end test** with a real Redis + Docker host: lobby provisions → proxy routes → players land
+   in a running match → match ends → container self-reaps.
+3. Consider an **orchestrator-side reaper** for a container that activates but is then abandoned (all
+   players leave), or one that never gets players (the deadline logs and leaves it idle today).
 
-After that: also pass the routed players' UUIDs to the container (today only matchId/mapId go);
-verify the partial `paper-global.yml` against a live Paper boot; end-to-end test with a real Redis +
-Docker host.
+Relevant existing code: `GameManager` (match-server section after `finishMatchStartup`), `QueueManager`,
+`MobListener.onPlayerJoin`, `WorldUnloadListener`, `orchestration/DockerMatchProvisioner`.
 
 ## Constraints / environment
 - Keep `orchestration.enabled=false` the default; never break the existing single-server flow. Keep

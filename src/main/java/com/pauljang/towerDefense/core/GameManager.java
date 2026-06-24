@@ -160,17 +160,33 @@ public class GameManager {
         plugin.getLogger().info("Map is Single Player: " + mapData.isSinglePlayer());
         plugin.getLogger().info("Template directory: " + mapData.getDirectory().getAbsolutePath());
 
-        // Clone world
+        // Clone the map template into a fresh match world off-thread, then assign players, run the
+        // countdown and start the tickers back on the main thread.
+        cloneMatchWorldAsync(match, mapData,
+                (worldName, templateDir) -> finishMatchStartup(match, worldName, templateDir, playerIds, mapData));
+    }
+
+    /** Main-thread continuation invoked once a match world has been cloned to disk. */
+    @FunctionalInterface
+    private interface MatchWorldReady {
+        void onReady(String worldName, File templateDir);
+    }
+
+    /**
+     * Clones the map template into a fresh {@code match_<id>} world on an async worker — region files can
+     * be tens of megabytes, and copying them on the main thread spikes TPS every time a match starts —
+     * then hops back to the main thread to run {@code ready}. On copy failure the up-front match
+     * registration is rolled back and {@code ready} never runs. Shared by the lobby
+     * ({@link #startMatch}) and match-server ({@link #startMatchServerMatch}) start paths.
+     */
+    private void cloneMatchWorldAsync(Match match, com.pauljang.towerDefense.data.MapManager.MapData mapData,
+                                      MatchWorldReady ready) {
         final String worldName = "match_" + match.getMatchId().toString().substring(0, 8);
         final File templateDir = mapData.getDirectory();
         final File targetDir = new File(Bukkit.getWorldContainer(), worldName);
 
         plugin.getLogger().info("Cloning world from " + templateDir.getAbsolutePath() + " to " + targetDir.getAbsolutePath());
 
-        // Region files can be tens of megabytes; copying them on the main thread freezes the whole
-        // server (a hard TPS spike) every time a match starts. Do the blocking file I/O on an async
-        // worker, then hop back to the main thread for the Bukkit world/player calls, which are NOT
-        // thread-safe.
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 copyDirectory(templateDir, targetDir);
@@ -211,18 +227,19 @@ public class GameManager {
             }
 
             // Files are on disk; finish world load, teleports and tickers on the main thread.
-            Bukkit.getScheduler().runTask(plugin, () ->
-                    finishMatchStartup(match, worldName, templateDir, playerIds, mapData));
+            Bukkit.getScheduler().runTask(plugin, () -> ready.onReady(worldName, templateDir));
         });
     }
 
     /**
-     * Main-thread continuation of {@link #startMatch}, invoked once the world folder has been
-     * cloned off-thread. Everything here touches the Bukkit API (world creation, players,
-     * schedulers) and therefore must run on the main server thread.
+     * Loads the cloned match world and its map config: creates the Bukkit world, loads the template's
+     * plots/waypoints onto the match, mirrors them into the GLOBAL config (which the singleton
+     * subsystems read by world name), and resets castle health. Returns the live world, or null if it
+     * failed to load (in which case the match registration is rolled back). All Bukkit calls here run on
+     * the main thread. Shared by the lobby and match-server start paths.
      */
-    private void finishMatchStartup(Match match, String worldName, File templateDir,
-                                    List<UUID> playerIds, com.pauljang.towerDefense.data.MapManager.MapData mapData) {
+    private World prepareMatchWorld(Match match, String worldName, File templateDir,
+                                    com.pauljang.towerDefense.data.MapManager.MapData mapData) {
         // Create world with proper settings
         org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator(worldName);
         creator.environment(org.bukkit.World.Environment.NORMAL);
@@ -232,7 +249,7 @@ public class GameManager {
         if (world == null) {
             plugin.getLogger().severe("Failed to load world " + worldName);
             activeMatches.remove(match.getMatchId());
-            return;
+            return null;
         }
 
         // Configure world settings
@@ -263,6 +280,18 @@ public class GameManager {
         // Reset the global castle health used by the boss bar / holograms for the new match.
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
+        return world;
+    }
+
+    /**
+     * Main-thread continuation of {@link #startMatch}, invoked once the world folder has been
+     * cloned off-thread. Everything here touches the Bukkit API (world creation, players,
+     * schedulers) and therefore must run on the main server thread.
+     */
+    private void finishMatchStartup(Match match, String worldName, File templateDir,
+                                    List<UUID> playerIds, com.pauljang.towerDefense.data.MapManager.MapData mapData) {
+        World world = prepareMatchWorld(match, worldName, templateDir, mapData);
+        if (world == null) return; // load failed; match already rolled back
 
         // Assign players to arenas and prepare them
         for (int i = 0; i < playerIds.size(); i++) {
@@ -382,6 +411,274 @@ public class GameManager {
 
         // Single-player waves are started at grace-end (see the runTaskLater above), not here, so the
         // build phase isn't immediately overrun by the wave engine.
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // Ephemeral match-server mode
+    //
+    // When this JVM runs as a docker/match-server container, the orchestration provisioner passes the
+    // match it should host via the TD_MATCH_ID / TD_MAP_ID env vars. Rather than idling in the lobby,
+    // the plugin clones that one map and waits; the Velocity proxy transfers the routed players in, and
+    // each is slotted into the match as they connect (PlayerJoinEvent). The match wakes (build-phase
+    // grace + HUD + waves) when the first player arrives, and ends — emitting the [TD-LIFECYCLE] ENDED
+    // sentinel — exactly like a normal match, so the container watchdog stops the server and the
+    // orchestrator reaps the container. All of this is inert unless the env vars are present, so the
+    // classic single-server lobby flow is unchanged.
+    // ------------------------------------------------------------------------------------------------
+
+    private boolean matchServerMode = false;
+    private Match matchServerMatch = null;
+    private boolean matchServerActivated = false;
+    // Expected routed roster (TD_PLAYER_UUIDS), in lobby order, and each player's pre-assigned arena.
+    // Empty when the orchestrator passed no roster (older provisioner) — then the match starts on the
+    // first join instead of waiting for everyone.
+    private final java.util.List<UUID> matchServerRoster = new java.util.ArrayList<>();
+    private final Map<UUID, String> matchServerArenaByPlayer = new HashMap<>();
+    // Safety net: start with whoever showed up if some expected players never connect, so the container
+    // doesn't wait forever (and the orchestrator doesn't have to reap a stuck-waiting server).
+    private static final long MATCH_SERVER_PLAYER_WAIT_SECONDS = 45L;
+
+    /** True when this JVM was booted as an ephemeral per-match container (TD_MATCH_ID/TD_MAP_ID set). */
+    public boolean isMatchServerMode() {
+        return matchServerMode;
+    }
+
+    /**
+     * If {@code TD_MATCH_ID} / {@code TD_MAP_ID} are present this JVM is an ephemeral match-server
+     * container: resolve the requested map and start that one match immediately instead of sitting in
+     * the lobby. A no-op (the classic lobby behaviour) when the env vars are absent. Called once from
+     * {@code onEnable}, after the maps are loaded and the lobby/game worlds are set up.
+     */
+    public void maybeStartAsMatchServer() {
+        String matchId = System.getenv("TD_MATCH_ID");
+        String mapId = System.getenv("TD_MAP_ID");
+        if (matchId == null || matchId.isBlank() || mapId == null || mapId.isBlank()) {
+            return; // not a match-server container — keep the normal lobby flow
+        }
+
+        com.pauljang.towerDefense.data.MapManager.MapData map = plugin.getMapManager().getMap(mapId);
+        if (map == null) {
+            plugin.getLogger().severe("[match-server] TD_MAP_ID '" + mapId + "' did not resolve to a known map; "
+                    + "this container cannot host match " + matchId + ". Check the bind-mounted "
+                    + "GAME_WORLD_TEMPLATES and that the map id matches a template folder.");
+            return;
+        }
+
+        matchServerMode = true;
+        parseMatchServerRoster(System.getenv("TD_PLAYER_UUIDS"), map);
+        plugin.getLogger().info("[match-server] booting as ephemeral match server for match " + matchId
+                + " on map '" + map.getId() + "' (" + map.getDisplayName() + ", "
+                + (map.isSinglePlayer() ? "single-player" : "multiplayer") + "); expecting "
+                + (matchServerRoster.isEmpty() ? "an unknown number of" : String.valueOf(matchServerRoster.size()))
+                + " routed player(s).");
+        startMatchServerMatch(map);
+    }
+
+    /**
+     * Parses the {@code TD_PLAYER_UUIDS} env (comma-separated UUIDs the orchestrator routed to this
+     * container) into the expected roster, pre-assigning each player an arena using the same alternating
+     * team layout the lobby uses (single-player -> the lone arena). Tolerates a blank/absent value
+     * (older provisioner) and skips malformed entries.
+     */
+    private void parseMatchServerRoster(String csv, com.pauljang.towerDefense.data.MapManager.MapData map) {
+        matchServerRoster.clear();
+        matchServerArenaByPlayer.clear();
+        if (csv == null || csv.isBlank()) return;
+
+        int idx = 0;
+        for (String token : csv.split(",")) {
+            String t = token.trim();
+            if (t.isEmpty()) continue;
+            UUID id;
+            try {
+                id = UUID.fromString(t);
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning("[match-server] ignoring malformed UUID in TD_PLAYER_UUIDS: '" + t + "'");
+                continue;
+            }
+            matchServerRoster.add(id);
+            matchServerArenaByPlayer.put(id, map.isSinglePlayer() ? SINGLE_PLAYER_ARENA : ((idx % 2 == 0) ? "1" : "2"));
+            idx++;
+        }
+        if (!matchServerRoster.isEmpty()) {
+            plugin.getLogger().info("[match-server] routed roster: " + matchServerRoster);
+        }
+    }
+
+    /**
+     * Starts the single match this container hosts. Mirrors {@link #startMatch} (create + register the
+     * match, clone its world off-thread) but finishes into {@link #finishMatchServerStartup}, which
+     * leaves the match waiting for players rather than running a roster-driven countdown.
+     */
+    private void startMatchServerMatch(com.pauljang.towerDefense.data.MapManager.MapData mapData) {
+        Match match = new Match(plugin, mapData);
+        match.setDifficulty(Difficulty.NORMAL);
+        activeMatches.put(match.getMatchId(), match);
+        // STARTING (not ACTIVE) keeps the singleton tower/mob/economy tickers dormant until the first
+        // routed player actually arrives and wakes the match.
+        currentState = GameState.STARTING;
+
+        plugin.getLogger().info("[match-server] preparing match " + match.getMatchId() + " on map "
+                + mapData.getDisplayName() + " (single-player: " + mapData.isSinglePlayer() + ")");
+        cloneMatchWorldAsync(match, mapData,
+                (worldName, templateDir) -> finishMatchServerStartup(match, worldName, templateDir, mapData));
+    }
+
+    /**
+     * Main-thread continuation once the match-server world is cloned: load the world + config, mark the
+     * match ready, and slot in any players the proxy already routed while the world was being prepared
+     * (the proxy waits only for the TCP port, which opens before the async clone finishes). The match
+     * stays in {@code STARTING} until enough players arrive (see {@link #slotPlayerIntoMatchServerMatch}).
+     */
+    private void finishMatchServerStartup(Match match, String worldName, File templateDir,
+                                          com.pauljang.towerDefense.data.MapManager.MapData mapData) {
+        World world = prepareMatchWorld(match, worldName, templateDir, mapData);
+        if (world == null) {
+            plugin.getLogger().severe("[match-server] failed to prepare the match world; this container has "
+                    + "no match to host and will sit idle until it is reaped.");
+            return;
+        }
+        matchServerMatch = match;
+        plugin.getLogger().info("[match-server] match " + match.getMatchId() + " world ready; waiting for players.");
+
+        // Slot in everyone who connected during the (async) clone.
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            slotPlayerIntoMatchServerMatch(p);
+        }
+
+        // Safety net: if some expected players never connect, start with whoever showed up after a grace
+        // window rather than waiting forever. No-op once the match has already activated.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (matchServerActivated) return;
+            if (match.getPlayers().isEmpty()) {
+                plugin.getLogger().warning("[match-server] no players connected within "
+                        + MATCH_SERVER_PLAYER_WAIT_SECONDS + "s; leaving the match idle for the orchestrator to reap.");
+                return;
+            }
+            plugin.getLogger().warning("[match-server] starting match " + match.getMatchId() + " with "
+                    + match.getPlayers().size() + " of " + Math.max(matchServerRoster.size(), match.getPlayers().size())
+                    + " expected player(s) after a " + MATCH_SERVER_PLAYER_WAIT_SECONDS + "s wait.");
+            activateMatchServerMatch(match);
+        }, MATCH_SERVER_PLAYER_WAIT_SECONDS * 20L);
+    }
+
+    /**
+     * Routes a player who connected to a match-server container. If the match world is still being
+     * prepared they wait in the lobby world ({@link #finishMatchServerStartup} slots them in once it is
+     * ready); otherwise they are placed into the match immediately. Called from
+     * {@code MobListener.onPlayerJoin} when {@link #isMatchServerMode()}.
+     */
+    public void handleMatchServerJoin(Player player) {
+        if (matchServerMatch == null || matchServerMatch.getWorld() == null) {
+            org.bukkit.World lobby = Bukkit.getWorld("lobby_world");
+            if (lobby != null) player.teleport(lobby.getSpawnLocation());
+            player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            player.setAllowFlight(true);
+            ensureCompass(player);
+            plugin.getLogger().info("[match-server] " + player.getName() + " connected before the match world was "
+                    + "ready; holding in lobby until it is.");
+            return;
+        }
+        slotPlayerIntoMatchServerMatch(player);
+    }
+
+    /**
+     * Adds a connected player to this container's match: assigns their arena (the pre-assigned team from
+     * the routed roster, or alternating teams by arrival order for an unexpected player / no roster),
+     * teleports them to their spawn and gives them gear. Wakes the match once the full expected roster
+     * has arrived — or immediately when no roster was provided (older provisioner).
+     */
+    private void slotPlayerIntoMatchServerMatch(Player player) {
+        Match match = matchServerMatch;
+        if (match == null || match.getWorld() == null) return;
+        UUID id = player.getUniqueId();
+        if (match.getPlayers().contains(id)) return; // already slotted (e.g. re-scanned on world-ready)
+
+        String arena = matchServerArenaByPlayer.get(id);
+        if (arena == null) {
+            // Not in the routed roster (or none was passed): fall back to parity by arrival order.
+            arena = match.getMapData().isSinglePlayer()
+                    ? SINGLE_PLAYER_ARENA
+                    : (match.getPlayers().size() % 2 == 0 ? "1" : "2");
+        }
+        match.addPlayer(player, arena);
+        playerToMatch.put(id, match);
+
+        // Wake the match (and the singleton subsystems) BEFORE the teleport so tower firing / gold income
+        // are already running by the time the player is on the track. With a known roster we wait for
+        // everyone; with none, the first arrival starts it.
+        if (!matchServerActivated) {
+            boolean rosterComplete = !matchServerRoster.isEmpty()
+                    && match.getPlayers().size() >= matchServerRoster.size();
+            if (matchServerRoster.isEmpty() || rosterComplete) {
+                activateMatchServerMatch(match);
+            }
+        }
+
+        org.bukkit.Location spawn = plugin.getWaypointConfigManager().getWaypoint(match, arena, "0");
+        if (spawn != null) {
+            player.teleport(spawn);
+        } else {
+            plugin.getLogger().severe("[match-server] waypoint '0' not found for arena " + arena
+                    + "; cannot place " + player.getName() + " on the track.");
+        }
+
+        player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+        player.setAllowFlight(true);
+        player.getInventory().clear();
+        resetPlayerForMatch(player, arena);
+        giveStarterWeapons(player);
+        ensureCompass(player);
+        if (castleBossBar != null) castleBossBar.addPlayer(player);
+
+        String teamWord = "1".equals(arena) ? ChatColor.BLUE + "Blue" : ChatColor.RED + "Red";
+        player.sendMessage(ChatColor.GREEN + "Joined the match! You are on the " + teamWord + ChatColor.GREEN + " Team.");
+        player.sendTitle(ChatColor.GREEN + "GO!", ChatColor.YELLOW + "Defend your castle!", 5, 40, 10);
+        player.playSound(player.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 1.0f, 1.0f);
+        plugin.getLogger().info("[match-server] slotted " + player.getName() + " into arena " + arena
+                + " of match " + match.getMatchId());
+        updateTabNames();
+    }
+
+    /**
+     * Wakes a match-server match: drives the global state to ACTIVE (so the singleton tower/mob/economy
+     * tickers run), opens the 10s build-phase grace, shows the castle HUD, and at grace-end starts the
+     * clocks and (single-player) the wave engine. Mirrors the ACTIVE transition in
+     * {@link #finishMatchStartup}, minus the roster countdown.
+     */
+    private void activateMatchServerMatch(Match match) {
+        if (matchServerActivated) return; // already woken (roster completed or deadline fired)
+        matchServerActivated = true;
+        match.setCurrentState(GameState.ACTIVE);
+        currentState = GameState.ACTIVE;
+
+        // 10-second build-phase grace: players can place towers but cannot send mobs, and the
+        // wave/Armageddon clocks don't tick until it ends (startTimeMillis stays 0 until then).
+        final long graceMs = 10_000L;
+        match.setGraceUntil(System.currentTimeMillis() + graceMs);
+
+        showBossBar();
+        updateCastleHologram(match, "1");
+        updateCastleHologram(match, "2");
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            matchStartTime = System.currentTimeMillis();
+            match.setStartTimeMillis(matchStartTime);
+            for (UUID pid : match.getPlayers()) {
+                Player p = Bukkit.getPlayer(pid);
+                if (p == null) continue;
+                p.sendTitle(ChatColor.RED + "" + ChatColor.BOLD + "Mobs Incoming!",
+                        ChatColor.YELLOW + "The battle begins!", 5, 40, 10);
+                p.sendMessage(ChatColor.RED + "The build phase is over — mobs can now be sent!");
+            }
+            if (match.getMapData().isSinglePlayer()) {
+                plugin.getWaveManager().startWaves(match);
+            }
+            plugin.getLogger().info("[match-server] match " + match.getMatchId()
+                    + " build-phase grace ended; clocks started.");
+        }, graceMs / 50L);
+
+        plugin.getLogger().info("[match-server] match " + match.getMatchId() + " is now ACTIVE (10s build-phase grace).");
     }
 
     public void copyDirectory(File source, File target) throws java.io.IOException {
