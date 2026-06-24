@@ -89,6 +89,9 @@ public final class TowerDefense extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (this.gameManager != null && this.gameManager.getOrchestrationService() != null) {
+            this.gameManager.getOrchestrationService().close();
+        }
         if (this.mobManager != null) {
             this.mobManager.cleanup();
         }

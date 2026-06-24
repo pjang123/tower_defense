@@ -60,3 +60,27 @@ upgrades:
       level3: 450
 
 # Tower stats now live in towers.yaml
+
+# Match-server orchestration (distributed mode). When enabled, this server behaves as a lobby:
+# instead of cloning the match world in-process it runs an ephemeral Docker match server per game
+# (the docker/match-server image) and publishes a route message on Redis so the Velocity proxy
+# transfers the players. Default off — the plugin keeps the classic single-server flow.
+orchestration:
+  enabled: false
+  # Image tag built from docker/match-server/Dockerfile.
+  match-image: "td-match:latest"
+  # Host directory holding the map templates (GAME_WORLD_TEMPLATES/{SINGLE_PLAYER,MULTI_PLAYER}/...).
+  # Bind-mounted read-only into each match container, so you can edit maps and drop them in without
+  # rebuilding the image. Must be a path the Docker daemon can see; relative paths resolve from the
+  # server's working directory.
+  maps-dir: "GAME_WORLD_TEMPLATES"
+  # Shared secret for Velocity modern forwarding; must match the proxy's forwarding.secret.
+  # Blank = standalone (no proxy forwarding).
+  velocity-secret: ""
+  # Seconds to wait for a freshly started match server to accept connections before giving up.
+  boot-timeout-seconds: 120
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    # Leave blank for no AUTH.
+    password: ""

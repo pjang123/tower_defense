@@ -1,0 +1,4 @@
+# Shell scripts must keep LF endings or bash in the Linux container fails to run them.
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+stage-maps.sh text eol=lf

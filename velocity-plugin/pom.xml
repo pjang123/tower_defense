@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Velocity-side consumer for Tower Defense match routing.
+
+  SEPARATE artifact from the Paper plugin: it depends on velocity-api, not paper-api, and runs on
+  the proxy, not a game server. It is NOT part of the main build.
+
+  NOT COMPILE-VERIFIED in this repo's offline environment (no velocity-api in ~/.m2). Adjust the
+  velocity-api version to match your proxy, then `mvn -f velocity-plugin/pom.xml package`.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.pauljang</groupId>
+    <artifactId>td-router</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>td-router</name>
+
+    <properties>
+        <!-- Velocity 3.3+ requires Java 17. -->
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.velocitypowered</groupId>
+            <!-- velocity-api bundles the annotation processor that generates velocity-plugin.json
+                 from the @Plugin annotation, so no plugin descriptor file is needed. -->
+            <artifactId>velocity-api</artifactId>
+            <version>3.3.0-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

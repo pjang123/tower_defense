@@ -26,6 +26,7 @@ import org.bukkit.entity.ArmorStand;
 
 public class GameManager {
     private final TowerDefense plugin;
+    private final com.pauljang.towerDefense.orchestration.OrchestrationService orchestration;
     
     // Concurrent match management
     private final Map<UUID, Match> activeMatches = new HashMap<>();
@@ -134,6 +135,16 @@ public class GameManager {
 
     public void startMatch(List<UUID> playerIds, com.pauljang.towerDefense.data.MapManager.MapData mapData,
                            Difficulty difficulty) {
+        // Match-server orchestration: when enabled, this lobby does not run the match in-process — it
+        // provisions an ephemeral container and signals the proxy to route the players there instead of
+        // cloning the world locally below. Default-off, so the classic single-server flow is unchanged.
+        if (orchestration.isEnabled()) {
+            String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
+            plugin.getLogger().info("[orchestration] delegating match " + matchId + " (" + mapData.getId()
+                    + ") to a container for " + playerIds.size() + " player(s)");
+            orchestration.provisionAndRoute(matchId, mapData.getId(), mapData.isSinglePlayer(), playerIds);
+            return;
+        }
         Match match = new Match(plugin, mapData);
         // Set before any addPlayer call so starting gold is scaled for the chosen difficulty.
         match.setDifficulty(difficulty);
@@ -403,6 +414,18 @@ public class GameManager {
         this.plugin = plugin;
         this.maxCastleHealth = plugin.getConfig().getInt("game.max-castle-health", 1000);
         this.matchSize = Math.max(2, plugin.getConfig().getInt("game.players-per-match", 8));
+        // Match-server orchestration. Read with code-level defaults so existing config.yml files
+        // (which predate these keys) need no migration; default enabled=false keeps the local flow.
+        this.orchestration = new com.pauljang.towerDefense.orchestration.OrchestrationService(
+                plugin.getConfig().getBoolean("orchestration.enabled", false),
+                plugin.getConfig().getString("orchestration.match-image", "td-match:latest"),
+                plugin.getConfig().getString("orchestration.maps-dir", "GAME_WORLD_TEMPLATES"),
+                plugin.getConfig().getString("orchestration.velocity-secret", ""),
+                plugin.getConfig().getString("orchestration.redis.host", "127.0.0.1"),
+                plugin.getConfig().getInt("orchestration.redis.port", 6379),
+                plugin.getConfig().getString("orchestration.redis.password", ""),
+                plugin.getConfig().getInt("orchestration.boot-timeout-seconds", 120),
+                plugin.getLogger());
         arenaHealth.put("1", maxCastleHealth);
         arenaHealth.put("2", maxCastleHealth);
         
@@ -514,6 +537,10 @@ public class GameManager {
 
     public GameState getCurrentState() {
         return currentState;
+    }
+
+    public com.pauljang.towerDefense.orchestration.OrchestrationService getOrchestrationService() {
+        return orchestration;
     }
 
     public int getCastleHealth() {
@@ -1592,6 +1619,12 @@ public class GameManager {
     private void handleMatchEnd(Match match, String winnerArenaOverride) {
         if (match == null) return;
         if (!finishedMatches.add(match.getMatchId())) return; // already handled
+
+        // Lifecycle sentinel for the ephemeral match-server container (docker/match-server):
+        // the entrypoint watchdog tails the log for this exact marker and gracefully stops the
+        // server once the match is over. Placed right after the once-only guard above so it fires
+        // exactly once per match, for every end path (castle defeat + forfeit, single/multiplayer).
+        plugin.getLogger().info("[TD-LIFECYCLE] ENDED matchId=" + match.getMatchId());
 
         match.setEndTimeMillis(System.currentTimeMillis());
         long durationSec = getMatchElapsedSeconds(match);
