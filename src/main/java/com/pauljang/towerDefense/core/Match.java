@@ -16,6 +16,7 @@ public class Match {
     private final TowerDefense plugin;
     private GameState currentState = GameState.STARTING;
     private final MapManager.MapData mapData;
+    private Difficulty difficulty = Difficulty.NORMAL;
     private World world;
     
     private final List<UUID> players = new ArrayList<>();
@@ -68,6 +69,8 @@ public class Match {
     public GameState getCurrentState() { return currentState; }
     public void setCurrentState(GameState currentState) { this.currentState = currentState; }
     public MapManager.MapData getMapData() { return mapData; }
+    public Difficulty getDifficulty() { return difficulty; }
+    public void setDifficulty(Difficulty difficulty) { this.difficulty = difficulty; }
     public World getWorld() { return world; }
     public void setWorld(World world) { this.world = world; }
     
@@ -110,7 +113,8 @@ public class Match {
     public void addPlayer(Player player, String arena) {
         players.add(player.getUniqueId());
         playerArenas.put(player.getUniqueId(), arena);
-        playerGold.put(player.getUniqueId(), plugin.getConfig().getInt("game.starting-gold", 100));
+        int baseGold = plugin.getConfig().getInt("game.starting-gold", 100);
+        playerGold.put(player.getUniqueId(), difficulty.scaleGold(baseGold));
         playerExp.put(player.getUniqueId(), 0);
     }
 }

@@ -522,6 +522,19 @@ public class MobListener implements Listener {
     }
 
     @EventHandler
+    public void onInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        // If a single-player player escapes the difficulty picker without choosing, clear the pending
+        // map selection so they aren't stranded (chooseDifficulty clears it first, so a real pick here
+        // is a no-op).
+        if (!(event.getInventory().getHolder() instanceof TDMenuHolder holder)) return;
+        if (holder.getType() != MenuType.CHOOSE_DIFFICULTY) return;
+        if (!(event.getPlayer() instanceof org.bukkit.entity.Player player)) return;
+        if (plugin.getQueueManager().isPickingDifficulty(player.getUniqueId())) {
+            plugin.getQueueManager().cancelDifficultySelection(player);
+        }
+    }
+
+    @EventHandler
     public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
         if (isLobbyCompass(event.getCurrentItem()) || isLobbyCompass(event.getCursor())) {
             event.setCancelled(true);
@@ -605,6 +618,20 @@ public class MobListener implements Listener {
                     session.castVote(player.getUniqueId(), mapIndex);
                     player.sendMessage(org.bukkit.ChatColor.GREEN + "Vote cast!");
                 }
+            }
+            return;
+        }
+
+        // Single-player difficulty picker (shown after the map vote)
+        if (menuType == MenuType.CHOOSE_DIFFICULTY) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+            if (clickedItem == null || clickedItem.getType() == org.bukkit.Material.AIR) return;
+
+            com.pauljang.towerDefense.core.Difficulty difficulty =
+                    com.pauljang.towerDefense.core.Difficulty.fromGuiSlot(event.getRawSlot());
+            if (difficulty != null) {
+                plugin.getQueueManager().chooseDifficulty(player, difficulty);
             }
             return;
         }

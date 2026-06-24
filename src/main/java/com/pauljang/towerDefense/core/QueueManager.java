@@ -19,6 +19,8 @@ public class QueueManager {
     private final List<UUID> multiPlayerQueue = new ArrayList<>();
     
     private final Map<UUID, VotingSession> activeVotes = new HashMap<>();
+    // Single-player players who have won a map vote and are picking a difficulty before the match starts.
+    private final Map<UUID, MapManager.MapData> pendingDifficulty = new HashMap<>();
 
     public QueueManager(TowerDefense plugin) {
         this.plugin = plugin;
@@ -151,6 +153,65 @@ public class QueueManager {
 
     public VotingSession getSession(UUID uuid) {
         return activeVotes.get(uuid);
+    }
+
+    /**
+     * Opens the single-player difficulty picker for {@code player} after they've settled on a map.
+     * The chosen map is held in {@link #pendingDifficulty} until they click a difficulty in
+     * {@link #chooseDifficulty}, which actually starts the match.
+     */
+    public void openDifficultyGUI(Player player, MapManager.MapData map) {
+        pendingDifficulty.put(player.getUniqueId(), map);
+
+        com.pauljang.towerDefense.ui.TDMenuHolder holder =
+                new com.pauljang.towerDefense.ui.TDMenuHolder(com.pauljang.towerDefense.ui.TDMenuHolder.MenuType.CHOOSE_DIFFICULTY);
+        Inventory gui = Bukkit.createInventory(holder, 27, ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "Choose Difficulty");
+        holder.setInventory(gui);
+
+        ItemStack border = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta borderMeta = border.getItemMeta();
+        if (borderMeta != null) { borderMeta.setDisplayName(" "); border.setItemMeta(borderMeta); }
+        for (int i = 0; i < 27; i++) gui.setItem(i, border);
+
+        for (Difficulty d : Difficulty.values()) {
+            ItemStack item = new ItemStack(d.getIcon());
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                meta.setDisplayName(d.getColor() + "" + ChatColor.BOLD + d.getDisplayName());
+                meta.setLore(Arrays.asList(
+                        ChatColor.GRAY + d.getLoreLine1(),
+                        ChatColor.GRAY + d.getLoreLine2(),
+                        "",
+                        ChatColor.YELLOW + "Click to play on " + d.getColoredName() + ChatColor.YELLOW + "!"));
+                item.setItemMeta(meta);
+            }
+            gui.setItem(d.getGuiSlot(), item);
+        }
+
+        player.openInventory(gui);
+    }
+
+    /** True while {@code player} is on the difficulty-picker screen with a pending map selection. */
+    public boolean isPickingDifficulty(UUID uuid) {
+        return pendingDifficulty.containsKey(uuid);
+    }
+
+    /** Drops a pending difficulty selection (player escaped the picker) and returns them to the lobby. */
+    public void cancelDifficultySelection(Player player) {
+        if (pendingDifficulty.remove(player.getUniqueId()) != null) {
+            player.sendMessage(ChatColor.YELLOW + "Match cancelled. Click Single Player to queue again.");
+        }
+    }
+
+    /** Locks in the chosen difficulty and starts the player's single-player match. */
+    public void chooseDifficulty(Player player, Difficulty difficulty) {
+        MapManager.MapData map = pendingDifficulty.remove(player.getUniqueId());
+        if (map == null) return; // stale click (e.g. match already starting)
+
+        player.closeInventory();
+        player.sendMessage(ChatColor.GREEN + "Difficulty: " + difficulty.getColoredName());
+        plugin.getGameManager().startMatch(
+                new ArrayList<>(Collections.singletonList(player.getUniqueId())), map, difficulty);
     }
 
     /**
@@ -288,6 +349,16 @@ public class QueueManager {
                     p.closeInventory();
                     removeVoteItem(p); // entering a match — the queue vote item is no longer needed
                     p.sendMessage(ChatColor.GREEN + "Map selected: " + winner.getDisplayName());
+                }
+            }
+
+            // Single player: let the lone player pick a difficulty before the match starts. The match
+            // is launched from chooseDifficulty once they click. Multiplayer always runs on NORMAL.
+            if (singlePlayer) {
+                Player p = Bukkit.getPlayer(participants.get(0));
+                if (p != null) {
+                    openDifficultyGUI(p, winner);
+                    return;
                 }
             }
 

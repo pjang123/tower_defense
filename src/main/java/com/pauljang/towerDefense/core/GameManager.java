@@ -129,7 +129,14 @@ public class GameManager {
     }
 
     public void startMatch(List<UUID> playerIds, com.pauljang.towerDefense.data.MapManager.MapData mapData) {
+        startMatch(playerIds, mapData, Difficulty.NORMAL);
+    }
+
+    public void startMatch(List<UUID> playerIds, com.pauljang.towerDefense.data.MapManager.MapData mapData,
+                           Difficulty difficulty) {
         Match match = new Match(plugin, mapData);
+        // Set before any addPlayer call so starting gold is scaled for the chosen difficulty.
+        match.setDifficulty(difficulty);
         activeMatches.put(match.getMatchId(), match);
 
         // The singleton subsystems (tower firing in TowerManager, mob combat/gold in MobListener,

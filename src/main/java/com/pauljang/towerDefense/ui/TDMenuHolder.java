@@ -14,6 +14,7 @@ public class TDMenuHolder implements InventoryHolder {
     public enum MenuType {
         OPEN_GAMES,
         VOTE_MAP,
+        CHOOSE_DIFFICULTY,
         MOB_SPAWNER,
         MOB_TIER,
         BUY_TOWER,

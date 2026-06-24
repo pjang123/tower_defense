@@ -138,7 +138,9 @@ public class WaveManager {
 
                 final String finalChain = chain;
                 final int finalTier = tier;
-                
+                // Scale the swarm size to the match's chosen difficulty (EASY thins it, HARD bulks it).
+                final int finalCount = match.getDifficulty().scaleCount(count);
+
                 new BukkitRunnable() {
                     int spawned = 0;
                     @Override
@@ -151,7 +153,7 @@ public class WaveManager {
                         plugin.getMobManager().spawnMobByChain(match, GameManager.SINGLE_PLAYER_ARENA, finalChain, finalTier);
                         spawned++;
 
-                        if (spawned >= count) {
+                        if (spawned >= finalCount) {
                             cancel();
                             finishedGroups[0]++;
                             if (finishedGroups[0] >= totalGroups) {
