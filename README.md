@@ -1,4 +1,3 @@
-cat > ~/tower_defense/README.md << 'ENDOFREADME'
 # Tower Defense — Distributed Minecraft Gamemode
 
 A multiplayer tower defense gamemode for Minecraft (PaperMC), re-architected from a single-server
