@@ -9,3 +9,8 @@ commands:
   td:
       description: Main command for Tower Defense
       usage: /td [start/stop/status]
+
+permissions:
+  towerdefense.admin:
+    description: Grants access to Tower Defense admin and map-setup commands
+    default: op

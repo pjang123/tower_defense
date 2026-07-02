@@ -29,6 +29,17 @@ public class WandListener implements Listener {
         startPreviewTask();
     }
 
+    /**
+     * The wand is authenticated by its PersistentDataContainer tag (set in {@code /td wand}), never by
+     * its display name — players can rename items at an anvil, so a name check would be forgeable.
+     */
+    private static boolean isSetupWand(ItemStack item) {
+        if (item == null || item.getType() != Material.BLAZE_ROD || !item.hasItemMeta()) return false;
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer()
+                .has(com.pauljang.towerDefense.TDKeys.SETUP_WAND, org.bukkit.persistence.PersistentDataType.BYTE);
+    }
+
     private void startPreviewTask() {
         org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
@@ -37,10 +48,8 @@ public class WandListener implements Listener {
                 
                 // If they are holding the wand
                 ItemStack item = player.getInventory().getItemInMainHand();
-                if (item != null && item.getType() == Material.BLAZE_ROD && item.hasItemMeta()) {
-                    org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
-                    if (meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("TD Setup Wand")) {
-                        
+                if (isSetupWand(item)) {
+
                         if (state == SetupState.AWAITING_PLOT) {
                             org.bukkit.block.Block targetBlock = player.getTargetBlockExact(15);
                             if (targetBlock != null && targetBlock.getType() != Material.AIR) {
@@ -63,8 +72,6 @@ public class WandListener implements Listener {
                             String arena = sm.getEditingArena(player.getUniqueId());
                             drawWaypointGraphHighlight(player, arena);
                         }
-                        
-                    }
                 }
             }
         }, 0L, 5L); // every 250ms
@@ -192,10 +199,7 @@ public class WandListener implements Listener {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
 
-        if (item == null || item.getType() != Material.BLAZE_ROD || !item.hasItemMeta()) return;
-        
-        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
-        if (!meta.hasDisplayName() || !meta.getDisplayName().contains("TD Setup Wand")) return;
+        if (!isSetupWand(item)) return;
 
         event.setCancelled(true);
         Action action = event.getAction();
@@ -341,12 +345,7 @@ public class WandListener implements Listener {
         if (event.getClickedBlock() == null) return;
 
         ItemStack item = event.getItem();
-        if (item != null && item.getType() == Material.BLAZE_ROD && item.hasItemMeta()) {
-            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
-            if (meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("TD Setup Wand")) {
-                return;
-            }
-        }
+        if (isSetupWand(item)) return;
 
         Location clickedLoc = event.getClickedBlock().getLocation();
         String plotId = plugin.getPlotConfigManager().getPlotAt(clickedLoc);

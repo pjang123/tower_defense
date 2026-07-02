@@ -178,6 +178,10 @@ public class TDCommand implements CommandExecutor {
                     player.sendMessage(ChatColor.RED + "Usage: /td loadworld <worldname>");
                     break;
                 }
+                if (!isSafeWorldName(args[1])) {
+                    player.sendMessage(ChatColor.RED + "Invalid world name. Use only letters, digits, '.', '_' and '-'.");
+                    break;
+                }
                 loadWorld(player, args[1]);
                 break;
 
@@ -188,6 +192,10 @@ public class TDCommand implements CommandExecutor {
                 }
                 if (args.length < 2) {
                     player.sendMessage(ChatColor.RED + "Usage: /td unloadworld <worldname>");
+                    break;
+                }
+                if (!isSafeWorldName(args[1])) {
+                    player.sendMessage(ChatColor.RED + "Invalid world name. Use only letters, digits, '.', '_' and '-'.");
                     break;
                 }
                 unloadWorld(player, args[1]);
@@ -437,11 +445,19 @@ public class TDCommand implements CommandExecutor {
     private void saveMapConfig(Player player) {
         org.bukkit.World world = player.getWorld();
         File worldFolder = world.getWorldFolder();
-        
-        // Verify we are inside the GAME_WORLD_TEMPLATES structure
-        if (!worldFolder.getAbsolutePath().contains("GAME_WORLD_TEMPLATES")) {
-            player.sendMessage(ChatColor.RED + "Error: This world is not inside the GAME_WORLD_TEMPLATES folder!");
-            player.sendMessage(ChatColor.GRAY + "Move your world folder to GAME_WORLD_TEMPLATES/SINGLE_PLAYER/<name> or MULTI_PLAYER/<name> first.");
+
+        // Verify we are inside the GAME_WORLD_TEMPLATES structure. Compare canonical paths rather than
+        // a substring so a folder that merely *mentions* the templates dir in its name can't pass.
+        try {
+            File templatesRoot = new File(plugin.getDataFolder().getParentFile().getParentFile(), "GAME_WORLD_TEMPLATES");
+            String rootPath = templatesRoot.getCanonicalPath() + File.separator;
+            if (!worldFolder.getCanonicalPath().startsWith(rootPath)) {
+                player.sendMessage(ChatColor.RED + "Error: This world is not inside the GAME_WORLD_TEMPLATES folder!");
+                player.sendMessage(ChatColor.GRAY + "Move your world folder to GAME_WORLD_TEMPLATES/SINGLE_PLAYER/<name> or MULTI_PLAYER/<name> first.");
+                return;
+            }
+        } catch (java.io.IOException e) {
+            player.sendMessage(ChatColor.RED + "Error: could not resolve the world folder path: " + e.getMessage());
             return;
         }
 
@@ -572,6 +588,17 @@ public class TDCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "Error loading world: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    /**
+     * A world name arriving from chat is used as a file-system path component in copy AND recursive
+     * force-delete operations, so it must stay a single safe path segment: no separators, no drive
+     * letters, no ".." traversal. Rejecting here protects every downstream File(...) built from it.
+     */
+    private boolean isSafeWorldName(String name) {
+        return name.length() <= 64
+                && name.matches("[A-Za-z0-9][A-Za-z0-9._-]*")
+                && !name.contains("..");
     }
 
     /**
@@ -831,6 +858,9 @@ public class TDCommand implements CommandExecutor {
         org.bukkit.inventory.meta.ItemMeta meta = wand.getItemMeta();
         meta.setDisplayName(ChatColor.GOLD + "TD Setup Wand");
         meta.setLore(java.util.Arrays.asList(ChatColor.YELLOW + "Admin Tool"));
+        // PDC tag is what the listeners authenticate on — a renamed blaze rod must never pass.
+        meta.getPersistentDataContainer().set(com.pauljang.towerDefense.TDKeys.SETUP_WAND,
+                org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
         wand.setItemMeta(meta);
         player.getInventory().addItem(wand);
         player.sendMessage(ChatColor.GREEN + "Gave Setup Wand!");

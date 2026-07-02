@@ -38,6 +38,8 @@ public final class TDKeys {
     public static NamespacedKey EVOKER_SHIELD;
     /** plotId of the Bombardier tower that owns a deployed landmine ArmorStand. */
     public static NamespacedKey LANDMINE_OWNER;
+    /** Marks the admin Setup Wand item; checked instead of the (player-forgeable) display name. */
+    public static NamespacedKey SETUP_WAND;
 
     /** Builds every key against the owning plugin. Call once from {@code onEnable}. */
     public static void init(Plugin plugin) {
@@ -61,5 +63,6 @@ public final class TDKeys {
         QUEUE_VOTE_ITEM = new NamespacedKey(plugin, "td_queue_vote_item");
         EVOKER_SHIELD = new NamespacedKey(plugin, "td_evoker_shield");
         LANDMINE_OWNER = new NamespacedKey(plugin, "td_landmine_owner");
+        SETUP_WAND = new NamespacedKey(plugin, "td_setup_wand");
     }
 }
